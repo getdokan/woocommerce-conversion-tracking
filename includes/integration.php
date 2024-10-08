@@ -109,10 +109,18 @@ class WeDevs_WC_Tracking_Integration extends WC_Integration {
      * @param int $post_id
      */
     function product_options_save( $post_id ) {
-
         if ( isset( $_POST['_wc_conv_track'] ) ) {
             $value = trim( sanitize_text_field( wp_unslash( $_POST['_wc_conv_track'] ) ) );
-            update_post_meta( $post_id, '_wc_conv_track', $value );
+
+            if ( wcct_is_hpos_enabled() ) {
+                $product = wc_get_product( $post_id );
+                if ( $product ) {
+                    $product->update_meta_data( '_wc_conv_track', $value );
+                    $product->save();
+                }
+            } else {
+                update_post_meta( $post_id, '_wc_conv_track', $value );
+            }
         }
     }
 
@@ -225,24 +233,53 @@ class WeDevs_WC_Tracking_Integration extends WC_Integration {
     public function thankyou_page( $order_id ) {
         $order = wc_get_order( $order_id );
 
-        if ( $items = $order->get_items() ) {
-            foreach ( $items as $item ) {
-                $product = $order->get_product_from_item( $item );
+        error_log( print_r( $order, true ) );
 
-                if ( ! $product ) {
-                    continue;
-                }
+        if ( ! $order ) {
+            return;
+        }
 
-                $code = get_post_meta( $product->get_id(), '_wc_conv_track', true );
+        /**
+         * @var WC_Order_Item_Product $item
+         */
+        foreach ( $order->get_items() as $item ) {
+            $product = $item->get_product();
 
-                if ( empty( $code ) ) {
-                    continue;
-                }
-
-                echo $this->print_conversion_code( $this->process_product_markdown( $code, $product ) );
+            if ( ! $product ) {
+                continue;
             }
+
+            $code = $this->get_product_conversion_code( $product->get_id() );
+
+            if ( empty( $code ) ) {
+                continue;
+            }
+
+            echo $this->print_conversion_code( $this->process_product_markdown( $code, $product ) );
         }
     }
+
+    /**
+     * Get product conversion code
+     *
+     * @param  int $product_id
+     *
+     * @return string
+     */
+    private function get_product_conversion_code( $product_id ) {
+        $product = wc_get_product( $product_id );
+
+        if ( ! $product ) {
+            return '';
+        }
+
+        if ( wcct_is_hpos_enabled() ) {
+            return $product->get_meta( '_wc_conv_track' );
+        } else {
+            return get_post_meta( $product_id, '_wc_conv_track', true );
+        }
+    }
+
 
     /**
      * Registration code print handler
@@ -258,16 +295,20 @@ class WeDevs_WC_Tracking_Integration extends WC_Integration {
      *
      * @param string $code
      *
-     * @return void
+     * @return string
      */
     function print_conversion_code( $code ) {
         if ( $code == '' ) {
-            return;
+            return '';
         }
+
+        ob_start();
 
         echo "<!-- Tracking pixel by WooCommerce Conversion Tracking plugin by Tareq Hasan -->\n";
         echo $code;
         echo "\n<!-- Tracking pixel by WooCommerce Conversion Tracking plugin -->\n";
+
+        return ob_get_clean();
     }
 
     /**
@@ -293,8 +334,7 @@ class WeDevs_WC_Tracking_Integration extends WC_Integration {
             return $code;
         }
 
-        if ( version_compare( WC()->version, '3.0', '<' ) ) {
-            // older version
+        if ( version_compare( WC()->version, '3.0', '<=' ) ) {
             $order_currency = $order->get_order_currency();
             $payment_method = $order->payment_method;
 
@@ -303,9 +343,15 @@ class WeDevs_WC_Tracking_Integration extends WC_Integration {
             $payment_method = $order->get_payment_method();
         }
 
+        if ( version_compare( WC()->version, '3.7', '<=' ) ) {
+            $used_coupons = $order->get_used_coupons();
+
+        } else {
+            $used_coupons = $order->get_coupon_codes();
+        }
+
         $customer       = $order->get_user();
-        $used_coupons   = $order->get_used_coupons() ? implode( ',', $order->get_used_coupons() ) : '';
-        $order_currency = $order_currency;
+        $used_coupons   = implode( ',', $order->$used_coupons() );
         $order_total    = $order->get_total();
         $order_number   = $order->get_order_number();
         $order_subtotal = $order->get_subtotal();
