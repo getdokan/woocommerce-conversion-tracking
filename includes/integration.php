@@ -267,11 +267,7 @@ class WeDevs_WC_Tracking_Integration extends WC_Integration {
             return '';
         }
 
-        if ( wcct_is_hpos_enabled() ) {
-            return $product->get_meta( '_wc_conv_track' );
-        } else {
-            return get_post_meta( $product_id, '_wc_conv_track', true );
-        }
+	    return $product->get_meta( '_wc_conv_track' );
     }
 
 
@@ -345,7 +341,7 @@ class WeDevs_WC_Tracking_Integration extends WC_Integration {
         }
 
         $customer       = $order->get_user();
-        $used_coupons   = implode( ',', $order->$used_coupons() );
+        $used_coupons   = implode( ',', $used_coupons );
         $order_total    = $order->get_total();
         $order_number   = $order->get_order_number();
         $order_subtotal = $order->get_subtotal();
