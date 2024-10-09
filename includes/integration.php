@@ -112,15 +112,11 @@ class WeDevs_WC_Tracking_Integration extends WC_Integration {
         if ( isset( $_POST['_wc_conv_track'] ) ) {
             $value = trim( sanitize_text_field( wp_unslash( $_POST['_wc_conv_track'] ) ) );
 
-            if ( wcct_is_hpos_enabled() ) {
-                $product = wc_get_product( $post_id );
-                if ( $product ) {
-                    $product->update_meta_data( '_wc_conv_track', $value );
-                    $product->save();
-                }
-            } else {
-                update_post_meta( $post_id, '_wc_conv_track', $value );
-            }
+	        $product = wc_get_product( $post_id );
+	        if ( $product ) {
+		        $product->update_meta_data( '_wc_conv_track', $value );
+		        $product->save();
+	        }
         }
     }
 
@@ -232,8 +228,6 @@ class WeDevs_WC_Tracking_Integration extends WC_Integration {
      */
     public function thankyou_page( $order_id ) {
         $order = wc_get_order( $order_id );
-
-        error_log( print_r( $order, true ) );
 
         if ( ! $order ) {
             return;
