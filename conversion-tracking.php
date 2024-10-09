@@ -259,8 +259,10 @@ class WeDevs_WC_Conversion_Tracking {
 
 	/**
 	 * Add High Performance Order Storage Support
+     *
+     * @see https://developer.woocommerce.com/docs/hpos-extension-recipe-book/
 	 *
-	 * @since 2.0.11
+	 * @since 2.1.0
 	 *
 	 * @return void
 	 */
