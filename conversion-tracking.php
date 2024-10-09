@@ -372,12 +372,3 @@ wcct_init();
 function wcct_manage_cap() {
     return apply_filters( 'wcct_capability', 'manage_options' );
 }
-
-/**
- * Check if HPOS is enabled
- *
- * @return bool
- */
-function wcct_is_hpos_enabled() {
-    return class_exists( \Automattic\WooCommerce\Utilities\OrderUtil::class ) && \Automattic\WooCommerce\Utilities\OrderUtil::custom_orders_table_usage_is_enabled();
-}
