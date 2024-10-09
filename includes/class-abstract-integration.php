@@ -80,7 +80,7 @@ abstract class WCCT_Integration {
     public function is_enabled() {
         $settings = $this->get_integration_settings();
 
-        if ( $settings && (boolean) $settings[ 'enabled' ] ) {
+        if ( $settings && wc_string_to_bool($settings[ 'enabled' ]) ) {
             return true;
         }
 
