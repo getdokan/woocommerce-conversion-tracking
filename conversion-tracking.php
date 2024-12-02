@@ -246,7 +246,7 @@ class WeDevs_WC_Conversion_Tracking {
      * @return void
      */
     public function init_tracker() {
-        $client = new Appsero\Client(
+        $client = new WeDevs_WC_Conversion_Tracking\Dependencies\Appsero\Client(
             '6816029d-7d48-4ed3-8ae4-aeb6a9496f21',
             'WooCommerce Conversion Tracking',
             __FILE__
