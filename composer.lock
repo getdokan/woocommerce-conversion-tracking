@@ -4,20 +4,20 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "020c3e2eb5daf03159e6438f208d8cc4",
+    "content-hash": "a54827de221253a0c8a17edfa018dba9",
     "packages": [
         {
             "name": "appsero/client",
-            "version": "v2.0.1",
+            "version": "v2.0.4",
             "source": {
                 "type": "git",
                 "url": "https://github.com/Appsero/client.git",
-                "reference": "b87e7593c6295748e88cdbfc92a638c8a73462ce"
+                "reference": "12ff65b9770286d21edf314e7acfcd26fdde3315"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/Appsero/client/zipball/b87e7593c6295748e88cdbfc92a638c8a73462ce",
-                "reference": "b87e7593c6295748e88cdbfc92a638c8a73462ce",
+                "url": "https://api.github.com/repos/Appsero/client/zipball/12ff65b9770286d21edf314e7acfcd26fdde3315",
+                "reference": "12ff65b9770286d21edf314e7acfcd26fdde3315",
                 "shasum": ""
             },
             "require": {
@@ -56,9 +56,9 @@
             ],
             "support": {
                 "issues": "https://github.com/Appsero/client/issues",
-                "source": "https://github.com/Appsero/client/tree/v2.0.1"
+                "source": "https://github.com/Appsero/client/tree/v2.0.4"
             },
-            "time": "2024-01-16T11:20:48+00:00"
+            "time": "2024-11-25T05:58:23+00:00"
         },
         {
             "name": "composer/installers",
@@ -348,12 +348,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/sirbrillig/phpcs-variable-analysis.git",
-                "reference": "02703669a3780f6c9b293bfe6294cfb359264b10"
+                "reference": "c3780f281e2e82ab1f2de7fa85a16532b1e44592"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/sirbrillig/phpcs-variable-analysis/zipball/02703669a3780f6c9b293bfe6294cfb359264b10",
-                "reference": "02703669a3780f6c9b293bfe6294cfb359264b10",
+                "url": "https://api.github.com/repos/sirbrillig/phpcs-variable-analysis/zipball/c3780f281e2e82ab1f2de7fa85a16532b1e44592",
+                "reference": "c3780f281e2e82ab1f2de7fa85a16532b1e44592",
                 "shasum": ""
             },
             "require": {
@@ -364,9 +364,9 @@
                 "dealerdirect/phpcodesniffer-composer-installer": "^0.7 || ^1.0",
                 "phpcsstandards/phpcsdevcs": "^1.1",
                 "phpstan/phpstan": "^1.7",
-                "phpunit/phpunit": "^4.8.36 || ^5.7.21 || ^6.5 || ^7.0 || ^8.0 || ^9.0",
+                "phpunit/phpunit": "^4.8.36 || ^5.7.21 || ^6.5 || ^7.0 || ^8.0 || ^9.0 || ^10.5.32 || ^11.3.3",
                 "sirbrillig/phpcs-import-detection": "^1.1",
-                "vimeo/psalm": "^0.2 || ^0.3 || ^1.1 || ^4.24 || ^5.0@beta"
+                "vimeo/psalm": "^0.2 || ^0.3 || ^1.1 || ^4.24 || ^5.0"
             },
             "default-branch": true,
             "type": "phpcodesniffer-standard",
@@ -399,7 +399,7 @@
                 "source": "https://github.com/sirbrillig/phpcs-variable-analysis",
                 "wiki": "https://github.com/sirbrillig/phpcs-variable-analysis/wiki"
             },
-            "time": "2023-12-07T16:24:19+00:00"
+            "time": "2024-12-01T22:31:44+00:00"
         },
         {
             "name": "squizlabs/php_codesniffer",
@@ -407,12 +407,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/PHPCSStandards/PHP_CodeSniffer.git",
-                "reference": "ff2765d764b8feac7d9c7c71f5948d679d44a3a8"
+                "reference": "daf63d979a68251d6a8a12152fc667b3a28361a4"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/PHPCSStandards/PHP_CodeSniffer/zipball/ff2765d764b8feac7d9c7c71f5948d679d44a3a8",
-                "reference": "ff2765d764b8feac7d9c7c71f5948d679d44a3a8",
+                "url": "https://api.github.com/repos/PHPCSStandards/PHP_CodeSniffer/zipball/daf63d979a68251d6a8a12152fc667b3a28361a4",
+                "reference": "daf63d979a68251d6a8a12152fc667b3a28361a4",
                 "shasum": ""
             },
             "require": {
@@ -480,7 +480,7 @@
                     "type": "open_collective"
                 }
             ],
-            "time": "2024-01-15T09:13:36+00:00"
+            "time": "2024-12-01T07:36:38+00:00"
         },
         {
             "name": "wp-coding-standards/wpcs",
@@ -543,5 +543,5 @@
         "php": ">=7.0"
     },
     "platform-dev": [],
-    "plugin-api-version": "2.3.0"
+    "plugin-api-version": "2.6.0"
 }
