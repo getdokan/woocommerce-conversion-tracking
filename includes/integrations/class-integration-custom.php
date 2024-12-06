@@ -107,24 +107,30 @@ class WCCT_Integration_Custom extends WCCT_Integration {
             return $code;
         }
 
-        if ( version_compare( WC()->version, '3.0', '<' ) ) {
-            // older version
+        if ( version_compare( WC()->version, '3.0', '<=' ) ) {
             $order_currency = $order->get_order_currency();
             $payment_method = $order->payment_method;
+            $order_shipping = $order->get_total_shipping();
 
         } else {
             $order_currency = $order->get_currency();
             $payment_method = $order->get_payment_method();
+            $order_shipping = $order->get_shipping_total();
+        }
+
+        if ( version_compare( WC()->version, '3.7', '<=' ) ) {
+            $used_coupons = $order->get_used_coupons();
+
+        } else {
+            $used_coupons = $order->get_coupon_codes();
         }
 
         $customer       = $order->get_user();
-        $used_coupons   = $order->get_used_coupons() ? implode( ',', $order->get_used_coupons() ) : '';
-        $order_currency = $order_currency;
-        $order_total    = $order->get_total() ? $order->get_total() : 0;
+        $used_coupons   = implode( ',', $used_coupons );
+        $order_total    = $order->get_total();
         $order_number   = $order->get_order_number();
         $order_subtotal = $order->get_subtotal();
 	    $order_discount = $order->get_total_discount();
-	    $order_shipping = $order->get_total_shipping();
 
 
         // customer details

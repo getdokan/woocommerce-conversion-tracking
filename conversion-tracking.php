@@ -78,8 +78,9 @@ class WeDevs_WC_Conversion_Tracking {
         $this->init_classes();
 
         register_activation_hook( __FILE__, array( $this, 'activate' ) );
-        // hpos support
-	    add_action( 'before_woocommerce_init', [ $this, 'add_hpos_support' ] );
+
+        // Add High Performance Order Storage Support
+        add_action( 'before_woocommerce_init', [ $this, 'declare_woocommerce_feature_compatibility' ] );
 
         do_action( 'wcct_loaded' );
     }
@@ -258,12 +259,14 @@ class WeDevs_WC_Conversion_Tracking {
 
 	/**
 	 * Add High Performance Order Storage Support
+     *
+     * @see https://developer.woocommerce.com/docs/hpos-extension-recipe-book/
 	 *
-	 * @since 2.0.11
+	 * @since 2.1.0
 	 *
 	 * @return void
 	 */
-	public function add_hpos_support() {
+	public function declare_woocommerce_feature_compatibility() {
 		if ( class_exists( \Automattic\WooCommerce\Utilities\FeaturesUtil::class ) ) {
 			\Automattic\WooCommerce\Utilities\FeaturesUtil::declare_compatibility( 'custom_order_tables', __FILE__, true );
             \Automattic\WooCommerce\Utilities\FeaturesUtil::declare_compatibility( 'cart_checkout_blocks', __FILE__, true );
@@ -345,7 +348,7 @@ class WeDevs_WC_Conversion_Tracking {
                 </div>
                 <div class="wcct-message-action">
                     <a href="" id="wcct-install-happ-addons" class="button button-primary"> <i class="dashicons dashicons-update wcct-update-icon"></i> Install Now For FREE</a>
-                    <p></strong><a target="_blank" href="https://wordpress.org/plugins/happy-elementor-addons/">Read more details ➔</a>
+                    <p><a target="_blank" href="https://wordpress.org/plugins/happy-elementor-addons/">Read more details ➔</a>
                     </p>
                 </div>
             </div>
@@ -364,7 +367,7 @@ wcct_init();
 /**
  * Manage Capability
  *
- * @return void
+ * @return string
  */
 function wcct_manage_cap() {
     return apply_filters( 'wcct_capability', 'manage_options' );
