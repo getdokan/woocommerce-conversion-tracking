@@ -3,10 +3,10 @@ Contributors: tareq1988, wedevs
 Tags: ecommerce, e-commerce, commerce, woocommerce, tracking, facebook, google, adwords, tracking-pixel
 Donate link: https://tareq.co/donate/
 Requires at least: 5.4
-Tested up to: 6.4.2
+Tested up to: 6.7.1
 WC requires at least: 5.0.0
-WC tested up to: 8.5.1
-Stable tag: 2.0.12
+WC tested up to: 9.4.3
+Stable tag: 2.1.0
 License: GPLv3
 License URI: http://www.gnu.org/licenses/gpl-3.0.html
 
@@ -102,6 +102,11 @@ Additionally, read weDevs [privacy policy](https://wedevs.com/privacy-policy/) f
 
 
 == Changelog ==
+
+= Version 2.1.0 (09 Dec, 2024) =
+
+- **Update:** Added support for High Performance Order Storage in WooCommerce
+- **Update:** WordPress 6.7.1 compatibility
 
 = Version 2.0.12 (16 Jan, 2024) =
 
