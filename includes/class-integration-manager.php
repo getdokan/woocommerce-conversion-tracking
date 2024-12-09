@@ -38,7 +38,7 @@ class WCCT_Integration_Manager {
     /**
      * Get all active integrations
      *
-     * @return void
+     * @return array
      */
     public function get_active_integrations() {
         $integrations = $this->integrations;
@@ -60,7 +60,7 @@ class WCCT_Integration_Manager {
      */
     public function get_integrations() {
         if ( empty( $this->integrations ) ) {
-            return;
+	        return array();
         }
 
         return $this->integrations;
