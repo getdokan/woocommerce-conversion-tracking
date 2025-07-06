@@ -4,6 +4,7 @@ Tags: ecommerce, e-commerce, commerce, woocommerce, tracking, facebook, google, 
 Donate link: https://tareq.co/donate/
 Requires at least: 5.4
 Tested up to: 6.7.1
+Requires PHP: 7.4
 WC requires at least: 5.0.0
 WC tested up to: 9.4.3
 Stable tag: 2.1.0
