@@ -56,7 +56,7 @@ Extract the zip file and just drop the contents in the wp-content/plugins/ direc
 = Minimum Requirements =
 
 * WooCommerce 3.0
-* PHP version 5.2.4 or greater
+* PHP version 7.4 or greater
 * MySQL version 5.0 or greater
 
 = Tracking Conversions =
