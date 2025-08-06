@@ -150,24 +150,12 @@ class WeDevs_WC_Conversion_Tracking {
      * @return void
      */
     public function define_constants() {
-        if ( ! defined( 'WCCT_VERSION' ) ) {
-            define( 'WCCT_VERSION', $this->version );
-        }
-        if ( ! defined( 'WCCT_FILE' ) ) {
-            define( 'WCCT_FILE', __FILE__ );
-        }
-        if ( ! defined( 'WCCT_PATH' ) ) {
-            define( 'WCCT_PATH', dirname( WCCT_FILE ) );
-        }
-        if ( ! defined( 'WCCT_INCLUDES' ) ) {
-            define( 'WCCT_INCLUDES', WCCT_PATH . '/includes' );
-        }
-        if ( ! defined( 'WCCT_URL' ) ) {
-            define( 'WCCT_URL', plugins_url( '', WCCT_FILE ) );
-        }
-        if ( ! defined( 'WCCT_ASSETS' ) ) {
-            define( 'WCCT_ASSETS', WCCT_URL . '/assets' );
-        }
+        defined( 'WCCT_VERSION' ) || define( 'WCCT_VERSION', $this->version );
+        defined( 'WCCT_FILE' ) || define( 'WCCT_FILE', __FILE__ );
+        defined( 'WCCT_PATH' ) || define( 'WCCT_PATH', dirname( WCCT_FILE ) );
+        defined( 'WCCT_INCLUDES' ) || define( 'WCCT_INCLUDES', WCCT_PATH . '/includes' );
+        defined( 'WCCT_URL' ) || define( 'WCCT_URL', plugins_url( '', WCCT_FILE ) );
+        defined( 'WCCT_ASSETS' ) || define( 'WCCT_ASSETS', WCCT_URL . '/assets' );
     }
 
     /**
