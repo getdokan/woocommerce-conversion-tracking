@@ -10,25 +10,62 @@
         }
     ],
     "minimum-stability": "dev",
+    "autoload": {
+        "psr-4": {
+            "WeDevs_WC_Conversion_Tracking\\Dependencies\\": "dependencies/"
+        }
+    },
     "require": {
         "php": ">=7.0",
         "composer/installers": "^1.9",
-        "appsero/client": "^2.0"
+        "appsero/client": "^2.0.4"
     },
 
     "require-dev": {
         "automattic/vipwpcs": "^2.3",
+        "coenjacobs/mozart": "^0.7.1",
         "dealerdirect/phpcodesniffer-composer-installer": "^0.7"
     },
    "scripts": {
         "phpcs": [
           "phpcs -p -s"
+        ],
+        "post-install-cmd": [
+           "[ $COMPOSER_DEV_MODE -eq 0 ] || \"vendor/bin/mozart\" compose",
+           "composer dump-autoload"
+        ],
+        "post-update-cmd": [
+           "[ $COMPOSER_DEV_MODE -eq 0 ] || \"vendor/bin/mozart\" compose",
+           "composer dump-autoload"
         ]
    },
     "config": {
         "allow-plugins": {
             "composer/installers": true,
             "dealerdirect/phpcodesniffer-composer-installer": true
+        }
+    },
+    "extra": {
+        "mozart": {
+            "dep_namespace": "WeDevs_WC_Conversion_Tracking\\Dependencies\\",
+            "dep_directory": "/dependencies/",
+            "classmap_directory": "/dependencies/classes/",
+            "classmap_prefix": "WeDevs_WC_Conversion_Tracking_",
+            "packages": [
+                "appsero/updater",
+                "appsero/client"
+            ],
+            "excluded_packages": [
+                "psr/container"
+            ],
+            "override_autoload": {
+                "google/apiclient": {
+                    "classmap": [
+                        "src/"
+                    ]
+                }
+            },
+            "delete_vendor_directories": true
         }
     }
 }
