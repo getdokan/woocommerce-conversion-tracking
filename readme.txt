@@ -4,6 +4,7 @@ Tags: ecommerce, e-commerce, commerce, woocommerce, tracking, facebook, google, 
 Donate link: https://tareq.co/donate/
 Requires at least: 5.4
 Tested up to: 6.7.1
+Requires PHP: 7.4
 WC requires at least: 5.0.0
 WC tested up to: 9.4.3
 Stable tag: 2.1.0
@@ -55,7 +56,7 @@ Extract the zip file and just drop the contents in the wp-content/plugins/ direc
 = Minimum Requirements =
 
 * WooCommerce 3.0
-* PHP version 5.2.4 or greater
+* PHP version 7.4 or greater
 * MySQL version 5.0 or greater
 
 = Tracking Conversions =
