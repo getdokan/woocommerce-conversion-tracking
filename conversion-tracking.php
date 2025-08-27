@@ -3,12 +3,14 @@
 Plugin Name: WooCommerce Conversion Tracking
 Plugin URI: https://wedevs.com/woocommerce-conversion-tracking/
 Description: Adds various conversion tracking codes to cart, checkout, registration success and product page on WooCommerce
-Version: 2.1.0
+Version: 2.1.1
 Author: weDevs
 Author URI: https://wedevs.com/?utm_source=ORG_Author_URI_WCCT
 License: GPL2
+Requires PHP: 7.4
+Requires Plugins: woocommerce
 WC requires at least: 5.0.0
-WC tested up to: 9.4.3
+WC tested up to: 10.1.1
 */
 
 /**
@@ -54,7 +56,7 @@ class WeDevs_WC_Conversion_Tracking {
      *
      * @var string
      */
-    public $version = '2.1.0';
+    public $version = '2.1.1';
 
     /**
      * Holds various class instances
@@ -150,12 +152,12 @@ class WeDevs_WC_Conversion_Tracking {
      * @return void
      */
     public function define_constants() {
-        define( 'WCCT_VERSION', $this->version );
-        define( 'WCCT_FILE', __FILE__ );
-        define( 'WCCT_PATH', dirname( WCCT_FILE ) );
-        define( 'WCCT_INCLUDES', WCCT_PATH . '/includes' );
-        define( 'WCCT_URL', plugins_url( '', WCCT_FILE ) );
-        define( 'WCCT_ASSETS', WCCT_URL . '/assets' );
+        defined( 'WCCT_VERSION' ) || define( 'WCCT_VERSION', $this->version );
+        defined( 'WCCT_FILE' ) || define( 'WCCT_FILE', __FILE__ );
+        defined( 'WCCT_PATH' ) || define( 'WCCT_PATH', dirname( WCCT_FILE ) );
+        defined( 'WCCT_INCLUDES' ) || define( 'WCCT_INCLUDES', WCCT_PATH . '/includes' );
+        defined( 'WCCT_URL' ) || define( 'WCCT_URL', plugins_url( '', WCCT_FILE ) );
+        defined( 'WCCT_ASSETS' ) || define( 'WCCT_ASSETS', WCCT_URL . '/assets' );
     }
 
     /**
@@ -247,7 +249,7 @@ class WeDevs_WC_Conversion_Tracking {
      * @return void
      */
     public function init_tracker() {
-        $client = new Appsero\Client(
+        $client = new WeDevs_WC_Conversion_Tracking\Dependencies\Appsero\Client(
             '6816029d-7d48-4ed3-8ae4-aeb6a9496f21',
             'WooCommerce Conversion Tracking',
             __FILE__
