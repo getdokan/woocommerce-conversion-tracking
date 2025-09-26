@@ -10,7 +10,7 @@ class WCCT_Integration_Google extends WCCT_Integration {
      */
     function __construct() {
         $this->id           = 'adwords';
-        $this->name         = __( 'Google Ads', 'woocommerce-conversion-tracking' );
+        $this->name         = 'Google Ads';
         $this->enabled      = true;
         $this->supports     = array(
             'checkout',

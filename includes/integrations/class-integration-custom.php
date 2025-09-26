@@ -10,7 +10,7 @@ class WCCT_Integration_Custom extends WCCT_Integration {
      */
     function __construct() {
         $this->id           = 'custom';
-        $this->name         = __( 'Custom', 'woocommerce-conversion-tracking' );
+        $this->name         = 'Custom';
         $this->enabled      = true;
         $this->supports     = array(
             'checkout',
