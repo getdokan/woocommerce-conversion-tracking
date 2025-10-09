@@ -8,7 +8,7 @@
     </button>
 
     <div class="msg-wrap">
-        <h3>WooCommerce Conversion Tracking just got <span style="color:#CD47B1">better</span></h3>
+        <h3>Conversion Tracking for WooCommerce just got <span style="color:#CD47B1">better</span></h3>
 
         <p>
             Good news, now you can easily track conversions of your WooCommerce store and send data to your favorite ad platforms for improved and precised retargeting campaigns without any coding at all! This makes your Facebook, Twitter, Google Adwords marketing and retargeting easier than ever!

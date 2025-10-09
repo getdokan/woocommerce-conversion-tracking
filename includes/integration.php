@@ -294,9 +294,9 @@ class WeDevs_WC_Tracking_Integration extends WC_Integration {
 
         ob_start();
 
-        echo "<!-- Tracking pixel by WooCommerce Conversion Tracking plugin by Tareq Hasan -->\n";
+        echo "<!-- Tracking pixel by Conversion Tracking for WooCommerce plugin by Tareq Hasan -->\n";
         echo $code;
-        echo "\n<!-- Tracking pixel by WooCommerce Conversion Tracking plugin -->\n";
+        echo "\n<!-- Tracking pixel by Conversion Tracking for WooCommerce plugin -->\n";
 
         return ob_get_clean();
     }

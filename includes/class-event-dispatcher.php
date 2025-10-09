@@ -183,10 +183,10 @@ class WCCT_Event_Dispatcher {
      */
     public function enqueue_scripts() {
 
-        echo '<!-- Starting: WooCommerce Conversion Tracking (https://wordpress.org/plugins/woocommerce-conversion-tracking/) -->' . PHP_EOL;
+        echo '<!-- Starting: Conversion Tracking for WooCommerce (https://wordpress.org/plugins/woocommerce-conversion-tracking/) -->' . PHP_EOL;
         foreach ( $this->integrations as $integration ) {
             $integration->enqueue_script();
         }
-        echo '<!-- End: WooCommerce Conversion Tracking Codes -->' . PHP_EOL;
+        echo '<!-- End: Conversion Tracking for WooCommerce Codes -->' . PHP_EOL;
     }
 }
