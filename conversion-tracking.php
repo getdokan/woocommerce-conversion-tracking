@@ -313,7 +313,7 @@ class WeDevs_WC_Conversion_Tracking {
         if ( ! function_exists( 'WC' ) ) {
             ?>
                 <div class="error notice is-dismissible">
-                    <p><?php echo __( '<b>Woocommerce conversion tracking</b> requires <a target="_blank" href="https://wordpress.org/plugins/woocommerce/">Woocommerce</a>', 'woocommerce-conversion-tracking' ); ?></p>
+                    <p><?php echo __( '<b>Conversion Tracking for WooCommerce</b> requires <a target="_blank" href="https://wordpress.org/plugins/woocommerce/">Woocommerce</a>', 'woocommerce-conversion-tracking' ); ?></p>
                 </div>
             <?php
         }
