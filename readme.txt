@@ -1,4 +1,4 @@
-=== WooCommerce Conversion Tracking ===
+=== Conversion Tracking for WooCommerce ===
 Contributors: tareq1988, wedevs
 Tags: ecommerce, e-commerce, commerce, woocommerce, tracking, facebook, google, adwords, tracking-pixel
 Donate link: https://tareq.co/donate/
@@ -7,7 +7,7 @@ Tested up to: 6.8.2
 Requires PHP: 7.4
 WC requires at least: 5.0.0
 WC tested up to: 10.1.1
-Stable tag: 2.1.1
+Stable tag: 2.1.2
 License: GPLv3
 License URI: http://www.gnu.org/licenses/gpl-3.0.html
 
@@ -104,9 +104,13 @@ Additionally, read weDevs [privacy policy](https://wedevs.com/privacy-policy/) f
 
 == Changelog ==
 
+= Version 2.1.1 (13 Oct, 2025) =
+
+- **Update:** Update plugin name.
+
 = Version 2.1.1 (26 Aug, 2025) =
 
-- **fix:** Resolved "Constant WCCT_VERSION already defined" warning caused by multiple plugin initializations in WooCommerce Conversion Tracking.
+- **fix:** Resolved "Constant WCCT_VERSION already defined" warning caused by multiple plugin initializations in Conversion Tracking for WooCommerce.
 - **Update:** Added missing 'Requires PHP' header
 - **Update:** WordPress 6.8.2 compatibility
 - **chore:** Updated Appsero SDK to the latest version for improved stability and performance.
@@ -121,7 +125,7 @@ Additionally, read weDevs [privacy policy](https://wedevs.com/privacy-policy/) f
 
 - **Update:** WordPress 6.4.2 compatibility
 - **Fix:** Updated Appsero Client Library to the latest version which will fix a security issue
-- **Fix:** Fixed a Broken Access Control vulnerability in WooCommerce Conversion Tracking Plugin that allowed lower privileged users to install and activate a new plugin via an ajax action without a nonce parameter.
+- **Fix:** Fixed a Broken Access Control vulnerability in Conversion Tracking for WooCommerce Plugin that allowed lower privileged users to install and activate a new plugin via an ajax action without a nonce parameter.
 
 = Version 2.0.11 (15 Sep, 2023) =
 

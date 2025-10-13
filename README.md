@@ -1,4 +1,4 @@
-WooCommerce Conversion Tracking
+Conversion Tracking for WooCommerce
 ====================
 
 Integrates conversion tracking codes from Facebook, Google and various providers.
