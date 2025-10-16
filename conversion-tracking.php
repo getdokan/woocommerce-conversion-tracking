@@ -1,9 +1,9 @@
 <?php
 /*
-Plugin Name: WooCommerce Conversion Tracking
+Plugin Name: Conversion Tracking for WooCommerce
 Plugin URI: https://wedevs.com/woocommerce-conversion-tracking/
 Description: Adds various conversion tracking codes to cart, checkout, registration success and product page on WooCommerce
-Version: 2.1.1
+Version: 2.1.4
 Author: weDevs
 Author URI: https://wedevs.com/?utm_source=ORG_Author_URI_WCCT
 License: GPL2
@@ -56,7 +56,7 @@ class WeDevs_WC_Conversion_Tracking {
      *
      * @var string
      */
-    public $version = '2.1.1';
+    public $version = '2.1.4';
 
     /**
      * Holds various class instances
@@ -251,7 +251,7 @@ class WeDevs_WC_Conversion_Tracking {
     public function init_tracker() {
         $client = new WeDevs_WC_Conversion_Tracking\Dependencies\Appsero\Client(
             '6816029d-7d48-4ed3-8ae4-aeb6a9496f21',
-            'WooCommerce Conversion Tracking',
+            'Conversion Tracking for WooCommerce',
             __FILE__
         );
 
@@ -313,7 +313,7 @@ class WeDevs_WC_Conversion_Tracking {
         if ( ! function_exists( 'WC' ) ) {
             ?>
                 <div class="error notice is-dismissible">
-                    <p><?php echo __( '<b>Woocommerce conversion tracking</b> requires <a target="_blank" href="https://wordpress.org/plugins/woocommerce/">Woocommerce</a>', 'woocommerce-conversion-tracking' ); ?></p>
+                    <p><?php echo __( '<b>Conversion Tracking for WooCommerce</b> requires <a target="_blank" href="https://wordpress.org/plugins/woocommerce/">Woocommerce</a>', 'woocommerce-conversion-tracking' ); ?></p>
                 </div>
             <?php
         }
