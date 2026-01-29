@@ -13,4 +13,6 @@ assets/spa
 assets/less
 .svnignore
 composer.json
+composer.lock
+phpcs-report.txt
 phpcs.xml.dist
