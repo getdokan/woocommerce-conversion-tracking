@@ -104,7 +104,7 @@ Additionally, read weDevs [privacy policy](https://wedevs.com/privacy-policy/) f
 
 == Changelog ==
 
-= Version 2.1.5 (29 Jan, 2026) =
+= Version 2.1.5 (02 Feb, 2026) =
 
 - **Update:** Removed Perfect Audience integration as the service is discontinued
 
