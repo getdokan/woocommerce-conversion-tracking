@@ -6,3 +6,4 @@ phpcs-report.txt
 vendor
 .DS_Store
 .idea/
+dependencies/

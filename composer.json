@@ -17,11 +17,11 @@
     },
     "require": {
         "php": ">=7.0",
-        "composer/installers": "^1.9",
-        "appsero/client": "^2.0.4"
+        "composer/installers": "^1.9"
     },
 
     "require-dev": {
+        "appsero/client": "^2.0.4",
         "automattic/vipwpcs": "^2.3",
         "coenjacobs/mozart": "^0.7.1",
         "dealerdirect/phpcodesniffer-composer-installer": "^0.7"
