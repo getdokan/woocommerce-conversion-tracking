@@ -65,11 +65,12 @@ abstract class WCCT_Integration {
 
     /**
      * Get the integration name
+     * Lazy translation so that we don't trigger autoload of the woocommerce-conversion-tracking textdomain
      *
      * @return string
      */
     public function get_name() {
-        return $this->name;
+        return __( $this->name, 'woocommerce-conversion-tracking' );
     }
 
     /**

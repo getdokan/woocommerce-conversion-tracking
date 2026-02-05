@@ -10,7 +10,7 @@ class WCCT_Integration_Facebook extends WCCT_Integration {
      */
     function __construct() {
         $this->id        = 'facebook';
-        $this->name      = __( 'Facebook', 'woocommerce-conversion-tracking' );
+        $this->name      = 'Facebook';
         $this->enabled   = true;
         $this->supports  = array(
             'add_to_cart',
