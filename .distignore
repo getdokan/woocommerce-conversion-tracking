@@ -1,0 +1,15 @@
+.git
+.gitignore
+.github
+.idea
+.DS_Store
+.svnignore
+Gruntfile.js
+node_modules
+package.json
+package-lock.json
+phpcs-report.txt
+phpcs.xml.dist
+build
+composer.json
+composer.lock
