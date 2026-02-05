@@ -2,8 +2,8 @@ name: Deploy and Release Plugin to WP.org
 
 on:
     push:
-        # tags:
-        #     - "*"
+        tags:
+            - "*"
 jobs:
     releaseToWPOrg:
         name: Release to WordPress.org
