@@ -76,8 +76,9 @@ class WeDevs_WC_Conversion_Tracking {
 
         $this->define_constants();
         $this->init_hooks();
-        $this->includes();
-        $this->init_classes();
+        // Defer heavy includes and class instantiation until WP 'init'
+        add_action( 'init', array( $this, 'includes' ), 10 );
+        add_action( 'init', array( $this, 'init_classes' ), 20 );
 
         register_activation_hook( __FILE__, array( $this, 'activate' ) );
 
@@ -191,7 +192,8 @@ class WeDevs_WC_Conversion_Tracking {
         add_filter( 'plugin_action_links_' . plugin_basename( __FILE__ ), array( $this, 'plugin_action_links' ) );
         add_action( 'admin_notices', array( $this, 'happy_addons_ads_banner' ) );
 
-        $this->init_tracker();
+        // Defer tracker initialization until after localization and integrations
+        add_action( 'init', array( $this, 'init_tracker' ), 30 );
     }
 
     /**
@@ -363,8 +365,8 @@ function wcct_init() {
     return WeDevs_WC_Conversion_Tracking::init();
 }
 
-// WeDevs_WC_Conversion_Tracking
-wcct_init();
+// Instantiate plugin on 'plugins_loaded' to allow localization to be registered
+add_action( 'plugins_loaded', 'wcct_init' );
 
 /**
  * Manage Capability
