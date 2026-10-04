@@ -13,3 +13,5 @@ phpcs.xml.dist
 build
 composer.json
 composer.lock
+tests
+phpunit.xml.dist
