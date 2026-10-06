@@ -49,6 +49,16 @@ This plugin inserts those codes on WooCommerce cart page, checkout success page 
 = Author =
 [Tareq Hasan](https://tareq.co)
 
+== External services ==
+
+This plugin connects to third-party advertising and analytics services only after you enable an integration and enter its ID on the settings page.
+
+= Google Analytics 4 =
+
+When the Google Analytics 4 integration is enabled with a Measurement ID, the plugin loads Google's gtag.js from www.googletagmanager.com on your store's pages. Google Analytics then receives the page address and referrer, with the `key` parameter removed, and the events you select: product views, add to cart, begin checkout and purchases. Event data contains product IDs, names, categories, prices, quantities, coupon codes, the order number, totals, tax, shipping and currency. No customer names, email addresses, phone numbers or addresses are sent. Google sets its own cookies and receives the visitor's IP address and browser details as part of the request.
+
+Google Analytics is provided by Google LLC: [Terms of Service](https://marketingplatform.google.com/about/analytics/terms/us/), [Privacy Policy](https://policies.google.com/privacy).
+
 == Installation ==
 
 Extract the zip file and just drop the contents in the wp-content/plugins/ directory of your WordPress installation and then activate the Plugin from Plugins page.

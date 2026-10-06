@@ -80,12 +80,15 @@ class WCCT_Integration_Google extends WCCT_Integration {
         if ( empty( $account_id ) ) {
             return;
         }
+
+        $loader_printed = $this->print_gtag_loader( $account_id );
         ?>
-        <script async src="https://www.googletagmanager.com/gtag/js?id=<?php echo esc_attr( $account_id ); ?>"></script>
         <script>
             window.dataLayer = window.dataLayer || [];
             function gtag(){dataLayer.push(arguments)};
+            <?php if ( $loader_printed ) { ?>
             gtag('js', new Date());
+            <?php } ?>
 
             gtag('config', '<?php echo esc_attr( $account_id ); ?>');
         </script>
