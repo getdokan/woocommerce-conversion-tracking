@@ -1,3 +1,8 @@
+/*
+ * Generated from assets/less/style.less by "npm run build".
+ * PLEASE DO NOT MODIFY assets/css/style.css, edit the LESS file instead.
+ */
+
 @integrationWidth: 600px;
 
 .wcct-admin {
@@ -342,13 +347,13 @@
 
                 @media (min-width: 992px) {
                     li {
-                        flex: 0 1 calc(50% - 5px);
+                        flex: 0 1 45%;
                     }
                 }
 
                 @media (min-width: 1367px) {
                     li {
-                        flex: 0 1 calc(33% - 5px);
+                        flex: 0 1 28%;
                     }
                 }
             }
@@ -398,4 +403,72 @@
         opacity: 1;
     }
 
+}
+
+// Admin notices
+.wcct-notice-wrap {
+    overflow: hidden;
+    padding: 22px 15px;
+}
+
+.wcct-message-icon {
+    width: 10%;
+    float: left;
+
+    img {
+        height: 50px;
+    }
+}
+
+.wcct-message-content {
+    width: 70%;
+    float: left;
+    margin-top: 20px;
+
+    p {
+        font-size: 16px;
+        padding: 0;
+        margin: 0;
+    }
+}
+
+.wcct-message-action {
+    width: 16.5%;
+    float: right;
+    text-align: center;
+    margin-right: 1.2%;
+}
+
+#wcct_remote_notice {
+    display: none;
+}
+
+// Happy Addons install button
+@happyAddons: #5c41d2;
+@happyAddonsHover: #150654;
+
+#wcct-install-happ-addons {
+    background: @happyAddons !important;
+    border-color: @happyAddons !important;
+    box-shadow: 0 1px 0 @happyAddons;
+    color: #fff;
+    text-decoration: none;
+    text-shadow: 0 -1px 1px @happyAddons, 1px 0 1px @happyAddons, 0 1px 1px @happyAddons, -1px 0 1px @happyAddons;
+    height: inherit;
+    padding: 4px 20px;
+    display: flex;
+    align-items: center;
+
+    i {
+        margin-right: 7px;
+    }
+
+    &:hover {
+        background: @happyAddonsHover !important;
+        border-color: @happyAddonsHover !important;
+        box-shadow: 0 1px 0 @happyAddonsHover;
+        color: #fff;
+        text-decoration: none;
+        text-shadow: 0 -1px 1px @happyAddonsHover, 1px 0 1px @happyAddonsHover, 0 1px 1px @happyAddonsHover, -1px 0 1px @happyAddonsHover;
+    }
 }

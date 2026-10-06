@@ -10,6 +10,7 @@
         }
     ],
     "minimum-stability": "dev",
+    "prefer-stable": true,
     "autoload": {
         "psr-4": {
             "WeDevs_WC_Conversion_Tracking\\Dependencies\\": "dependencies/"
@@ -17,7 +18,7 @@
     },
     "require": {
         "php": ">=7.0",
-        "composer/installers": "^1.9"
+        "composer/installers": "^2.3"
     },
 
     "require-dev": {
@@ -41,6 +42,9 @@
         ]
    },
     "config": {
+        "platform": {
+            "php": "7.4"
+        },
         "allow-plugins": {
             "composer/installers": true,
             "dealerdirect/phpcodesniffer-composer-installer": true

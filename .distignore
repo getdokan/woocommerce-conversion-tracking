@@ -4,7 +4,6 @@
 .idea
 .DS_Store
 .svnignore
-Gruntfile.js
 node_modules
 package.json
 package-lock.json
@@ -15,3 +14,17 @@ composer.json
 composer.lock
 tests
 phpunit.xml.dist
+.claude
+.distignore
+.editorconfig
+.gitattributes
+plugin-deploy.sh
+export.sh
+secret.json
+debug.log
+npm-debug.log
+phpunit.xml
+*~
+/bin
+/assets/less
+/README.md

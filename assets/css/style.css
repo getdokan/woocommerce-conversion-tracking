@@ -1,7 +1,7 @@
 /*
-Woocommerce-Conversion-Tracking - v1.0.0
-Generated: 2018-02-20 (1519126580166)
-PLEASE DO NOT MODIFY*/
+ * Generated from assets/less/style.less by "npm run build".
+ * PLEASE DO NOT MODIFY assets/css/style.css, edit the LESS file instead.
+ */
 .wcct-admin {
   /**
      * Form Settings area
@@ -41,8 +41,8 @@ PLEASE DO NOT MODIFY*/
   right: 0;
   bottom: 0;
   background-color: #CCC;
-  -webkit-transition: .4s;
-  transition: .4s;
+  -webkit-transition: 0.4s;
+  transition: 0.4s;
 }
 .wcct-admin .switch .slider.round {
   border-radius: 34px;
@@ -58,8 +58,8 @@ PLEASE DO NOT MODIFY*/
   left: 2px;
   bottom: 2px;
   background-color: white;
-  -webkit-transition: .4s;
-  transition: .4s;
+  -webkit-transition: 0.4s;
+  transition: 0.4s;
 }
 .wcct-admin input[type="checkbox"] {
   border: 1px solid #b4b9be;
@@ -278,12 +278,12 @@ PLEASE DO NOT MODIFY*/
 }
 @media (min-width: 992px) {
   .wcct-admin .sidebar-wrap .premium-box .wcct-doc-list li {
-    flex: 0 1 calc(45%);
+    flex: 0 1 45%;
   }
 }
 @media (min-width: 1367px) {
   .wcct-admin .sidebar-wrap .premium-box .wcct-doc-list li {
-    flex: 0 1 calc(28%);
+    flex: 0 1 28%;
   }
 }
 .wcct-admin .wcct-tooltip {

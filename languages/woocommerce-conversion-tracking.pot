@@ -1,40 +1,58 @@
-# Copyright (C) 2024 weDevs
+# Copyright (C) 2026 weDevs
 # This file is distributed under the GPL2.
 msgid ""
 msgstr ""
-"Project-Id-Version: WooCommerce Conversion Tracking 2.0.11\n"
-"Report-Msgid-Bugs-To: https://example.com\n"
-"POT-Creation-Date: 2024-01-16 10:36:36+00:00\n"
-"MIME-Version: 1.0\n"
-"Content-Type: text/plain; charset=utf-8\n"
-"Content-Transfer-Encoding: 8bit\n"
-"PO-Revision-Date: 2024-MO-DA HO:MI+ZONE\n"
+"Project-Id-Version: Conversion Tracking for WooCommerce 2.1.6\n"
+"Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/woocommerce-conversion-tracking\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
-"Language-Team: LANGUAGE <EMAIL@ADDRESS>\n"
-"X-Generator: grunt-wp-i18n 0.5.4\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"POT-Creation-Date: 2026-10-06T10:03:12+00:00\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"X-Generator: WP-CLI 2.12.0\n"
+"X-Domain: woocommerce-conversion-tracking\n"
 
-#: conversion-tracking.php:293
+#. Plugin Name of the plugin
+#: conversion-tracking.php
+msgid "Conversion Tracking for WooCommerce"
+msgstr ""
+
+#. Plugin URI of the plugin
+#: conversion-tracking.php
+msgid "https://wedevs.com/woocommerce-conversion-tracking/"
+msgstr ""
+
+#. Description of the plugin
+#: conversion-tracking.php
+msgid "Adds various conversion tracking codes to cart, checkout, registration success and product page on WooCommerce"
+msgstr ""
+
+#. Author of the plugin
+#: conversion-tracking.php
+msgid "weDevs"
+msgstr ""
+
+#. Author URI of the plugin
+#: conversion-tracking.php
+msgid "https://wedevs.com/?utm_source=ORG_Author_URI_WCCT"
+msgstr ""
+
+#: conversion-tracking.php:301
 msgid "Get PRO"
 msgstr ""
 
-#: conversion-tracking.php:296
+#: conversion-tracking.php:304
 msgid "Docs"
 msgstr ""
 
-#: conversion-tracking.php:297
+#: conversion-tracking.php:305
 msgid "Settings"
 msgstr ""
 
-#: conversion-tracking.php:310
-msgid ""
-"<b>Woocommerce conversion tracking</b> requires <a target=\"_blank\" "
-"href=\"https://wordpress.org/plugins/woocommerce/\">Woocommerce</a>"
-msgstr ""
-
-#: conversion-tracking.php:343
-msgid ""
-"Reach beyond your imagination in creating web pages. <strong> Try Happy "
-"Addons for Elementor to shape your dream.</strong> 😊"
+#: conversion-tracking.php:318
+msgid "<b>Conversion Tracking for WooCommerce</b> requires <a target=\"_blank\" href=\"https://wordpress.org/plugins/woocommerce/\">Woocommerce</a>"
 msgstr ""
 
 #: includes/class-admin.php:50
@@ -45,7 +63,8 @@ msgstr ""
 msgid "Integrations"
 msgstr ""
 
-#: includes/class-ajax.php:31 includes/class-ajax.php:77
+#: includes/class-ajax.php:31
+#: includes/class-ajax.php:77
 #: includes/class-ajax.php:138
 msgid "nonce verification failed"
 msgstr ""
@@ -54,11 +73,13 @@ msgstr ""
 msgid "Settings has been saved successfully!"
 msgstr ""
 
-#: includes/class-ajax.php:69 includes/class-ajax.php:130
+#: includes/class-ajax.php:69
+#: includes/class-ajax.php:130
 msgid "You do not have permission to install Happy Addons"
 msgstr ""
 
 #: includes/class-ajax.php:92
+#, php-format
 msgid "ERROR: Error fetching plugin information: %s"
 msgstr ""
 
@@ -113,9 +134,7 @@ msgid "Conversion Tracking Pixel"
 msgstr ""
 
 #: includes/integration.php:14
-msgid ""
-"Various conversion tracking pixel integration like Facebook Ad, Google "
-"AdWords, etc. Insert your scripts codes here:"
+msgid "Various conversion tracking pixel integration like Facebook Ad, Google AdWords, etc. Insert your scripts codes here:"
 msgstr ""
 
 #: includes/integration.php:43
@@ -126,14 +145,18 @@ msgstr ""
 msgid "Select which position in your page you want to insert the tag"
 msgstr ""
 
-#: includes/integration.php:50 includes/integration.php:52
 #. translators: %s: tag name
+#: includes/integration.php:50
+#: includes/integration.php:52
+#, php-format
 msgid "Inside %s tag"
 msgstr ""
 
-#: includes/integration.php:57 includes/integration.php:67
-#: includes/integration.php:80
 #. translators: %s: page name
+#: includes/integration.php:57
+#: includes/integration.php:67
+#: includes/integration.php:80
+#, php-format
 msgid "Tags for %s"
 msgstr ""
 
@@ -154,8 +177,10 @@ msgstr ""
 msgid "Adds script on the purchase success page"
 msgstr ""
 
-#: includes/integration.php:72 includes/integration.php:139
 #. translators: %s: dynamic values
+#: includes/integration.php:72
+#: includes/integration.php:143
+#, php-format
 msgid "You can use dynamic values: %s"
 msgstr ""
 
@@ -167,32 +192,27 @@ msgstr ""
 msgid "Adds script on the successful registraion page"
 msgstr ""
 
-#: includes/integration.php:134
+#: includes/integration.php:138
 msgid "Conversion Tracking Code"
 msgstr ""
 
-#: includes/integration.php:136
+#: includes/integration.php:140
 msgid "Insert conversion tracking code for this product."
 msgstr ""
 
 #: includes/integrations/class-integration-custom.php:13
-#: includes/views/settings.php:155
+#: includes/views/settings.php:154
 msgid "Custom"
 msgstr ""
 
-#: includes/integrations/class-integration-custom.php:34
 #. translators: %s: dynamic values
+#: includes/integrations/class-integration-custom.php:34
+#, php-format
 msgid "Put your JavaScript tracking scripts here. You can use dynamic values: %s"
 msgstr ""
 
 #: includes/integrations/class-integration-custom.php:41
 msgid "Registration Scripts"
-msgstr ""
-
-#: includes/integrations/class-integration-custom.php:43
-msgid ""
-"<a href=\"%s\" target=\"_blank\">Learn more</a> about setting up custom "
-"scripts."
 msgstr ""
 
 #: includes/integrations/class-integration-facebook.php:13
@@ -205,16 +225,19 @@ msgid "Pixel ID"
 msgstr ""
 
 #: includes/integrations/class-integration-facebook.php:36
+#, php-format
 msgid "Find the Pixel ID from <a href=\"%s\" target=\"_blank\">here</a>."
 msgstr ""
 
 #: includes/integrations/class-integration-facebook.php:41
+#: includes/integrations/class-integration-ga4.php:100
 #: includes/integrations/class-integration-google.php:38
 #: includes/integrations/class-integration-twitter.php:31
 msgid "Events"
 msgstr ""
 
 #: includes/integrations/class-integration-facebook.php:44
+#: includes/integrations/class-integration-ga4.php:104
 msgid "Add to Cart"
 msgstr ""
 
@@ -223,9 +246,46 @@ msgid "Initiate Checkout"
 msgstr ""
 
 #: includes/integrations/class-integration-facebook.php:46
+#: includes/integrations/class-integration-ga4.php:106
 #: includes/integrations/class-integration-google.php:43
 #: includes/integrations/class-integration-twitter.php:36
 msgid "Purchase"
+msgstr ""
+
+#: includes/integrations/class-integration-ga4.php:57
+msgid "Google Analytics 4"
+msgstr ""
+
+#. translators: 1: example measurement ID, 2: Google help link
+#: includes/integrations/class-integration-ga4.php:77
+#, php-format
+msgid "Your GA4 Measurement ID, for example %1$s. Find it in Google Analytics under Admin &rarr; Data streams &rarr; your web stream. <a href=\"%2$s\" target=\"_blank\">Learn more</a>."
+msgstr ""
+
+#: includes/integrations/class-integration-ga4.php:82
+msgid "<strong>Avoid double counting:</strong> if this GA4 property is already a destination of the Google tag you use for Google Ads (Google tag settings &rarr; Destinations), page views can be counted twice. Remove that destination, or turn on \"Ignore duplicate instances of on-page configuration\" in your Google tag settings."
+msgstr ""
+
+#: includes/integrations/class-integration-ga4.php:85
+msgid "The saved Measurement ID is missing or invalid, so nothing is sent to Google Analytics. Only IDs that start with G- are accepted."
+msgstr ""
+
+#: includes/integrations/class-integration-ga4.php:92
+msgid "Measurement ID"
+msgstr ""
+
+#: includes/integrations/class-integration-ga4.php:103
+msgid "View Item"
+msgstr ""
+
+#: includes/integrations/class-integration-ga4.php:105
+msgid "Begin Checkout"
+msgstr ""
+
+#. translators: %s: the rejected measurement ID
+#: includes/integrations/class-integration-ga4.php:143
+#, php-format
+msgid "Google Analytics 4: \"%s\" is not a valid Measurement ID. Use the ID that starts with G-, for example G-XXXXXXXXXX. Settings were not saved."
 msgstr ""
 
 #: includes/integrations/class-integration-google.php:13
@@ -238,9 +298,8 @@ msgid "Account ID"
 msgstr ""
 
 #: includes/integrations/class-integration-google.php:33
-msgid ""
-"Provide the Google Ads Account ID. Usually it's something like "
-"<code>AW-123456789</code>, <a href=\"%s\" target=\"_blank\">learn more</a>."
+#, php-format
+msgid "Provide the Google Ads Account ID. Usually it's something like <code>AW-123456789</code>, <a href=\"%s\" target=\"_blank\">learn more</a>."
 msgstr ""
 
 #: includes/integrations/class-integration-twitter.php:13
@@ -249,9 +308,8 @@ msgid "Twitter"
 msgstr ""
 
 #: includes/integrations/class-integration-twitter.php:39
-msgid ""
-"Find the Universal Tag ID from <a href=\"%s\" target=\"_blank\">here</a>, "
-"navigate to Tools &rarr; Conversion Tracking."
+#, php-format
+msgid "Find the Universal Tag ID from <a href=\"%s\" target=\"_blank\">here</a>, navigate to Tools &rarr; Conversion Tracking."
 msgstr ""
 
 #: includes/views/settings.php:5
@@ -271,31 +329,5 @@ msgid "Getting Started"
 msgstr ""
 
 #: includes/views/settings.php:153
-msgid "Perfect Audience"
-msgstr ""
-
-#: includes/views/settings.php:154
 msgid "Microsoft Advertising"
-msgstr ""
-
-#. Plugin Name of the plugin/theme
-msgid "WooCommerce Conversion Tracking"
-msgstr ""
-
-#. Plugin URI of the plugin/theme
-msgid "https://wedevs.com/woocommerce-conversion-tracking/"
-msgstr ""
-
-#. Description of the plugin/theme
-msgid ""
-"Adds various conversion tracking codes to cart, checkout, registration "
-"success and product page on WooCommerce"
-msgstr ""
-
-#. Author of the plugin/theme
-msgid "weDevs"
-msgstr ""
-
-#. Author URI of the plugin/theme
-msgid "https://wedevs.com/?utm_source=ORG_Author_URI_WCCT"
 msgstr ""
