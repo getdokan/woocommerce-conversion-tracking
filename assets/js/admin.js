@@ -22,7 +22,8 @@
                 $( '#wcct-submit' ).removeClass( 'updating-message' );
             },
             error: function(error) {
-                alert('something wrong happend');
+                $( '#wcct-submit' ).removeClass( 'updating-message' );
+                alert( error && error.message ? error.message : 'something wrong happend' );
             }
         });
 

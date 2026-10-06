@@ -124,6 +124,21 @@ class GA4DataTest extends TestCase {
         $this->assertSame( 0.0, $params['value'] );
     }
 
+    public function test_event_params_value_uses_line_totals_when_given() {
+        // One line of 10.00 for 3: the unit price rounds to 3.33, which would give 9.99.
+        $items  = array( array( 'item_id' => '1', 'price' => 3.33, 'quantity' => 3 ) );
+        $params = WCCT_GA4_Data::event_params( 'G-TEST1234', 'USD', $items, 2, array(), '10.00' );
+
+        $this->assertSame( 10.0, $params['value'] );
+    }
+
+    public function test_purchase_value_uses_line_totals_when_given() {
+        $items  = array( array( 'item_id' => '1', 'price' => 3.33, 'quantity' => 3 ) );
+        $params = WCCT_GA4_Data::purchase_params( 'G-TEST1234', '1001', 'USD', $items, 0, 0, array(), 2, 10 );
+
+        $this->assertSame( 10.0, $params['value'] );
+    }
+
     public function test_purchase_value_excludes_tax_and_shipping() {
         // Two items at 8.00 after discount, 3.20 tax, 5.00 shipping: order total 24.20.
         $items  = array( array( 'item_id' => '1', 'price' => 8.0, 'quantity' => 2 ) );

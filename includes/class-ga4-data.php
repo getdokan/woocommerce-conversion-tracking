@@ -125,14 +125,16 @@ class WCCT_GA4_Data {
      * @param  array  $items
      * @param  int    $decimals
      * @param  array  $coupons
+     * @param  float  $value    Total from line totals. Defaults to price x quantity of the items,
+     *                          which drifts from the line totals when unit prices are rounded.
      *
      * @return array
      */
-    public static function event_params( $send_to, $currency, array $items, $decimals = 2, array $coupons = array() ) {
+    public static function event_params( $send_to, $currency, array $items, $decimals = 2, array $coupons = array(), $value = null ) {
         $params = array(
             'send_to'  => (string) $send_to,
             'currency' => (string) $currency,
-            'value'    => self::items_value( $items, $decimals ),
+            'value'    => null === $value ? self::items_value( $items, $decimals ) : round( (float) $value, $decimals ),
             'items'    => array_values( $items ),
         );
 
@@ -159,11 +161,12 @@ class WCCT_GA4_Data {
      * @param  float  $shipping
      * @param  array  $coupons
      * @param  int    $decimals
+     * @param  float  $value    Item total after discounts, see event_params()
      *
      * @return array
      */
-    public static function purchase_params( $send_to, $transaction_id, $currency, array $items, $tax, $shipping, array $coupons = array(), $decimals = 2 ) {
-        $params = self::event_params( $send_to, $currency, $items, $decimals, $coupons );
+    public static function purchase_params( $send_to, $transaction_id, $currency, array $items, $tax, $shipping, array $coupons = array(), $decimals = 2, $value = null ) {
+        $params = self::event_params( $send_to, $currency, $items, $decimals, $coupons, $value );
 
         $params['transaction_id'] = (string) $transaction_id;
         $params['tax']            = round( (float) $tax, $decimals );
