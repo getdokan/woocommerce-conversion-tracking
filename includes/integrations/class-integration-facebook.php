@@ -264,6 +264,22 @@ class WCCT_Integration_Facebook extends WCCT_Integration {
         <script>
             (function (window, document) {
                 if (window.wcfbq) return;
+                var cleanUrl = function (url) {
+                    try {
+                        var hashPos = url.indexOf('#');
+                        var hash = hashPos > -1 ? url.substring(hashPos) : '';
+                        var base = hashPos > -1 ? url.substring(0, hashPos) : url;
+                        var queryPos = base.indexOf('?');
+                        if (queryPos == -1) return url;
+                        var pairs = base.substring(queryPos + 1).split('&'), kept = [];
+                        for (var i = 0; i < pairs.length; i++) {
+                            if (decodeURIComponent(pairs[i].split('=')[0].replace(/\+/g, ' ')) != 'key') kept.push(pairs[i]);
+                        }
+                        return base.substring(0, queryPos) + (kept.length ? '?' + kept.join('&') : '') + hash;
+                    } catch (e) {
+                        return String(url).split('?')[0];
+                    }
+                };
                 window.wcfbq = (function () {
                     if (arguments.length > 0) {
                         var pixelId, trackType, contentObj;
@@ -293,8 +309,8 @@ class WCCT_Integration_Facebook extends WCCT_Integration {
                                     return;
                             }
 
-                            params.push('dl=' + encodeURIComponent(document.location.href));
-                            if (document.referrer) params.push('rl=' + encodeURIComponent(document.referrer));
+                            params.push('dl=' + encodeURIComponent(cleanUrl(document.location.href)));
+                            if (document.referrer) params.push('rl=' + encodeURIComponent(cleanUrl(document.referrer)));
                             params.push('if=false');
                             params.push('ts=' + new Date().getTime());
 
