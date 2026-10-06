@@ -81,20 +81,12 @@ class WCCT_Integration_Google extends WCCT_Integration {
             return;
         }
 
-        // Load gtag.js once per page, other integrations may already have printed it.
-        $print_loader = ! did_action( 'wcct_gtag_loader_printed' );
-
-        if ( $print_loader ) {
-            ?>
-        <script async src="https://www.googletagmanager.com/gtag/js?id=<?php echo esc_attr( $account_id ); ?>"></script>
-            <?php
-            do_action( 'wcct_gtag_loader_printed', $account_id );
-        }
+        $loader_printed = $this->print_gtag_loader( $account_id );
         ?>
         <script>
             window.dataLayer = window.dataLayer || [];
             function gtag(){dataLayer.push(arguments)};
-            <?php if ( $print_loader ) { ?>
+            <?php if ( $loader_printed ) { ?>
             gtag('js', new Date());
             <?php } ?>
 

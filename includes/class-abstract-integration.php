@@ -150,4 +150,29 @@ abstract class WCCT_Integration {
 
         return $product_ids;
     }
+
+    /**
+     * Print the gtag.js loader, once per page
+     *
+     * Integrations that use gtag.js call this instead of printing the
+     * loader themselves. Code that prints its own loader can fire the
+     * wcct_gtag_loader_printed action so the loader is not printed again.
+     *
+     * @param  string $tag_id ID for the loader URL, for example G-XXXXXXXXXX
+     *
+     * @return boolean True when the loader was printed by this call, false
+     *                 when it was already on the page. Only the first caller
+     *                 should send gtag('js').
+     */
+    protected function print_gtag_loader( $tag_id ) {
+        if ( did_action( 'wcct_gtag_loader_printed' ) ) {
+            return false;
+        }
+        ?>
+        <script async src="https://www.googletagmanager.com/gtag/js?id=<?php echo esc_attr( $tag_id ); ?>"></script>
+        <?php
+        do_action( 'wcct_gtag_loader_printed', $tag_id );
+
+        return true;
+    }
 }
