@@ -3,11 +3,11 @@ Contributors: tareq1988, wedevs
 Tags: ecommerce, e-commerce, commerce, woocommerce, tracking, facebook, google, adwords, tracking-pixel
 Donate link: https://tareq.co/donate/
 Requires at least: 5.4
-Tested up to: 6.8.2
+Tested up to: 7.1
 Requires PHP: 7.4
 WC requires at least: 5.0.0
-WC tested up to: 10.1.1
-Stable tag: 2.1.5
+WC tested up to: 11.1
+Stable tag: 2.1.6
 License: GPLv3
 License URI: http://www.gnu.org/licenses/gpl-3.0.html
 
@@ -113,6 +113,13 @@ Additionally, read weDevs [privacy policy](https://wedevs.com/privacy-policy/) f
 
 
 == Changelog ==
+
+= Version 2.1.6 (06 Oct, 2026) =
+
+- **New:** Google Analytics 4 integration with view item, add to cart, begin checkout and purchase events
+- **Fix:** Deferred plugin class and translation loading to avoid early textdomain notices
+- **Update:** Improved data handling on the order received page
+- **Update:** WordPress 7.1.2 and WooCommerce 11.1.2 compatibility
 
 = Version 2.1.5 (02 Feb, 2026) =
 
