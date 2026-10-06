@@ -78,6 +78,9 @@ class WeDevs_WC_Conversion_Tracking {
         $this->init_hooks();
         $this->includes();
 
+        // Must run at load time: Appsero registers activation/deactivation hooks.
+        $this->init_tracker();
+
         register_activation_hook( __FILE__, array( $this, 'activate' ) );
 
         // Add High Performance Order Storage Support
@@ -198,11 +201,11 @@ class WeDevs_WC_Conversion_Tracking {
      * @return void
      */
     public function init_classes() {
-        $this->init_tracker();
+        // Manager must exist before the dispatcher, which reads active integrations on construct.
+        $this->container['manager']             = new WCCT_Integration_Manager();
         $this->container['ajax']                = new WCCT_Ajax();
         $this->container['event_dispatcher']    = new WCCT_Event_Dispatcher();
         $this->container['admin']               = new WCCT_Admin();
-        $this->container['manager']             = new WCCT_Integration_Manager();
 
         new WCCT_Welcome_20();
 

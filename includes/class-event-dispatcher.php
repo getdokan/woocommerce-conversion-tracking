@@ -16,7 +16,8 @@ class WCCT_Event_Dispatcher {
      * Constructor for WCCT_Event_Dispatcher class
      */
     function __construct() {
-        add_action( 'plugins_loaded', array( $this, 'init_integrations' ) );
+        $this->init_integrations();
+
         add_action( 'wp_head', array( $this, 'enqueue_scripts' ) );
 
         // purchase events
