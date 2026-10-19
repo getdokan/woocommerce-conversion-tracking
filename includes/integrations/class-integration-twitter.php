@@ -10,7 +10,7 @@ class WCCT_Integration_Twitter extends WCCT_Integration {
      */
     function __construct() {
         $this->id       = 'twitter';
-        $this->name     = __( 'Twitter', 'woocommerce-conversion-tracking' );
+        $this->name     = 'Twitter';
         $this->enabled  = true;
         $this->supports = array(
             'checkout',
