@@ -186,6 +186,8 @@ class WeDevs_WC_Conversion_Tracking {
      * @return void
      */
     public function init_hooks() {
+        $this->container['capability'] = new \StorePulse\ConversionTracking\Access\Capability();
+        $this->container['capability']->register();
 
         add_action( 'plugins_loaded', array( $this, 'plugin_upgrades' ) );
         add_action( 'init', array( $this, 'localization_setup' ) );
@@ -361,10 +363,10 @@ function wcct_init() {
 wcct_init();
 
 /**
- * Manage Capability
+ * Capability that opens the settings; manage_wcct unless filtered
  *
  * @return string
  */
 function wcct_manage_cap() {
-    return apply_filters( 'wcct_capability', 'manage_options' );
+    return apply_filters( 'wcct_capability', \StorePulse\ConversionTracking\Access\Capability::NAME );
 }

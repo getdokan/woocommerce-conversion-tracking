@@ -23,6 +23,10 @@
             },
             error: function(error) {
                 $( '#wcct-submit' ).removeClass( 'updating-message' );
+                // A 403 rejects with the jqXHR instead of the response data.
+                if ( error && error.responseJSON && error.responseJSON.data ) {
+                    error = error.responseJSON.data;
+                }
                 alert( error && error.message ? error.message : 'something wrong happend' );
             }
         });

@@ -1,5 +1,8 @@
 <?php
 
+use StorePulse\ConversionTracking\Access\CustomScripts;
+use StorePulse\ConversionTracking\Access\SettingsIds;
+
 /**
  * Ajax handler class
  */
@@ -21,15 +24,21 @@ class WCCT_Ajax {
      * @return void
      */
     public function wcct_save_settings() {
-        if ( ! current_user_can( 'manage_options' ) ) {
-            return;
+        if ( ! current_user_can( wcct_manage_cap() ) ) {
+            wp_send_json_error(
+                [
+                    'message' => __( 'You do not have permission to change these settings.', 'woocommerce-conversion-tracking' ),
+                ],
+                403
+            );
         }
 
         if ( ! isset( $_REQUEST['_wpnonce'] ) || ! wp_verify_nonce( sanitize_key( wp_unslash( $_REQUEST['_wpnonce'] ) ), 'wcct-settings' ) ) {
             wp_send_json_error(
                 [
                     'message' => __( 'nonce verification failed', 'woocommerce-conversion-tracking' )
-                ]
+                ],
+                403
             );
         }
 
@@ -50,8 +59,27 @@ class WCCT_Ajax {
         }
 
 
+        $stored_settings = get_option( 'wcct_settings', array() );
+        $stored_settings = is_array( $stored_settings ) ? $stored_settings : array();
+        $can_edit_script = current_user_can( CustomScripts::CAPABILITY );
+
+        if ( ! $can_edit_script && CustomScripts::changed( stripslashes_deep( $integration_settings ), $stored_settings ) ) {
+            wp_send_json_error(
+                [
+                    'message' => __( 'Only administrators can change custom scripts.', 'woocommerce-conversion-tracking' ),
+                ],
+                403
+            );
+        }
+
         $integration_settings = apply_filters( 'wcct_save_integrations_settings', $integration_settings );
-        update_option( 'wcct_settings', stripslashes_deep( $integration_settings ) );
+        $integration_settings = SettingsIds::clean( stripslashes_deep( $integration_settings ) );
+
+        if ( ! $can_edit_script ) {
+            $integration_settings = CustomScripts::keep( $integration_settings, $stored_settings );
+        }
+
+        update_option( 'wcct_settings', $integration_settings );
         wp_send_json_success( array(
             'message' => __( 'Settings has been saved successfully!', 'woocommerce-conversion-tracking' )
         ) );

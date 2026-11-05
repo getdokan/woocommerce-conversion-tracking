@@ -55,7 +55,13 @@
 
                                                 case 'textarea':
                                                     $value = isset( $settings[ $field['name'] ] ) ? $settings[ $field['name'] ] : '';
-                                                    printf( '<textarea type="text" name="settings[%s][%s]" placeholder="%s" id="%s" cols="30" rows="3">%s</textarea>', esc_attr( $id ), esc_attr( $field['name'] ), esc_attr( $placeholder ), esc_attr( $id ) . '-' . esc_attr( $field['name'] ), esc_attr( $value ) );
+                                                    // Disabled fields aren't posted, so the save keeps the stored script.
+                                                    $locked = \StorePulse\ConversionTracking\Access\CustomScripts::INTEGRATION === $id && ! current_user_can( \StorePulse\ConversionTracking\Access\CustomScripts::CAPABILITY );
+                                                    printf( '<textarea type="text" name="settings[%s][%s]" placeholder="%s" id="%s" cols="30" rows="3"%s>%s</textarea>', esc_attr( $id ), esc_attr( $field['name'] ), esc_attr( $placeholder ), esc_attr( $id ) . '-' . esc_attr( $field['name'] ), $locked ? ' disabled' : '', esc_textarea( $value ) );
+
+                                                    if ( $locked ) {
+                                                        echo '<p class="help">' . esc_html__( 'Only administrators can edit custom scripts.', 'woocommerce-conversion-tracking' ) . '</p>';
+                                                    }
                                                     break;
 
                                                 case 'checkbox':
