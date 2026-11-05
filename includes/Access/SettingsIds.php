@@ -47,6 +47,17 @@ class SettingsIds {
             return $value;
         }
 
+        return self::clean_id( $value );
+    }
+
+    /**
+     * Strip everything but ID characters from one string.
+     *
+     * @param string $value Value.
+     *
+     * @return string
+     */
+    public static function clean_id( string $value ): string {
         // Pixel IDs, tag IDs and Google labels (AW-123/abc) only need these.
         return preg_replace( '/[^A-Za-z0-9_\-\/\.:]/', '', $value );
     }

@@ -189,6 +189,9 @@ class WeDevs_WC_Conversion_Tracking {
         $this->container['capability'] = new \StorePulse\ConversionTracking\Access\Capability();
         $this->container['capability']->register();
 
+        $this->container['rest'] = new \StorePulse\ConversionTracking\REST\Routes();
+        $this->container['rest']->register();
+
         add_action( 'plugins_loaded', array( $this, 'plugin_upgrades' ) );
         add_action( 'init', array( $this, 'localization_setup' ) );
         add_action( 'init', array( $this, 'init_classes' ) );

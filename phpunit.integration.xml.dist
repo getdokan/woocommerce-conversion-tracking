@@ -10,5 +10,8 @@
         <testsuite name="characterisation">
             <directory suffix="Test.php">tests/integration/Characterisation</directory>
         </testsuite>
+        <testsuite name="rest">
+            <directory suffix="Test.php">tests/integration/REST</directory>
+        </testsuite>
     </testsuites>
 </phpunit>

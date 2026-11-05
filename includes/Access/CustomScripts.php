@@ -54,6 +54,21 @@ class CustomScripts {
     }
 
     /**
+     * Whether a new value differs from the stored one, ignoring line-break style.
+     *
+     * @param mixed $new New value.
+     * @param mixed $old Stored value.
+     *
+     * @return bool
+     */
+    public static function differs( $new, $old ): bool {
+        $new = is_string( $new ) ? self::normalize( $new ) : $new;
+        $old = is_string( $old ) ? self::normalize( $old ) : $old;
+
+        return $new !== $old;
+    }
+
+    /**
      * Put the stored scripts back into the new settings.
      *
      * @param array $new New settings.
