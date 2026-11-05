@@ -1,0 +1,124 @@
+<!-- wcct-fixture: facebook/cart-after-add-to-cart -->
+<!-- page: is_cart -->
+<!-- head -->
+<!-- Starting: Conversion Tracking for WooCommerce (https://wordpress.org/plugins/woocommerce-conversion-tracking/) -->
+        <script>
+            !function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+            n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;
+            n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;
+            t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,
+            document,'script','https://connect.facebook.net/en_US/fbevents.js');
+
+            fbq('init', '111111111111111', {});fbq('track', 'PageView', {});        </script>
+                <script>
+            (function (window, document) {
+                if (window.wcfbq) return;
+                var cleanUrl = function (url) {
+                    try {
+                        var hashPos = url.indexOf('#');
+                        var hash = hashPos > -1 ? url.substring(hashPos) : '';
+                        var base = hashPos > -1 ? url.substring(0, hashPos) : url;
+                        var queryPos = base.indexOf('?');
+                        if (queryPos == -1) return url;
+                        var pairs = base.substring(queryPos + 1).split('&'), kept = [];
+                        for (var i = 0; i < pairs.length; i++) {
+                            if (decodeURIComponent(pairs[i].split('=')[0].replace(/\+/g, ' ')) != 'key') kept.push(pairs[i]);
+                        }
+                        return base.substring(0, queryPos) + (kept.length ? '?' + kept.join('&') : '') + hash;
+                    } catch (e) {
+                        return String(url).split('?')[0];
+                    }
+                };
+                window.wcfbq = (function () {
+                    if (arguments.length > 0) {
+                        var pixelId, trackType, contentObj;
+
+                        if (typeof arguments[0] == 'string') pixelId = arguments[0];
+                        if (typeof arguments[1] == 'string') trackType = arguments[1];
+                        if (typeof arguments[2] == 'object') contentObj = arguments[2];
+
+                        var params = [];
+                        if (typeof pixelId === 'string' && pixelId.replace(/\s+/gi, '') != '' &&
+                        typeof trackType === 'string' && trackType.replace(/\s+/gi, '')) {
+                            params.push('id=' + encodeURIComponent(pixelId));
+                            switch (trackType) {
+                                case 'PageView':
+                                case 'ViewContent':
+                                case 'Search':
+                                case 'AddToCart':
+                                case 'InitiateCheckout':
+                                case 'AddPaymentInfo':
+                                case 'Lead':
+                                case 'CompleteRegistration':
+                                case 'Purchase':
+                                case 'AddToWishlist':
+                                    params.push('ev=' + encodeURIComponent(trackType));
+                                    break;
+                                default:
+                                    return;
+                            }
+
+                            params.push('dl=' + encodeURIComponent(cleanUrl(document.location.href)));
+                            if (document.referrer) params.push('rl=' + encodeURIComponent(cleanUrl(document.referrer)));
+                            params.push('if=false');
+                            params.push('ts=' + new Date().getTime());
+
+                            if (typeof contentObj == 'object') {
+                                for (var u in contentObj) {
+                                    if (typeof contentObj[u] == 'object' && contentObj[u] instanceof Array) {
+                                        if (contentObj[u].length > 0) {
+                                            for (var y = 0; y < contentObj[u].length; y++) { contentObj[u][y] = (contentObj[u][y] + '').replace(/^\s+|\s+$/gi, '').replace(/\s+/gi, ' ').replace(/,/gi, '§'); }
+                                            params.push('cd[' + u + ']=' + encodeURIComponent(contentObj[u].join(',').replace(/^/gi, '[\'').replace(/$/gi, '\']').replace(/,/gi, '\',\'').replace(/§/gi, '\,')));
+                                        }
+                                    }
+                                    else if (typeof contentObj[u] == 'string')
+                                        params.push('cd[' + u + ']=' + encodeURIComponent(contentObj[u]));
+                                }
+                            }
+
+                            params.push('v=' + encodeURIComponent('2.7.19'));
+
+                            var imgId = new Date().getTime();
+                            var img = document.createElement('img');
+                            img.id = 'fb_' + imgId, img.src = 'https://www.facebook.com/tr/?' + params.join('&'), img.width = 1, img.height = 1, img.style = 'display:none;';
+                            document.body.appendChild(img);
+                            window.setTimeout(function () { var t = document.getElementById('fb_' + imgId); t.parentElement.removeChild(t); }, 1000);
+                        }
+                    }
+                });
+            })(window, document);
+        </script>
+                <script type="text/javascript">
+            jQuery(function($) {
+                $(document).on('added_to_cart', function (event, fragments, dhash, button) {
+                    var currencySymbol = $($(button.get()[0]).closest('.product')
+                        .find('.woocommerce-Price-currencySymbol').get()[0]).text();
+
+                    var price = $(button.get()[0]).closest('.product').find('.amount').text();
+                    var originalPrice = price.split(currencySymbol).slice(-1).pop();
+
+                    wcfbq('111111111111111', 'AddToCart', {
+                        content_ids: [ $(button).data('product_id') ],
+                        content_type: 'product',
+                        value: originalPrice,
+                        currency: 'USD'
+                    });
+                });
+            });
+        </script>
+        <!-- End: Conversion Tracking for WooCommerce Codes -->
+
+<!-- body -->
+
+<!-- footer -->
+
+<!-- footer: wc_enqueue_js -->
+
+fbq('track', 'AddToCart', {
+    "content_ids": "[2001]",
+    "content_type": "product",
+    "value": "18.00",
+    "currency": "USD"
+});
+
+<!-- scripts -->

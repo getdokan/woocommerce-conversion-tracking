@@ -1,0 +1,23 @@
+{
+    "name": "woocommerce-conversion-tracking-integration-tests",
+    "version": "1.0.0",
+    "private": true,
+    "description": "wp-env store for the PHPUnit characterisation tests of Conversion Tracking for WooCommerce",
+    "license": "GPL-2.0-or-later",
+    "engines": {
+        "node": ">=22.13.0"
+    },
+    "scripts": {
+        "wp-env": "wp-env",
+        "env:start": "wp-env start",
+        "env:stop": "wp-env stop",
+        "env:destroy": "wp-env destroy",
+        "test": "wp-env run cli --env-cwd=wp-content/plugins/woocommerce-conversion-tracking composer test",
+        "test:integration": "wp-env run cli --env-cwd=wp-content/plugins/woocommerce-conversion-tracking composer test:integration",
+        "test:pro": "wp-env run cli --env-cwd=wp-content/plugins/wc-conversion-tracking-pro composer test",
+        "fixtures:update": "wp-env run cli --env-cwd=wp-content/plugins/woocommerce-conversion-tracking env WCCT_UPDATE_FIXTURES=1 composer test:integration"
+    },
+    "devDependencies": {
+        "@wordpress/env": "^12.1.0"
+    }
+}

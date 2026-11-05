@@ -1,0 +1,14 @@
+<?xml version="1.0"?>
+<!-- Characterisation tests in a real WordPress + WooCommerce store. Run inside wp-env, see tests/integration/README.md. -->
+<phpunit
+    bootstrap="tests/integration/bootstrap.php"
+    colors="true"
+    cacheResult="false"
+    beStrictAboutOutputDuringTests="true"
+>
+    <testsuites>
+        <testsuite name="characterisation">
+            <directory suffix="Test.php">tests/integration/Characterisation</directory>
+        </testsuite>
+    </testsuites>
+</phpunit>

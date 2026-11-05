@@ -8,3 +8,4 @@ vendor
 .idea/
 dependencies/
 dist/
+tests/.output/

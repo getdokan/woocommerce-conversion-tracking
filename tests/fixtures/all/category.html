@@ -1,0 +1,223 @@
+<!-- wcct-fixture: all/category -->
+<!-- page: is_product_category -->
+<!-- head -->
+<!-- Starting: Conversion Tracking for WooCommerce (https://wordpress.org/plugins/woocommerce-conversion-tracking/) -->
+        <script>
+            !function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+            n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;
+            n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;
+            t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,
+            document,'script','https://connect.facebook.net/en_US/fbevents.js');
+
+            fbq('init', '111111111111111', {});fbq('track', 'PageView', {});        </script>
+                <script>
+            (function (window, document) {
+                if (window.wcfbq) return;
+                var cleanUrl = function (url) {
+                    try {
+                        var hashPos = url.indexOf('#');
+                        var hash = hashPos > -1 ? url.substring(hashPos) : '';
+                        var base = hashPos > -1 ? url.substring(0, hashPos) : url;
+                        var queryPos = base.indexOf('?');
+                        if (queryPos == -1) return url;
+                        var pairs = base.substring(queryPos + 1).split('&'), kept = [];
+                        for (var i = 0; i < pairs.length; i++) {
+                            if (decodeURIComponent(pairs[i].split('=')[0].replace(/\+/g, ' ')) != 'key') kept.push(pairs[i]);
+                        }
+                        return base.substring(0, queryPos) + (kept.length ? '?' + kept.join('&') : '') + hash;
+                    } catch (e) {
+                        return String(url).split('?')[0];
+                    }
+                };
+                window.wcfbq = (function () {
+                    if (arguments.length > 0) {
+                        var pixelId, trackType, contentObj;
+
+                        if (typeof arguments[0] == 'string') pixelId = arguments[0];
+                        if (typeof arguments[1] == 'string') trackType = arguments[1];
+                        if (typeof arguments[2] == 'object') contentObj = arguments[2];
+
+                        var params = [];
+                        if (typeof pixelId === 'string' && pixelId.replace(/\s+/gi, '') != '' &&
+                        typeof trackType === 'string' && trackType.replace(/\s+/gi, '')) {
+                            params.push('id=' + encodeURIComponent(pixelId));
+                            switch (trackType) {
+                                case 'PageView':
+                                case 'ViewContent':
+                                case 'Search':
+                                case 'AddToCart':
+                                case 'InitiateCheckout':
+                                case 'AddPaymentInfo':
+                                case 'Lead':
+                                case 'CompleteRegistration':
+                                case 'Purchase':
+                                case 'AddToWishlist':
+                                    params.push('ev=' + encodeURIComponent(trackType));
+                                    break;
+                                default:
+                                    return;
+                            }
+
+                            params.push('dl=' + encodeURIComponent(cleanUrl(document.location.href)));
+                            if (document.referrer) params.push('rl=' + encodeURIComponent(cleanUrl(document.referrer)));
+                            params.push('if=false');
+                            params.push('ts=' + new Date().getTime());
+
+                            if (typeof contentObj == 'object') {
+                                for (var u in contentObj) {
+                                    if (typeof contentObj[u] == 'object' && contentObj[u] instanceof Array) {
+                                        if (contentObj[u].length > 0) {
+                                            for (var y = 0; y < contentObj[u].length; y++) { contentObj[u][y] = (contentObj[u][y] + '').replace(/^\s+|\s+$/gi, '').replace(/\s+/gi, ' ').replace(/,/gi, '§'); }
+                                            params.push('cd[' + u + ']=' + encodeURIComponent(contentObj[u].join(',').replace(/^/gi, '[\'').replace(/$/gi, '\']').replace(/,/gi, '\',\'').replace(/§/gi, '\,')));
+                                        }
+                                    }
+                                    else if (typeof contentObj[u] == 'string')
+                                        params.push('cd[' + u + ']=' + encodeURIComponent(contentObj[u]));
+                                }
+                            }
+
+                            params.push('v=' + encodeURIComponent('2.7.19'));
+
+                            var imgId = new Date().getTime();
+                            var img = document.createElement('img');
+                            img.id = 'fb_' + imgId, img.src = 'https://www.facebook.com/tr/?' + params.join('&'), img.width = 1, img.height = 1, img.style = 'display:none;';
+                            document.body.appendChild(img);
+                            window.setTimeout(function () { var t = document.getElementById('fb_' + imgId); t.parentElement.removeChild(t); }, 1000);
+                        }
+                    }
+                });
+            })(window, document);
+        </script>
+                <script type="text/javascript">
+            jQuery(function($) {
+                $(document).on('added_to_cart', function (event, fragments, dhash, button) {
+                    var currencySymbol = $($(button.get()[0]).closest('.product')
+                        .find('.woocommerce-Price-currencySymbol').get()[0]).text();
+
+                    var price = $(button.get()[0]).closest('.product').find('.amount').text();
+                    var originalPrice = price.split(currencySymbol).slice(-1).pop();
+
+                    wcfbq('111111111111111', 'AddToCart', {
+                        content_ids: [ $(button).data('product_id') ],
+                        content_type: 'product',
+                        value: originalPrice,
+                        currency: 'USD'
+                    });
+                });
+            });
+        </script>
+                <script async src="https://www.googletagmanager.com/gtag/js?id=AW-123456789"></script>
+                <script>
+            window.dataLayer = window.dataLayer || [];
+            function gtag(){dataLayer.push(arguments)};
+                        gtag('js', new Date());
+            
+            gtag('config', 'AW-123456789');
+        </script>
+                <script type="text/javascript">
+            !function(e,t,n,s,u,a){e.twq||(s=e.twq=function(){s.exe?s.exe.apply(s,arguments):s.queue.push(arguments);},s.version='1.1',s.queue=[],u=t.createElement(n),u.async=!0,u.src='//static.ads-twitter.com/uwt.js',a=t.getElementsByTagName(n)[0],a.parentNode.insertBefore(u,a))}(window,document,'script');
+
+            twq('init', 'ct0x1', {});            twq('track', 'PageView', {});        </script>
+
+                        <script>
+            window.dataLayer = window.dataLayer || [];
+            window.wcctGtag = window.wcctGtag || function () { window.dataLayer.push(arguments); };
+                        (function () {
+                var cleanUrl = function (url) {
+                    try {
+                        var hashPos = url.indexOf('#');
+                        var hash = hashPos > -1 ? url.substring(hashPos) : '';
+                        var base = hashPos > -1 ? url.substring(0, hashPos) : url;
+                        var queryPos = base.indexOf('?');
+                        if (queryPos == -1) return url;
+                        var pairs = base.substring(queryPos + 1).split('&'), kept = [];
+                        for (var i = 0; i < pairs.length; i++) {
+                            if (decodeURIComponent(pairs[i].split('=')[0].replace(/\+/g, ' ')) != 'key') kept.push(pairs[i]);
+                        }
+                        return base.substring(0, queryPos) + (kept.length ? '?' + kept.join('&') : '') + hash;
+                    } catch (e) {
+                        return String(url).split('?')[0];
+                    }
+                };
+                var config = {};
+                var pageLocation = cleanUrl(window.location.href);
+                if (pageLocation != window.location.href) config.page_location = pageLocation;
+                if (document.referrer) {
+                    var referrer = cleanUrl(document.referrer);
+                    if (referrer != document.referrer) config.page_referrer = referrer;
+                }
+                wcctGtag('config', "G-CTTEST1234", config);
+            })();
+        </script>
+        <!-- End: Conversion Tracking for WooCommerce Codes -->
+
+<!-- body -->
+
+<!-- footer -->
+        <script>
+            (function () {
+                window.dataLayer = window.dataLayer || [];
+                var gtag = window.wcctGtag || function () { window.dataLayer.push(arguments); };
+                var events = [];
+                var pending = [];
+                // IDs of adds already sent from the AJAX response, skipped
+                // when the same adds come back from the session.
+                var sentKey = 'wcct_ga4_sent_add_to_cart';
+                var readSent = function () {
+                    try { return JSON.parse(window.sessionStorage.getItem(sentKey)) || []; } catch (e) { return []; }
+                };
+                var sendAdds = function (entries, remember) {
+                    var sent = readSent();
+                    for (var i = 0; i < entries.length; i++) {
+                        if (!entries[i] || !entries[i].params || sent.indexOf(entries[i].id) > -1) continue;
+                        gtag('event', 'add_to_cart', entries[i].params);
+                        if (remember) sent.push(entries[i].id);
+                    }
+                    if (remember) {
+                        try { window.sessionStorage.setItem(sentKey, JSON.stringify(sent.slice(-50))); } catch (e) {}
+                    }
+                };
+                sendAdds(pending, false);
+                // Tells the server the purchase was sent, so it is not sent again.
+                // Runs only once gtag.js has handled the event, so a blocked or
+                // abandoned page sends the purchase again on the next view.
+                // gtag also runs the callback when event_timeout passes, even if
+                // the hit failed, so the timeout is long enough that the callback
+                // in practice comes from the hit being sent.
+                var confirmSent = function (order) {
+                    var done = false;
+                    return function () {
+                        if (done) return;
+                        done = true;
+                        var url = "{home}\/wp-admin\/admin-ajax.php";
+                        var body = new FormData();
+                        body.append('action', "wcct_ga4_purchase_sent");
+                        body.append('order_id', order.order_id);
+                        body.append('key', order.key);
+                        if (navigator.sendBeacon && navigator.sendBeacon(url, body)) return;
+                        var xhr = new XMLHttpRequest();
+                        xhr.open('POST', url);
+                        xhr.send(body);
+                    };
+                };
+                for (var i = 0; i < events.length; i++) {
+                    if (events[i][2]) {
+                        events[i][1].event_callback = confirmSent(events[i][2]);
+                        events[i][1].event_timeout = 60000;
+                    }
+                    gtag('event', events[i][0], events[i][1]);
+                }
+                                if (window.jQuery) {
+                    window.jQuery(document.body).on('added_to_cart', function (e, fragments) {
+                        if (fragments && fragments['wcct_ga4_add_to_cart']) {
+                            sendAdds(fragments['wcct_ga4_add_to_cart'], true);
+                            delete fragments['wcct_ga4_add_to_cart'];
+                        }
+                    });
+                }
+                            })();
+        </script>
+        
+<!-- footer: wc_enqueue_js -->
+
+<!-- scripts -->
