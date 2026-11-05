@@ -102,6 +102,10 @@ class Assets {
             array(
                 'version'    => WCCT_VERSION,
                 'proVersion' => defined( 'WCCT_PRO_VERSION' ) ? WCCT_PRO_VERSION : '',
+                'docs'       => array(
+                    'home'  => Docs::home_url(),
+                    'tiles' => Docs::tiles(),
+                ),
             )
         );
     }

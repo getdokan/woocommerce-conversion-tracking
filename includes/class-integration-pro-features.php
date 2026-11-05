@@ -130,7 +130,7 @@ class WCCT_Pro_Features {
                 <li>Facebook <strong>Product Catalog</strong></li>
                 <li><mark><strong>Multiple</strong> Facebook Pixels</mark></li>
                 <li>Advanced Google Adwords Events</li>
-                <li>Advanced Twitter Events</li>
+                <li>Advanced X (formerly Twitter) Events</li>
                 <li>Perfect Audience Integration</li>
                 <li>Bing Ads</li>
             </ul>

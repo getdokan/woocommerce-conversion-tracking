@@ -2,7 +2,7 @@
 /*
 Plugin Name: Conversion Tracking for WooCommerce
 Plugin URI: https://wedevs.com/woocommerce-conversion-tracking/
-Description: Adds various conversion tracking codes to cart, checkout, registration success and product page on WooCommerce
+Description: Sends WooCommerce purchases and shopper events to Meta, Google Analytics 4, Google Ads and X, each purchase counted once, plus your own scripts.
 Version: 2.1.6
 Author: weDevs
 Author URI: https://wedevs.com/?utm_source=ORG_Author_URI_WCCT

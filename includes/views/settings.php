@@ -152,13 +152,12 @@
             <h3 class="wcct-doc-title"><?php esc_html_e( 'Documentation', 'woocommerce-conversion-tracking' ); ?></h3>
 
             <ul class="wcct-doc-list">
-                <li><a href="https://wedevs.com/docs/woocommerce-conversion-tracking/getting-started/installation/" target="_blank"><img src="<?php echo esc_attr( plugins_url( 'assets/images/getting_started.png', WCCT_FILE ) ); ?>" alt="" class="doc-list-icon"><span><?php esc_html_e( 'Getting Started', 'woocommerce-conversion-tracking' ) ?></span></a></li>
-                <li><a href="https://wedevs.com/docs/woocommerce-conversion-tracking/facebook/?utm_source=wp-admin&utm_medium=docs-link&utm_campaign=wcct_docs&utm_content=Facebook" target="_blank"><img src="<?php echo esc_attr( plugins_url( 'assets/images/facebook.png', WCCT_FILE ) ); ?>" alt="" class="doc-list-icon"><span><?php esc_html_e( 'Facebook', 'woocommerce-conversion-tracking' ) ?></span></a></li>
-                <li><a href="https://wedevs.com/docs/woocommerce-conversion-tracking/twitter/?utm_source=wp-admin&utm_medium=docs-link&utm_campaign=wcct_docs&utm_content=Twitter" target="_blank"><img src="<?php echo esc_attr( plugins_url( 'assets/images/twitter.png', WCCT_FILE ) ); ?>" alt="" class="doc-list-icon"><span><?php esc_html_e( 'Twitter', 'woocommerce-conversion-tracking' ) ?></span></a></li>
-                <li><a href="https://wedevs.com/docs/woocommerce-conversion-tracking/google-adwords/?utm_source=wp-admin&utm_medium=docs-link&utm_campaign=wcct_docs&utm_content=Adwords" target="_blank"><img src="<?php echo esc_attr( plugins_url( 'assets/images/adwords.png', WCCT_FILE ) ); ?>" alt="" class="doc-list-icon"><span><?php esc_html_e( 'Google Ads', 'woocommerce-conversion-tracking' ) ?></span></a></li>
-                <li><a href="https://wedevs.com/docs/woocommerce-conversion-tracking/bing-ads" target="_blank"><img src="<?php echo esc_attr( plugins_url( 'assets/images/bing_ads.png', WCCT_FILE ) ); ?>" alt="" class="doc-list-icon"><span><?php esc_html_e( 'Microsoft Advertising', 'woocommerce-conversion-tracking' ) ?></span></a></li>
-                <li><a href="https://wedevs.com/docs/woocommerce-conversion-tracking/custom/?utm_source=wp-admin&utm_medium=docs-link&utm_campaign=wcct_docs&utm_content=Custom" target="_blank"><img src="<?php echo esc_attr( plugins_url( 'assets/images/custom.png', WCCT_FILE ) ); ?>" alt="" class="doc-list-icon"><span><?php esc_html_e( 'Custom', 'woocommerce-conversion-tracking' ) ?></span></a></li>
+                <?php foreach ( \StorePulse\ConversionTracking\Admin\Docs::tiles() as $tile ) : ?>
+                    <li><a href="<?php echo esc_url( $tile['url'] ); ?>" target="_blank"><img src="<?php echo esc_url( $tile['icon'] ); ?>" alt="" class="doc-list-icon"><span><?php echo esc_html( $tile['title'] ); ?><?php echo $tile['pro'] && ! wcct_init()->is_pro() ? ' ' . esc_html__( '(Pro)', 'woocommerce-conversion-tracking' ) : ''; ?></span></a></li>
+                <?php endforeach; ?>
             </ul>
+
+            <p><a href="<?php echo esc_url( \StorePulse\ConversionTracking\Admin\Docs::home_url() ); ?>" target="_blank"><?php esc_html_e( 'All documentation', 'woocommerce-conversion-tracking' ); ?></a></p>
         </div>
 
         <?php do_action( 'wcct_sidebar' ) ?>

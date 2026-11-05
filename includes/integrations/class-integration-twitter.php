@@ -10,7 +10,7 @@ class WCCT_Integration_Twitter extends WCCT_Integration {
      */
     function __construct() {
         $this->id       = 'twitter';
-        $this->name     = __( 'Twitter', 'woocommerce-conversion-tracking' );
+        $this->name     = __( 'X (formerly Twitter)', 'woocommerce-conversion-tracking' );
         $this->enabled  = true;
         $this->supports = array(
             'checkout',
@@ -36,7 +36,7 @@ class WCCT_Integration_Twitter extends WCCT_Integration {
                         'label'            => __( 'Purchase', 'woocommerce-conversion-tracking' ),
                         'label_name'       => 'universal_tag_id',
                         'placeholder'      => 'Universal Tag ID',
-                        'help'             => sprintf( __( 'Find the Universal Tag ID from <a href="%s" target="_blank">here</a>, navigate to Tools &rarr; Conversion Tracking.', 'woocommerce-conversion-tracking' ), 'https://ads.twitter.com/' )
+                        'help'             => sprintf( __( 'Find the Universal Tag ID from <a href="%s" target="_blank">here</a>, navigate to Tools &rarr; Conversion Tracking.', 'woocommerce-conversion-tracking' ), 'https://ads.x.com/' )
                     ),
                 )
             ),
