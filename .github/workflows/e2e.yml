@@ -1,0 +1,220 @@
+name: E2E
+
+# Runs started by a wc-conversion-tracking-pro PR (pro_sha set) are named after both branches so they can be found.
+run-name: ${{ inputs.pro_sha && format('E2E (pro {0}, lite {1})', inputs.pro_ref, inputs.lite_ref || github.ref_name) || github.workflow }}
+
+# Places guest orders in a wp-env store (tests/e2e) and fails on a JS error or a missing Purchase hit.
+on:
+    pull_request:
+    push:
+        branches: [develop, master, feature/ct-revamp]
+    workflow_dispatch:
+        inputs:
+            wp_stack:
+                description: 'latest = current WordPress and WooCommerce (the default); pinned = the versions in tests/e2e/.wp-env.json'
+                default: latest
+                type: choice
+                options:
+                    - latest
+                    - pinned
+            # The three inputs below are set by wc-conversion-tracking-pro's e2e-on-lite.yml. Leave them empty for a manual run.
+            pro_ref:
+                description: wc-conversion-tracking-pro branch (empty = the branch with the same name as Lite's, else develop)
+                default: ''
+                type: string
+            lite_ref:
+                description: Lite branch to test (empty = the branch picked in "Use workflow from")
+                default: ''
+                type: string
+            pro_sha:
+                description: wc-conversion-tracking-pro commit to test and give the "e2e" status (empty = none)
+                default: ''
+                type: string
+
+# A newer run cancels the older one: per PR, per Pro branch for Pro dispatches, else per branch.
+concurrency:
+    group: ${{ github.workflow }}-${{ inputs.pro_sha && format('pro-{0}', inputs.pro_ref) || github.event.pull_request.number && format('pr-{0}', github.event.pull_request.number) || github.ref }}-${{ inputs.wp_stack || 'latest' }}
+    cancel-in-progress: true
+
+permissions:
+    contents: read
+
+env:
+    WP_STACK: ${{ inputs.wp_stack || 'latest' }}
+
+jobs:
+    e2e:
+        name: e2e
+        runs-on: ubuntu-latest
+        timeout-minutes: 30
+        defaults:
+            run:
+                working-directory: woocommerce-conversion-tracking/tests/e2e
+        steps:
+            # Lite and Pro are checked out side by side, as in wp-content/plugins, so the Pro mapping is the same as locally.
+            - name: Check out Lite
+              uses: actions/checkout@v4
+              with:
+                  ref: ${{ inputs.lite_ref }}
+                  path: woocommerce-conversion-tracking
+
+            # Pro is private. Fork PRs get no secrets, so they test Lite only.
+            - name: Pick the Pro branch
+              id: pro
+              if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+              working-directory: .
+              env:
+                  # Needs "Contents: Read" and "Commit statuses: Read and write" on getdokan/wc-conversion-tracking-pro.
+                  PRO_TOKEN: ${{ secrets.CT_PRO_TOKEN }}
+                  PRO_REF: ${{ inputs.pro_sha || inputs.pro_ref }}
+                  LITE_REF: ${{ inputs.lite_ref || github.head_ref || github.ref_name }}
+              run: |
+                  if [ -z "$PRO_TOKEN" ]; then
+                      # A run started by Pro must test Pro, so it can't fall back to Lite only.
+                      if [ -n "$PRO_REF" ]; then
+                          echo "::error::CT_PRO_TOKEN is not set, so the Pro commit can't be tested"
+                          exit 1
+                      fi
+                      echo "::warning::CT_PRO_TOKEN is not set, so this run tests Lite only"
+                      exit 0
+                  fi
+                  ref=$PRO_REF
+                  if [ -z "$ref" ] && GH_TOKEN=$PRO_TOKEN gh api "repos/getdokan/wc-conversion-tracking-pro/branches/$LITE_REF" --silent 2>/dev/null; then
+                      ref=$LITE_REF
+                  fi
+                  echo "ref=${ref:-develop}" >> "$GITHUB_OUTPUT"
+
+            - name: Check out Pro
+              if: steps.pro.outputs.ref
+              uses: actions/checkout@v4
+              with:
+                  repository: getdokan/wc-conversion-tracking-pro
+                  ref: ${{ steps.pro.outputs.ref }}
+                  path: wc-conversion-tracking-pro
+                  token: ${{ secrets.CT_PRO_TOKEN }}
+
+            - name: Set up PHP
+              uses: shivammathur/setup-php@v2
+              with:
+                  php-version: '7.4'
+                  coverage: none
+                  tools: composer:v2
+
+            - name: Set up Node
+              uses: actions/setup-node@v4
+              with:
+                  node-version: 22
+                  cache: npm
+                  cache-dependency-path: |
+                      woocommerce-conversion-tracking/package-lock.json
+                      woocommerce-conversion-tracking/tests/e2e/package-lock.json
+
+            # Same build as release.yml: the dev install runs Mozart (dependencies/), then the dev packages are removed.
+            - name: Build Lite
+              working-directory: woocommerce-conversion-tracking
+              run: |
+                  composer install --no-interaction --no-progress
+                  composer install --no-interaction --no-progress --no-dev -o
+                  npm ci --no-audit --no-fund
+                  npm run build
+
+            - name: Install test dependencies
+              run: npm ci --no-audit --no-fund
+
+            - name: Prepare wp-env config
+              run: |
+                  override='{}'
+                  if [ -d ../../../wc-conversion-tracking-pro ]; then
+                      override=$(jq '.mappings["wp-content/plugins/wc-conversion-tracking-pro"] = "../../../wc-conversion-tracking-pro"' <<<"$override")
+                  fi
+                  # latest: newest WordPress, and the current stable WooCommerce (the unversioned zip can be a beta).
+                  if [ "$WP_STACK" = latest ]; then
+                      wc=$(curl -fsSL https://api.wordpress.org/plugins/info/1.0/woocommerce.json | jq -r .version)
+                      if [ -z "$wc" ] || [ "$wc" = null ]; then
+                          echo "::error::Could not resolve the current WooCommerce release from wordpress.org"
+                          exit 1
+                      fi
+                      plugins=$(jq --arg wc "$wc" '.plugins | map(sub("/woocommerce\\.[0-9][0-9.]*\\.zip$"; "/woocommerce.\($wc).zip"))' .wp-env.json)
+                      override=$(jq --argjson plugins "$plugins" '.core = null | .plugins = $plugins' <<<"$override")
+                  fi
+                  echo "$override" | tee .wp-env.override.json
+
+            # Docker Hub's anonymous pull limits can fail wp-env start; Google's public mirror avoids them.
+            - name: Route Docker Hub pulls through a mirror
+              run: |
+                  sudo mkdir -p /etc/docker
+                  if [ -s /etc/docker/daemon.json ]; then
+                      sudo jq '. + {"registry-mirrors": ["https://mirror.gcr.io"]}' /etc/docker/daemon.json | sudo tee /etc/docker/daemon.json.tmp >/dev/null
+                      sudo mv /etc/docker/daemon.json.tmp /etc/docker/daemon.json
+                  else
+                      echo '{ "registry-mirrors": ["https://mirror.gcr.io"] }' | sudo tee /etc/docker/daemon.json >/dev/null
+                  fi
+                  sudo systemctl restart docker
+                  for _ in $(seq 1 15); do docker info >/dev/null 2>&1 && break; sleep 1; done
+
+            - name: Start WordPress
+              id: wp-env
+              uses: nick-fields/retry@v3
+              with:
+                  timeout_minutes: 8
+                  max_attempts: 3
+                  retry_wait_seconds: 60
+                  command: cd woocommerce-conversion-tracking/tests/e2e && npx wp-env start --scripts=false
+
+            # Run outside wp-env start so its output shows in the log.
+            - name: Set up the store
+              run: npm run env:setup
+
+            - name: Record versions
+              run: |
+                  {
+                      echo "### E2E stack ($WP_STACK)"
+                      echo
+                      echo "- WordPress $(npx wp-env run cli wp core version 2>/dev/null | tr -d '\r' | head -n1)"
+                      npx wp-env run cli wp plugin list --status=active --fields=name,version --format=csv --skip-update-check 2>/dev/null \
+                          | tr -d '\r' | tail -n +2 | sed 's/^/- /; s/,/ /'
+                  } | tee -a "$GITHUB_STEP_SUMMARY"
+
+            - name: Get the Playwright version
+              run: echo "PLAYWRIGHT_VERSION=$(npm ls @playwright/test --json | jq -r '.dependencies["@playwright/test"].version')" >> "$GITHUB_ENV"
+
+            - name: Cache Playwright browsers
+              id: playwright-cache
+              uses: actions/cache@v4
+              with:
+                  path: ~/.cache/ms-playwright
+                  key: ${{ runner.os }}-playwright-${{ env.PLAYWRIGHT_VERSION }}
+
+            - name: Install Playwright browsers
+              if: steps.playwright-cache.outputs.cache-hit != 'true'
+              run: npx playwright install --with-deps chromium
+
+            - name: Run e2e tests
+              run: npm test
+
+            - name: Upload test artifacts
+              if: failure() && steps.wp-env.outcome == 'success'
+              uses: actions/upload-artifact@v4
+              with:
+                  name: e2e-artifacts
+                  path: |
+                      woocommerce-conversion-tracking/tests/e2e/playwright-report
+                      woocommerce-conversion-tracking/tests/e2e/test-results
+                      woocommerce-conversion-tracking/tests/e2e/wp-data
+                  if-no-files-found: ignore
+                  retention-days: 7
+
+            # Reports back to the wc-conversion-tracking-pro commit that started this run.
+            - name: Set the e2e status on the Pro commit
+              if: always() && inputs.pro_sha != '' && steps.pro.outputs.ref
+              working-directory: .
+              env:
+                  GH_TOKEN: ${{ secrets.CT_PRO_TOKEN }}
+                  PRO_SHA: ${{ inputs.pro_sha }}
+                  STATE: ${{ job.status == 'success' && 'success' || 'failure' }}
+                  RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+                  LITE_REF: ${{ inputs.lite_ref || github.ref_name }}
+              run: |
+                  gh api "repos/getdokan/wc-conversion-tracking-pro/statuses/$PRO_SHA" \
+                      -f state="$STATE" -f context=e2e -f target_url="$RUN_URL" \
+                      -f description="lite ${LITE_REF:0:100}: $STATE"

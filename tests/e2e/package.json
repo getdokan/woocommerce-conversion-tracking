@@ -1,0 +1,29 @@
+{
+    "name": "woocommerce-conversion-tracking-e2e",
+    "version": "1.0.0",
+    "private": true,
+    "description": "Playwright end-to-end tests for Conversion Tracking for WooCommerce",
+    "license": "GPL-2.0-or-later",
+    "engines": {
+        "node": ">=22.13.0"
+    },
+    "scripts": {
+        "wp-env": "wp-env",
+        "env:start": "wp-env start",
+        "env:stop": "wp-env stop",
+        "env:reset": "wp-env reset && npm run env:setup",
+        "env:destroy": "wp-env destroy",
+        "env:setup": "wp-env run cli sh wp-content/plugins/woocommerce-conversion-tracking/tests/e2e/setup/setup.sh",
+        "install:chromium": "playwright install chromium",
+        "test": "playwright test",
+        "test:headed": "playwright test --headed",
+        "test:ui": "playwright test --ui",
+        "test:debug": "playwright test --debug",
+        "test:report": "playwright show-report"
+    },
+    "devDependencies": {
+        "@playwright/test": "^1.64.1",
+        "@types/node": "^22.13.0",
+        "@wordpress/env": "^12.1.0"
+    }
+}
