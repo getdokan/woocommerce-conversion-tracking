@@ -115,3 +115,17 @@
 <!-- footer: wc_enqueue_js -->
 
 <!-- scripts -->
+{
+    "handle": "wcct-facebook-events",
+    "src": "",
+    "ver": "{version}",
+    "deps": [],
+    "in_footer": true,
+    "printed": true,
+    "extra": {
+        "after": [
+            false,
+            "fbq('track', 'InitiateCheckout', {\n    \"num_items\": 3,\n    \"content_ids\": \"[2001,2003]\",\n    \"content_type\": \"product\",\n    \"value\": \"78.00\",\n    \"currency\": \"USD\"\n});\n"
+        ]
+    }
+}

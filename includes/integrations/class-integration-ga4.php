@@ -2,6 +2,10 @@
 
 require_once WCCT_INCLUDES . '/class-ga4-data.php';
 
+use StorePulse\ConversionTracking\Events\Event;
+use StorePulse\ConversionTracking\Events\SentFlags;
+use StorePulse\ConversionTracking\Events\SkippedStatuses;
+
 /**
  * Google Analytics 4 integration
  */
@@ -13,13 +17,6 @@ class WCCT_Integration_GA4 extends WCCT_Integration {
      * @var string
      */
     const SESSION_KEY = 'wcct_ga4_pending_add_to_cart';
-
-    /**
-     * Order meta key that marks the purchase event as sent
-     *
-     * @var string
-     */
-    const TRACKED_META_KEY = '_wcct_ga4_tracked';
 
     /**
      * Cart fragment key that carries add to cart data in AJAX responses
@@ -61,7 +58,6 @@ class WCCT_Integration_GA4 extends WCCT_Integration {
         add_filter( 'wcct_save_integrations_settings', array( $this, 'sanitize_settings' ) );
         add_action( 'woocommerce_add_to_cart', array( $this, 'capture_add_to_cart' ), 10, 6 );
         add_filter( 'woocommerce_add_to_cart_fragments', array( $this, 'add_to_cart_fragment' ) );
-        add_action( 'wp_footer', array( $this, 'print_footer_events' ), 30 );
         add_action( 'wp_ajax_' . self::PURCHASE_SENT_ACTION, array( $this, 'mark_purchase_sent' ) );
         add_action( 'wp_ajax_nopriv_' . self::PURCHASE_SENT_ACTION, array( $this, 'mark_purchase_sent' ) );
     }
@@ -277,11 +273,24 @@ class WCCT_Integration_GA4 extends WCCT_Integration {
     /**
      * Print the events for this page in the footer
      *
+     * @deprecated 3.0.0 The pipeline prints the footer script, see get_footer_script().
+     *
      * @return void
      */
     public function print_footer_events() {
+        _deprecated_function( __METHOD__, '3.0.0', 'WCCT_Integration_GA4::get_footer_script()' );
+    }
+
+    /**
+     * Footer script for the events on this page
+     *
+     * @param Event[] $page_events Events decided on page load.
+     *
+     * @return string
+     */
+    public function get_footer_script( array $page_events ) {
         if ( ! $this->is_tracking_page() ) {
-            return;
+            return '';
         }
 
         $events      = array();
@@ -292,42 +301,41 @@ class WCCT_Integration_GA4 extends WCCT_Integration {
             $pending = array();
         }
 
-        if ( is_product() && $this->event_allowed( 'view_item' ) ) {
-            $product = wc_get_product( get_queried_object_id() );
-
-            if ( $product ) {
-                $events[] = array( 'view_item', $this->get_event_params( array( $this->get_product_item( $product, 1 ) ) ) );
+        foreach ( $page_events as $page_event ) {
+            if ( Event::VIEW_PRODUCT === $page_event->get_name() && $page_event->get_product() && $this->event_allowed( 'view_item' ) ) {
+                $events[] = array( 'view_item', $this->get_event_params( array( $this->get_product_item( $page_event->get_product(), 1 ) ) ) );
             }
-        }
 
-        if ( is_checkout() && ! is_order_received_page() && ! is_wc_endpoint_url( 'order-pay' ) && $this->event_allowed( 'begin_checkout' ) ) {
-            $params = $this->get_begin_checkout_params();
+            if ( Event::BEGIN_CHECKOUT === $page_event->get_name() && $this->event_allowed( 'begin_checkout' ) ) {
+                $params = $this->get_begin_checkout_params();
 
-            if ( $params ) {
-                $events[] = array( 'begin_checkout', $params );
+                if ( $params ) {
+                    $events[] = array( 'begin_checkout', $params );
+                }
             }
-        }
 
-        if ( is_order_received_page() && $this->event_allowed( 'purchase' ) ) {
-            $order = $this->get_purchase_order();
+            if ( Event::PURCHASE === $page_event->get_name() && $this->event_allowed( 'purchase' ) ) {
+                $order = $this->get_purchase_order( $page_event->get_order() );
 
-            if ( $order ) {
-                $events[] = array(
-                    'purchase',
-                    $this->get_purchase_params( $order ),
-                    array(
-                        'order_id' => $order->get_id(),
-                        'key'      => $order->get_order_key(),
-                    ),
-                );
+                if ( $order ) {
+                    $events[] = array(
+                        'purchase',
+                        $this->get_purchase_params( $order ),
+                        array(
+                            'order_id' => $order->get_id(),
+                            'key'      => $order->get_order_key(),
+                        ),
+                    );
+                }
             }
         }
 
         if ( ! $events && ! $pending && ! $listen_ajax ) {
-            return;
+            return '';
         }
+
+        ob_start();
         ?>
-        <script>
             (function () {
                 window.dataLayer = window.dataLayer || [];
                 var gtag = window.wcctGtag || function () { window.dataLayer.push(arguments); };
@@ -391,8 +399,8 @@ class WCCT_Integration_GA4 extends WCCT_Integration {
                 }
                 <?php } ?>
             })();
-        </script>
         <?php
+        return trim( ob_get_clean() );
     }
 
     /**
@@ -427,17 +435,14 @@ class WCCT_Integration_GA4 extends WCCT_Integration {
     }
 
     /**
-     * Order on the order received page that still needs a purchase event
+     * The purchase event's order, unless its status is skipped or it was already sent
      *
-     * The order key must match, failed and cancelled orders are skipped, and
-     * orders already sent are skipped.
+     * @param  WC_Order|null $order Order the pipeline found on the order received page.
      *
      * @return WC_Order|false
      */
-    private function get_purchase_order() {
-        $order = $this->get_order_by_key( absint( get_query_var( 'order-received' ) ), isset( $_GET['key'] ) ? wp_unslash( $_GET['key'] ) : '' ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- sanitized in get_order_by_key()
-
-        if ( ! $order || ! WCCT_GA4_Data::is_trackable_status( $order->get_status() ) || $order->get_meta( self::TRACKED_META_KEY ) ) {
+    private function get_purchase_order( $order ) {
+        if ( ! $order instanceof WC_Order || SkippedStatuses::is_skipped( $order->get_status() ) || SentFlags::is_sent( $order, $this->id ) ) {
             return false;
         }
 
@@ -461,10 +466,7 @@ class WCCT_Integration_GA4 extends WCCT_Integration {
             wp_send_json_error( null, 403 );
         }
 
-        if ( ! $order->get_meta( self::TRACKED_META_KEY ) ) {
-            $order->update_meta_data( self::TRACKED_META_KEY, 1 );
-            $order->save_meta_data();
-        }
+        SentFlags::mark_sent( $order, $this->id );
 
         wp_send_json_success();
     }
@@ -672,7 +674,7 @@ class WCCT_Integration_GA4 extends WCCT_Integration {
      * @return boolean
      */
     private function is_tracking_page() {
-        if ( ! $this->is_enabled() || '' === $this->get_measurement_id() ) {
+        if ( ! $this->is_active() || '' === $this->get_measurement_id() ) {
             return false;
         }
 
@@ -716,5 +718,3 @@ class WCCT_Integration_GA4 extends WCCT_Integration {
         return wp_json_encode( $data, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT );
     }
 }
-
-return new WCCT_Integration_GA4();

@@ -116,11 +116,18 @@
 
 <!-- footer: wc_enqueue_js -->
 
-fbq('track', 'Purchase', {
-    "content_ids": "[2001]",
-    "content_type": "product",
-    "value": "23.00",
-    "currency": "USD"
-});
-
 <!-- scripts -->
+{
+    "handle": "wcct-facebook-events",
+    "src": "",
+    "ver": "{version}",
+    "deps": [],
+    "in_footer": true,
+    "printed": true,
+    "extra": {
+        "after": [
+            false,
+            "fbq('track', 'Purchase', {\n    \"content_ids\": \"[2001]\",\n    \"content_type\": \"product\",\n    \"value\": \"23.00\",\n    \"currency\": \"USD\"\n});\n"
+        ]
+    }
+}

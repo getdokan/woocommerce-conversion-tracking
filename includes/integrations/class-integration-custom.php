@@ -57,9 +57,37 @@ class WCCT_Integration_Custom extends WCCT_Integration {
     }
 
     /**
+     * Merchant scripts are HTML, so nothing goes in the inline footer script
+     *
+     * @param array $events Events decided on page load.
+     *
+     * @return string
+     */
+    public function get_footer_script( array $events ) {
+        return '';
+    }
+
+    /**
+     * Merchant HTML for this page's events, printed after the footer scripts
+     *
+     * @param array $events Events decided on page load.
+     *
+     * @return string
+     */
+    public function get_footer_markup( array $events ) {
+        $html = '';
+
+        foreach ( $events as $event ) {
+            $html .= $this->get_event_script( $event );
+        }
+
+        return $html;
+    }
+
+    /**
      * Check Out
      *
-     * @return void
+     * @return string|void Merchant HTML for the pipeline
      */
     public function checkout( $order_id ) {
         if ( ! $this->is_enabled() ) {
@@ -69,14 +97,14 @@ class WCCT_Integration_Custom extends WCCT_Integration {
         $code = $this->get_integration_settings();
 
         if ( isset( $code['checkout'] ) && ! empty( $code['checkout'] ) ) {
-            echo $this->process_order_markdown( $code['checkout'], $order_id );
+            return $this->process_order_markdown( $code['checkout'], $order_id );
         }
     }
 
     /**
      * Registration
      *
-     * @return void
+     * @return string|void Merchant HTML for the pipeline
      */
     public function registration() {
         if ( $this->is_enabled() ) {
@@ -84,7 +112,7 @@ class WCCT_Integration_Custom extends WCCT_Integration {
             $code = $this->get_integration_settings();
 
             if ( isset( $code['registration'] ) && ! empty( $code['registration'] ) ) {
-                echo $code['registration'];
+                return $code['registration'];
             }
         }
     }
@@ -154,5 +182,3 @@ class WCCT_Integration_Custom extends WCCT_Integration {
         return $code;
     }
 }
-
-return new WCCT_Integration_Custom();

@@ -57,7 +57,8 @@ class WCCT_Test_Fixture {
     public static function normalise( $text, $home ) {
         $home = rtrim( $home, '/' );
         $text = str_replace( "\r\n", "\n", $text );
-        $text = str_replace( array( $home, str_replace( '/', '\/', $home ), rawurlencode( $home ) ), array( '{home}', '{home}', '{home}' ), $text );
+        // Inline script data is JSON-encoded again in the scripts section, so escaped URLs get a second backslash.
+        $text = str_replace( array( $home, str_replace( '/', '\\\\/', $home ), str_replace( '/', '\/', $home ), rawurlencode( $home ) ), array( '{home}', '{home}', '{home}', '{home}' ), $text );
 
         // Random IDs, for example GA4's add to cart entry IDs.
         return preg_replace( '/[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}/', '{uuid}', $text );

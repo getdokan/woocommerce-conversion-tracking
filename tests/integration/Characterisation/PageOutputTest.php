@@ -101,20 +101,20 @@ class PageOutputTest extends WCCT_Test_Page_Case {
     }
 
     public function test_ga4_view_item_is_sent_on_the_product_page() {
-        $output = $this->output_of( $this->request( 'ga4', 'product-simple' ) );
+        $output = $this->event_js( $this->request( 'ga4', 'product-simple' ) );
 
         $this->assertMatchesRegularExpression( '/var events = \[\["view_item",\{"send_to":"G-CTTEST1234","currency":"USD","value":18,"items":\[\{"item_id":"2001","item_name":"Beanie"/', $output );
     }
 
     public function test_ga4_begin_checkout_is_sent_on_both_checkouts() {
         foreach ( array( 'checkout-classic', 'checkout-block' ) as $page ) {
-            $this->assertStringContainsString( '[["begin_checkout",{"send_to":"G-CTTEST1234","currency":"USD","value":78', $this->output_of( $this->request( 'ga4', $page ) ), $page );
+            $this->assertStringContainsString( '[["begin_checkout",{"send_to":"G-CTTEST1234","currency":"USD","value":78', $this->event_js( $this->request( 'ga4', $page ) ), $page );
         }
     }
 
     public function test_ga4_purchase_needs_the_order_key() {
-        $this->assertStringContainsString( '[["purchase",{"send_to":"G-CTTEST1234","currency":"USD","value":73', $this->output_of( $this->request( 'ga4', 'order-received-block' ) ) );
-        $this->assertStringContainsString( 'var events = [];', $this->output_of( $this->request( 'ga4', 'order-received-no-key' ) ) );
+        $this->assertStringContainsString( '[["purchase",{"send_to":"G-CTTEST1234","currency":"USD","value":73', $this->event_js( $this->request( 'ga4', 'order-received-block' ) ) );
+        $this->assertStringContainsString( 'var events = [];', $this->event_js( $this->request( 'ga4', 'order-received-no-key' ) ) );
     }
 
     public function test_meta_purchase_is_queued_on_the_thank_you_page() {

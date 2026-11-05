@@ -1,5 +1,7 @@
 <?php
 
+use StorePulse\ConversionTracking\Platforms\Registry;
+
 /**
  * Manager Class
  */
@@ -20,38 +22,84 @@ class WCCT_Integration_Manager {
     }
 
     /**
+     * Keys the deprecated wcct_integrations filter used, per integration ID
+     *
+     * @var array
+     */
+    const LEGACY_KEYS = array(
+        'adwords'  => 'google',
+        'bing_ads' => 'bing-ads',
+    );
+
+    /**
      * Required all integration class
+     *
+     * Platforms register through wcct_platforms, keyed by integration ID.
+     * The Custom integration is always last.
      *
      * @return void
      */
     public function includes_integration() {
-        $this->integrations['facebook']     = require_once WCCT_INCLUDES . '/integrations/class-integration-facebook.php';
-        $this->integrations['google']       = require_once WCCT_INCLUDES . '/integrations/class-integration-google.php';
-        $this->integrations['twitter']      = require_once WCCT_INCLUDES . '/integrations/class-integration-twitter.php';
-        $this->integrations['ga4']          = require_once WCCT_INCLUDES . '/integrations/class-integration-ga4.php';
+        require_once WCCT_INCLUDES . '/integrations/class-integration-facebook.php';
+        require_once WCCT_INCLUDES . '/integrations/class-integration-google.php';
+        require_once WCCT_INCLUDES . '/integrations/class-integration-twitter.php';
+        require_once WCCT_INCLUDES . '/integrations/class-integration-ga4.php';
+        require_once WCCT_INCLUDES . '/integrations/class-integration-custom.php';
 
+        $platforms = Registry::normalise(
+            array(
+                new WCCT_Integration_Facebook(),
+                new WCCT_Integration_Google(),
+                new WCCT_Integration_Twitter(),
+                new WCCT_Integration_GA4(),
+            )
+        );
 
-        $this->integrations     = apply_filters( 'wcct_integrations', $this->integrations );
+        $platforms = $this->apply_legacy_filter( $platforms );
 
-        $this->integrations['custom']       = require_once WCCT_INCLUDES . '/integrations/class-integration-custom.php';
+        /**
+         * Platforms, keyed by integration ID. Add or replace a WCCT_Integration under its ID.
+         *
+         * @since 3.0.0
+         *
+         * @param WCCT_Integration[] $platforms Platforms.
+         */
+        $platforms = Registry::normalise( apply_filters( 'wcct_platforms', $platforms ) );
+
+        unset( $platforms['custom'] );
+        $platforms['custom'] = new WCCT_Integration_Custom();
+
+        $this->integrations = $platforms;
     }
 
     /**
-     * Get all active integrations
+     * Run the deprecated wcct_integrations filter, keyed as before 3.0
+     *
+     * @param WCCT_Integration[] $platforms Platforms keyed by ID.
+     *
+     * @return WCCT_Integration[]
+     */
+    private function apply_legacy_filter( $platforms ) {
+        if ( ! has_filter( 'wcct_integrations' ) ) {
+            return $platforms;
+        }
+
+        $legacy = array();
+
+        foreach ( $platforms as $id => $platform ) {
+            $legacy[ isset( self::LEGACY_KEYS[ $id ] ) ? self::LEGACY_KEYS[ $id ] : $id ] = $platform;
+        }
+
+        return Registry::normalise( apply_filters_deprecated( 'wcct_integrations', array( $legacy ), '3.0.0', 'wcct_platforms', __( 'Register platforms through wcct_platforms, keyed by integration ID. Each platform must extend WCCT_Integration; anything else is dropped.', 'woocommerce-conversion-tracking' ) ) );
+    }
+
+    /**
+     * Get all active integrations: enabled and not paused
      *
      * @return array
      */
     public function get_active_integrations() {
-        $integrations = $this->integrations;
-        $active       = array();
-
-        foreach ( $integrations as $integration ) {
-            if ( $integration->is_enabled() ) {
-                $active[] = $integration;
-            }
-        }
-
-        return $active;
+        return array_values( Registry::active( $this->integrations ) );
     }
 
     /**

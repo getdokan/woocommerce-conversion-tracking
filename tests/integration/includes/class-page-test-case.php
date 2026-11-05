@@ -84,6 +84,24 @@ abstract class WCCT_Test_Page_Case extends TestCase {
     }
 
     /**
+     * Event JavaScript of a page: WooCommerce's queued JavaScript and the code added to inline scripts
+     *
+     * @param array $result Result from request_page().
+     *
+     * @return string
+     */
+    protected function event_js( array $result ) {
+        $code = implode( '', $result['queued_js'] );
+
+        foreach ( $result['scripts'] as $script ) {
+            $after = isset( $script['extra']['after'] ) && is_array( $script['extra']['after'] ) ? $script['extra']['after'] : array();
+            $code .= implode( '', array_filter( $after, 'is_string' ) );
+        }
+
+        return $code;
+    }
+
+    /**
      * Assert a request's output matches its fixture file
      *
      * @param string $name   Fixture name, for example "facebook/home".

@@ -18,11 +18,18 @@
 
 <!-- footer: wc_enqueue_js -->
 
-gtag('event', 'conversion', {
-    "send_to": "AW-123456789/CtPurchaseLabel",
-    "transaction_id": 3002,
-    "value": "23.00",
-    "currency": "USD"
-});
-
 <!-- scripts -->
+{
+    "handle": "wcct-adwords-events",
+    "src": "",
+    "ver": "{version}",
+    "deps": [],
+    "in_footer": true,
+    "printed": true,
+    "extra": {
+        "after": [
+            false,
+            "gtag('event', 'conversion', {\n    \"send_to\": \"AW-123456789/CtPurchaseLabel\",\n    \"transaction_id\": 3002,\n    \"value\": \"23.00\",\n    \"currency\": \"USD\"\n});\n"
+        ]
+    }
+}

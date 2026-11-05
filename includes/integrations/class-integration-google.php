@@ -98,7 +98,7 @@ class WCCT_Integration_Google extends WCCT_Integration {
     /**
      * Check Out google adwords
      *
-     * @return void
+     * @return string|void JavaScript for the pipeline
      */
     public function checkout( $order_id ) {
         if ( ! $this->event_enabled( 'Purchase' ) ) {
@@ -122,8 +122,6 @@ class WCCT_Integration_Google extends WCCT_Integration {
             'currency'       => get_woocommerce_currency()
         ) );
 
-        wc_enqueue_js( $code );
+        return $code;
     }
 }
-
-return new WCCT_Integration_Google();

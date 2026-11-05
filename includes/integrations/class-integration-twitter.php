@@ -90,7 +90,7 @@ class WCCT_Integration_Twitter extends WCCT_Integration {
      *
      * @param  integer $order_id
      *
-     * @return void
+     * @return string|void JavaScript for the pipeline
      */
     public function checkout( $order_id ) {
         if ( ! $this->event_enabled( 'Purchase' ) ) {
@@ -101,8 +101,16 @@ class WCCT_Integration_Twitter extends WCCT_Integration {
         $content_type = 'product';
         $product_ids  = array();
 
+        if ( ! $order ) {
+            return;
+        }
+
         foreach ( $order->get_items() as $item ) {
             $product = wc_get_product( $item['product_id'] );
+
+            if ( ! $product ) {
+                continue;
+            }
 
             $product_ids[] = $product->get_id();
 
@@ -118,8 +126,6 @@ class WCCT_Integration_Twitter extends WCCT_Integration {
             'currency'     => get_woocommerce_currency()
         ) );
 
-        wc_enqueue_js( $code );
+        return $code;
     }
 }
-
-return new WCCT_Integration_Twitter();

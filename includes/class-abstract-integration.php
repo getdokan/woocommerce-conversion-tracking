@@ -41,6 +41,36 @@ abstract class WCCT_Integration {
     protected $supports = array();
 
     /**
+     * How the integration sends events; only 'browser' in 3.0
+     *
+     * @var array
+     */
+    protected $transports = array( 'browser' );
+
+    /**
+     * Pipeline event name => the method that renders it
+     *
+     * @var array
+     */
+    protected static $event_methods = array(
+        'add_to_cart'     => 'add_to_cart',
+        'begin_checkout'  => 'initiate_checkout',
+        'purchase'        => 'checkout',
+        'view_product'    => 'product_view',
+        'view_category'   => 'category_view',
+        'search'          => 'search',
+        'sign_up'         => 'registration',
+        'add_to_wishlist' => 'add_to_wishlist',
+    );
+
+    /**
+     * Event being rendered by get_event_script(), null otherwise
+     *
+     * @var \StorePulse\ConversionTracking\Events\Event|null
+     */
+    protected $current_event = null;
+
+    /**
      * Get settings for all integration
      *
      * @return array
@@ -85,6 +115,96 @@ abstract class WCCT_Integration {
         }
 
         return false;
+    }
+
+    /**
+     * Whether tracking is paused; reads the autoloaded wcct_paused_platforms option, so it costs no query
+     *
+     * @return boolean
+     */
+    public function is_paused() {
+        $options = wp_load_alloptions();
+        $paused  = isset( $options['wcct_paused_platforms'] ) ? maybe_unserialize( $options['wcct_paused_platforms'] ) : array();
+        $paused  = is_array( $paused ) && in_array( $this->id, $paused, true );
+
+        /**
+         * Whether a platform is paused.
+         *
+         * @since 3.0.0
+         *
+         * @param bool   $paused Whether the ID is in the wcct_paused_platforms option.
+         * @param string $id     Integration ID.
+         */
+        return (bool) apply_filters( 'wcct_platform_paused', $paused, $this->id );
+    }
+
+    /**
+     * Enabled and not paused
+     *
+     * @return boolean
+     */
+    public function is_active() {
+        return $this->is_enabled() && ! $this->is_paused();
+    }
+
+    /**
+     * How the integration sends events
+     *
+     * @return array
+     */
+    public function get_transports() {
+        return $this->transports;
+    }
+
+    /**
+     * JavaScript for this page's footer script, without script tags
+     *
+     * @param \StorePulse\ConversionTracking\Events\Event[] $events Events decided on page load.
+     *
+     * @return string
+     */
+    public function get_footer_script( array $events ) {
+        $code = '';
+
+        foreach ( $events as $event ) {
+            $script = $this->get_event_script( $event );
+            $code  .= '' !== $script ? $script . "\n" : '';
+        }
+
+        return $code;
+    }
+
+    /**
+     * Raw HTML printed after the footer scripts, for integrations whose output isn't JavaScript
+     *
+     * @param \StorePulse\ConversionTracking\Events\Event[] $events Events decided on page load.
+     *
+     * @return string
+     */
+    public function get_footer_markup( array $events ) {
+        return '';
+    }
+
+    /**
+     * JavaScript that sends one event, from the method named in $event_methods, or an empty string
+     *
+     * @param \StorePulse\ConversionTracking\Events\Event $event Event.
+     *
+     * @return string
+     */
+    public function get_event_script( $event ) {
+        $name   = $event->get_name();
+        $method = isset( static::$event_methods[ $name ] ) ? static::$event_methods[ $name ] : '';
+
+        if ( ! $method || ! $this->supports( $method ) || ! method_exists( $this, $method ) ) {
+            return '';
+        }
+
+        $this->current_event = $event;
+        $code                = $this->$method( 'purchase' === $name ? $event->get_order_id() : '' );
+        $this->current_event = null;
+
+        return is_string( $code ) ? $code : '';
     }
 
     /**

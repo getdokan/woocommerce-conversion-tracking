@@ -1,7 +1,12 @@
 <?php
 
+use StorePulse\ConversionTracking\Events\EventFactory;
+use StorePulse\ConversionTracking\Events\Pipeline;
+
 /**
  * Event Manager
+ *
+ * Prints the integrations' head code. Events go through the pipeline, see Pipeline.
  */
 class WCCT_Event_Dispatcher {
 
@@ -13,32 +18,29 @@ class WCCT_Event_Dispatcher {
     private $integrations;
 
     /**
+     * The event pipeline
+     *
+     * @var Pipeline
+     */
+    private $pipeline;
+
+    /**
      * Constructor for WCCT_Event_Dispatcher class
      */
     function __construct() {
         $this->init_integrations();
 
+        $this->pipeline = new Pipeline( array( $this, 'get_integrations' ) );
+        $this->pipeline->init_hooks();
+
         add_action( 'wp_head', array( $this, 'enqueue_scripts' ) );
-
-        // purchase events
-        add_action( 'woocommerce_add_to_cart', array( $this, 'added_to_cart' ), 9999, 4 );
-        add_action( 'woocommerce_after_checkout_form', array( $this, 'initiate_checkout' ) );
-        add_action( 'woocommerce_thankyou', array( $this, 'checkout_complete' ) );
-
-        // view events
-        add_action( 'woocommerce_after_single_product', array( $this, 'product_view' ) );
-        add_action( 'woocommerce_after_shop_loop', array( $this, 'category_view' ) );
 
         // registration events
         add_action( 'woocommerce_registration_redirect', array( $this, 'wc_redirect_url' ) );
-        add_action( 'template_redirect', array( $this, 'track_registration' ) );
-
-        // Search Event
-        add_action( 'pre_get_posts', array( $this, 'product_search' ) );
 
         // Wishlist Event
-        add_filter( 'yith_wcwl_added_to_wishlist', array( $this, 'product_wishlist' ) );
-        add_action( 'woocommerce_wishlist_add_item', array( $this, 'product_wishlist' ) );
+        add_action( 'yith_wcwl_added_to_wishlist', array( $this, 'product_wishlist' ) );
+        add_action( 'woocommerce_wishlist_add_item', array( $this, 'product_wishlist' ), 10, 0 );
     }
 
     /**
@@ -54,79 +56,111 @@ class WCCT_Event_Dispatcher {
     }
 
     /**
+     * Active integrations
+     *
+     * @return array
+     */
+    public function get_integrations() {
+        return $this->integrations;
+    }
+
+    /**
+     * The event pipeline
+     *
+     * @return Pipeline
+     */
+    public function get_pipeline() {
+        return $this->pipeline;
+    }
+
+    /**
+     * Product wishlist event
+     *
+     * @param int $product_id Product added, from YITH's hook; 0 when the hook doesn't pass one.
+     *
+     * @return void
+     */
+    public function product_wishlist( $product_id = 0 ) {
+        $this->pipeline->dispatch( EventFactory::add_to_wishlist( $product_id ) );
+    }
+
+    /**
      * Do add to cart event
+     *
+     * @deprecated 3.0.0 The pipeline sends add to cart.
      *
      * @return void
      */
     public function added_to_cart() {
-        $this->dispatch_event( 'add_to_cart' );
+        _deprecated_function( __METHOD__, '3.0.0' );
     }
 
     /**
      * Initiate checkout events
      *
+     * @deprecated 3.0.0 Decided on page load by the pipeline.
+     *
      * @return void
      */
     public function initiate_checkout() {
-        $this->dispatch_event( 'initiate_checkout' );
+        _deprecated_function( __METHOD__, '3.0.0' );
     }
 
     /**
      * Check out events
+     *
+     * @deprecated 3.0.0 Decided on page load by the pipeline.
      *
      * @param  int $order_id
      *
      * @return void
      */
     public function checkout_complete( $order_id ) {
-        $this->dispatch_event( 'checkout', $order_id );
+        _deprecated_function( __METHOD__, '3.0.0' );
     }
 
     /**
      * Single product view event
      *
+     * @deprecated 3.0.0 Decided on page load by the pipeline.
+     *
      * @return void
      */
     public function product_view() {
-        $this->dispatch_event( 'product_view' );
+        _deprecated_function( __METHOD__, '3.0.0' );
     }
 
     /**
      * Product category view event
      *
+     * @deprecated 3.0.0 Decided on page load by the pipeline.
+     *
      * @return void
      */
     public function category_view() {
-        $this->dispatch_event( 'category_view' );
+        _deprecated_function( __METHOD__, '3.0.0' );
     }
 
     /**
      * Customer registration
      *
+     * @deprecated 3.0.0 Decided on page load by the pipeline.
+     *
      * @return void
      */
     public function complete_registration() {
-        $this->dispatch_event( 'registration' );
+        _deprecated_function( __METHOD__, '3.0.0' );
     }
 
     /**
      * Product search event
      *
-     * @return void
-     */
-    public function product_search( $query ) {
-        if ( ! is_admin() && $query->is_main_query() && $query->is_search() ) {
-            $this->dispatch_event( 'search' );
-        }
-    }
-
-    /**
-     * Product wishlist event
+     * @deprecated 3.0.0 Decided on page load by the pipeline.
      *
      * @return void
      */
-    public function product_wishlist() {
-        $this->dispatch_event( 'add_to_wishlist' );
+    public function product_search( $query ) {
+        _deprecated_function( __METHOD__, '3.0.0' );
     }
 
     /**
@@ -150,31 +184,12 @@ class WCCT_Event_Dispatcher {
     /**
      * Print registration code when particular GET tag exists
      *
-     * @uses add_action()
+     * @deprecated 3.0.0 Decided on page load by the pipeline.
+     *
      * @return void
      */
     function track_registration() {
-        if ( isset( $_GET['_wc_user_reg'] ) && $_GET['_wc_user_reg'] == 'true' ) {
-            add_action( 'wp_footer', array( $this, 'complete_registration' ) );
-        }
-    }
-
-    /**
-     * Dispatch an event
-     *
-     * @param  string $event
-     * @param  mixed $value
-     *
-     * @return void
-     */
-    private function dispatch_event( $event, $value = '' ) {
-        foreach ( $this->integrations as $integration ) {
-            if ( $integration->supports( $event ) ) {
-                if ( method_exists( $integration, $event ) ) {
-                    $integration->$event( $value );
-                }
-            }
-        }
+        _deprecated_function( __METHOD__, '3.0.0' );
     }
 
     /**

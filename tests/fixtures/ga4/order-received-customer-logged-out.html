@@ -39,70 +39,21 @@
 <!-- body -->
 
 <!-- footer -->
-        <script>
-            (function () {
-                window.dataLayer = window.dataLayer || [];
-                var gtag = window.wcctGtag || function () { window.dataLayer.push(arguments); };
-                var events = [["purchase",{"send_to":"G-CTTEST1234","currency":"USD","value":18,"items":[{"item_id":"2001","item_name":"Beanie","item_category":"Clothing","item_category2":"Accessories","price":18,"quantity":1}],"transaction_id":"3002","tax":0,"shipping":5},{"order_id":3002,"key":"wc_order_ctcustomer01"}]];
-                var pending = [];
-                // IDs of adds already sent from the AJAX response, skipped
-                // when the same adds come back from the session.
-                var sentKey = 'wcct_ga4_sent_add_to_cart';
-                var readSent = function () {
-                    try { return JSON.parse(window.sessionStorage.getItem(sentKey)) || []; } catch (e) { return []; }
-                };
-                var sendAdds = function (entries, remember) {
-                    var sent = readSent();
-                    for (var i = 0; i < entries.length; i++) {
-                        if (!entries[i] || !entries[i].params || sent.indexOf(entries[i].id) > -1) continue;
-                        gtag('event', 'add_to_cart', entries[i].params);
-                        if (remember) sent.push(entries[i].id);
-                    }
-                    if (remember) {
-                        try { window.sessionStorage.setItem(sentKey, JSON.stringify(sent.slice(-50))); } catch (e) {}
-                    }
-                };
-                sendAdds(pending, false);
-                // Tells the server the purchase was sent, so it is not sent again.
-                // Runs only once gtag.js has handled the event, so a blocked or
-                // abandoned page sends the purchase again on the next view.
-                // gtag also runs the callback when event_timeout passes, even if
-                // the hit failed, so the timeout is long enough that the callback
-                // in practice comes from the hit being sent.
-                var confirmSent = function (order) {
-                    var done = false;
-                    return function () {
-                        if (done) return;
-                        done = true;
-                        var url = "{home}\/wp-admin\/admin-ajax.php";
-                        var body = new FormData();
-                        body.append('action', "wcct_ga4_purchase_sent");
-                        body.append('order_id', order.order_id);
-                        body.append('key', order.key);
-                        if (navigator.sendBeacon && navigator.sendBeacon(url, body)) return;
-                        var xhr = new XMLHttpRequest();
-                        xhr.open('POST', url);
-                        xhr.send(body);
-                    };
-                };
-                for (var i = 0; i < events.length; i++) {
-                    if (events[i][2]) {
-                        events[i][1].event_callback = confirmSent(events[i][2]);
-                        events[i][1].event_timeout = 60000;
-                    }
-                    gtag('event', events[i][0], events[i][1]);
-                }
-                                if (window.jQuery) {
-                    window.jQuery(document.body).on('added_to_cart', function (e, fragments) {
-                        if (fragments && fragments['wcct_ga4_add_to_cart']) {
-                            sendAdds(fragments['wcct_ga4_add_to_cart'], true);
-                            delete fragments['wcct_ga4_add_to_cart'];
-                        }
-                    });
-                }
-                            })();
-        </script>
-        
+
 <!-- footer: wc_enqueue_js -->
 
 <!-- scripts -->
+{
+    "handle": "wcct-ga4-events",
+    "src": "",
+    "ver": "{version}",
+    "deps": [],
+    "in_footer": true,
+    "printed": true,
+    "extra": {
+        "after": [
+            false,
+            "(function () {\n                window.dataLayer = window.dataLayer || [];\n                var gtag = window.wcctGtag || function () { window.dataLayer.push(arguments); };\n                var events = [];\n                var pending = [];\n                // IDs of adds already sent from the AJAX response, skipped\n                // when the same adds come back from the session.\n                var sentKey = 'wcct_ga4_sent_add_to_cart';\n                var readSent = function () {\n                    try { return JSON.parse(window.sessionStorage.getItem(sentKey)) || []; } catch (e) { return []; }\n                };\n                var sendAdds = function (entries, remember) {\n                    var sent = readSent();\n                    for (var i = 0; i < entries.length; i++) {\n                        if (!entries[i] || !entries[i].params || sent.indexOf(entries[i].id) > -1) continue;\n                        gtag('event', 'add_to_cart', entries[i].params);\n                        if (remember) sent.push(entries[i].id);\n                    }\n                    if (remember) {\n                        try { window.sessionStorage.setItem(sentKey, JSON.stringify(sent.slice(-50))); } catch (e) {}\n                    }\n                };\n                sendAdds(pending, false);\n                // Tells the server the purchase was sent, so it is not sent again.\n                // Runs only once gtag.js has handled the event, so a blocked or\n                // abandoned page sends the purchase again on the next view.\n                // gtag also runs the callback when event_timeout passes, even if\n                // the hit failed, so the timeout is long enough that the callback\n                // in practice comes from the hit being sent.\n                var confirmSent = function (order) {\n                    var done = false;\n                    return function () {\n                        if (done) return;\n                        done = true;\n                        var url = \"{home}\\/wp-admin\\/admin-ajax.php\";\n                        var body = new FormData();\n                        body.append('action', \"wcct_ga4_purchase_sent\");\n                        body.append('order_id', order.order_id);\n                        body.append('key', order.key);\n                        if (navigator.sendBeacon && navigator.sendBeacon(url, body)) return;\n                        var xhr = new XMLHttpRequest();\n                        xhr.open('POST', url);\n                        xhr.send(body);\n                    };\n                };\n                for (var i = 0; i < events.length; i++) {\n                    if (events[i][2]) {\n                        events[i][1].event_callback = confirmSent(events[i][2]);\n                        events[i][1].event_timeout = 60000;\n                    }\n                    gtag('event', events[i][0], events[i][1]);\n                }\n                                if (window.jQuery) {\n                    window.jQuery(document.body).on('added_to_cart', function (e, fragments) {\n                        if (fragments && fragments['wcct_ga4_add_to_cart']) {\n                            sendAdds(fragments['wcct_ga4_add_to_cart'], true);\n                            delete fragments['wcct_ga4_add_to_cart'];\n                        }\n                    });\n                }\n                            })();"
+        ]
+    }
+}

@@ -171,22 +171,4 @@ class GA4DataTest extends TestCase {
             'array'        => array( array() ),
         );
     }
-
-    /**
-     * @dataProvider order_statuses
-     */
-    public function test_trackable_statuses( $status, $expected ) {
-        $this->assertSame( $expected, WCCT_GA4_Data::is_trackable_status( $status ) );
-    }
-
-    public function order_statuses() {
-        return array(
-            'processing' => array( 'processing', true ),
-            'completed'  => array( 'completed', true ),
-            'on-hold'    => array( 'on-hold', true ),
-            'pending'    => array( 'pending', true ),
-            'failed'     => array( 'failed', false ),
-            'cancelled'  => array( 'cancelled', false ),
-        );
-    }
 }

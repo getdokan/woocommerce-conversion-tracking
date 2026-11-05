@@ -9,13 +9,6 @@
 class WCCT_GA4_Data {
 
     /**
-     * Order statuses that are never sent as a purchase
-     *
-     * @var array
-     */
-    const SKIPPED_STATUSES = array( 'failed', 'cancelled' );
-
-    /**
      * Clean a measurement ID and return it only if it is a valid GA4 ID
      *
      * @param  mixed $measurement_id
@@ -187,17 +180,6 @@ class WCCT_GA4_Data {
         $transaction_id = is_scalar( $order_number ) ? trim( (string) $order_number ) : '';
 
         return '' !== $transaction_id ? $transaction_id : (string) abs( (int) $order_id );
-    }
-
-    /**
-     * Whether an order status counts as a purchase
-     *
-     * @param  string $status Status without the wc- prefix
-     *
-     * @return boolean
-     */
-    public static function is_trackable_status( $status ) {
-        return ! in_array( (string) $status, self::SKIPPED_STATUSES, true );
     }
 
     /**

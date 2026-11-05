@@ -110,7 +110,7 @@ class WCCT_Integration_Facebook extends WCCT_Integration {
     /**
      * Enqueue add to cart event
      *
-     * @return void
+     * @return string|void JavaScript for the pipeline
      */
     public function add_to_cart() {
 
@@ -127,7 +127,7 @@ class WCCT_Integration_Facebook extends WCCT_Integration {
             'currency'     => get_woocommerce_currency()
         ) );
 
-        wc_enqueue_js( $code );
+        return $code;
     }
 
     /**
@@ -167,7 +167,7 @@ class WCCT_Integration_Facebook extends WCCT_Integration {
     /**
      * Fire initiate checkout events
      *
-     * @return void
+     * @return string|void JavaScript for the pipeline
      */
     public function initiate_checkout() {
         if ( ! $this->event_enabled( 'InitiateCheckout' ) ) {
@@ -184,7 +184,7 @@ class WCCT_Integration_Facebook extends WCCT_Integration {
             'currency'     => get_woocommerce_currency()
         ) );
 
-        wc_enqueue_js( $code );
+        return $code;
     }
 
     /**
@@ -192,7 +192,7 @@ class WCCT_Integration_Facebook extends WCCT_Integration {
      *
      * @param  integer $order_id
      *
-     * @return void
+     * @return string|void JavaScript for the pipeline
      */
     public function checkout( $order_id ) {
         if ( ! $this->event_enabled( 'Purchase' ) ) {
@@ -203,8 +203,16 @@ class WCCT_Integration_Facebook extends WCCT_Integration {
         $content_type = 'product';
         $product_ids  = array();
 
+        if ( ! $order ) {
+            return;
+        }
+
         foreach ( $order->get_items() as $item ) {
             $product = wc_get_product( $item['product_id'] );
+
+            if ( ! $product ) {
+                continue;
+            }
 
             $product_ids[] = $product->get_id();
 
@@ -220,13 +228,13 @@ class WCCT_Integration_Facebook extends WCCT_Integration {
             'currency'     => get_woocommerce_currency()
         ) );
 
-        wc_enqueue_js( $code );
+        return $code;
     }
 
     /**
      * Registration script
      *
-     * @return void
+     * @return string|void JavaScript for the pipeline
      */
     public function registration() {
         if ( ! $this->event_enabled( 'Registration' ) ) {
@@ -234,7 +242,7 @@ class WCCT_Integration_Facebook extends WCCT_Integration {
         }
 
         $code = $this->build_event( 'CompleteRegistration' );
-        wc_enqueue_js( $code );
+        return $code;
     }
 
     /**
@@ -342,5 +350,3 @@ class WCCT_Integration_Facebook extends WCCT_Integration {
         <?php
     }
 }
-
-return new WCCT_Integration_Facebook();

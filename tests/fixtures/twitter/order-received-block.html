@@ -15,11 +15,18 @@
 
 <!-- footer: wc_enqueue_js -->
 
-twq('track', 'Purchase', {
-    "content_ids": "[2001,2002]",
-    "content_type": "product_group",
-    "value": "78.00",
-    "currency": "USD"
-});
-
 <!-- scripts -->
+{
+    "handle": "wcct-twitter-events",
+    "src": "",
+    "ver": "{version}",
+    "deps": [],
+    "in_footer": true,
+    "printed": true,
+    "extra": {
+        "after": [
+            false,
+            "twq('track', 'Purchase', {\n    \"content_ids\": \"[2001,2002]\",\n    \"content_type\": \"product_group\",\n    \"value\": \"78.00\",\n    \"currency\": \"USD\"\n});\n"
+        ]
+    }
+}

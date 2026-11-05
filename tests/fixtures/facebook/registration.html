@@ -116,6 +116,18 @@
 
 <!-- footer: wc_enqueue_js -->
 
-fbq('track', 'CompleteRegistration', {});
-
 <!-- scripts -->
+{
+    "handle": "wcct-facebook-events",
+    "src": "",
+    "ver": "{version}",
+    "deps": [],
+    "in_footer": true,
+    "printed": true,
+    "extra": {
+        "after": [
+            false,
+            "fbq('track', 'CompleteRegistration', {});\n"
+        ]
+    }
+}
