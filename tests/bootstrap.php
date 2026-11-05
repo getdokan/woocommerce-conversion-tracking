@@ -6,3 +6,5 @@
  */
 require_once dirname( __DIR__ ) . '/vendor/autoload.php';
 require_once dirname( __DIR__ ) . '/includes/class-ga4-data.php';
+require_once __DIR__ . '/unit/Fakes/InMemoryOptionStore.php';
+require_once __DIR__ . '/unit/Fakes/InMemorySecretStorage.php';

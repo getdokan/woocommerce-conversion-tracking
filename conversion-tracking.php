@@ -225,23 +225,13 @@ class WeDevs_WC_Conversion_Tracking {
     }
 
     /**
-     * Do plugin upgrade
+     * Run the 3.0 settings migration on any request where the stored settings need it
      *
      * @since  2.0
      * @return void
      */
     public function plugin_upgrades() {
-        if ( ! is_admin() && ! current_user_can( 'manage_options' ) ) {
-            return;
-        }
-
-        require_once WCCT_INCLUDES . '/class-upgrades.php';
-
-        $upgrader   = new WCCT_Upgrades();
-
-        if ( $upgrader->needs_update() ) {
-            $upgrader->perform_updates();
-        }
+        \StorePulse\ConversionTracking\Migration\SettingsMigration::maybe_run();
     }
 
     /**
