@@ -125,6 +125,15 @@ wcct_test_early_hook(
         if ( ! empty( $wcct_job['rollback'] ) ) {
             $wpdb->query( 'SET autocommit = 0' );
             $wpdb->query( 'START TRANSACTION' );
+
+            // Roll back after everything WordPress and WooCommerce write on shutdown, too.
+            add_action(
+                'shutdown',
+                function () use ( $wpdb ) {
+                    $wpdb->query( 'ROLLBACK' );
+                },
+                PHP_INT_MAX
+            );
         }
 
         foreach ( $wcct_job['options'] as $name => $value ) {
@@ -264,10 +273,6 @@ $wcct_result['scripts']   = $wcct_recorder->describe_scripts();
 
 if ( 'request' === $wcct_job['type'] ) {
     $wcct_result['html'] = $wcct_html;
-}
-
-if ( ! empty( $wcct_job['rollback'] ) ) {
-    $wpdb->query( 'ROLLBACK' );
 }
 
 wcct_test_write_result();
