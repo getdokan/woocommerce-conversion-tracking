@@ -33,8 +33,10 @@ class SettingsMigration {
      * @return void
      */
     public static function maybe_run() {
-        // One query instead of two when neither option is autoloaded.
-        wp_prime_option_caches( array( self::MARKER, self::V1_OPTION ) );
+        // One query instead of two when neither option is autoloaded (WordPress 6.4+).
+        if ( function_exists( 'wp_prime_option_caches' ) ) {
+            wp_prime_option_caches( array( self::MARKER, self::V1_OPTION ) );
+        }
 
         $trigger = self::trigger();
 
