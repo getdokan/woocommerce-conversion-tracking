@@ -16,6 +16,13 @@ type WcctAdminData = {
         home: string;
         tiles: WcctDocsTile[];
     };
+    help: {
+        docs: string;
+        support: string;
+        feature_request: string;
+    };
+    logosUrl: string;
+    classicUrl: string;
 };
 
 interface Window {

@@ -60,6 +60,50 @@ class Docs {
     );
 
     /**
+     * Free support forum
+     *
+     * @var string
+     */
+    const SUPPORT_URL = 'https://wordpress.org/support/plugin/woocommerce-conversion-tracking/';
+
+    /**
+     * Where feature requests go
+     *
+     * @var string
+     */
+    const FEATURE_REQUEST_URL = 'https://github.com/getdokan/woocommerce-conversion-tracking/issues/new';
+
+    /**
+     * Help menu links: docs, support and feature request
+     *
+     * @return array { docs: string, support: string, feature_request: string }
+     */
+    public static function help_links() {
+        $defaults = array(
+            'docs'            => self::home_url(),
+            'support'         => self::SUPPORT_URL,
+            'feature_request' => self::FEATURE_REQUEST_URL,
+        );
+
+        /**
+         * Filter the Help menu links; Pro points Support at its own channel.
+         *
+         * @since PLUGIN_SINCE
+         *
+         * @param array $links { docs, support, feature_request } URLs.
+         */
+        $links = apply_filters( 'wcct_help_links', $defaults );
+        $links = is_array( $links ) ? $links : array();
+
+        foreach ( $defaults as $key => $url ) {
+            $value            = isset( $links[ $key ] ) && is_string( $links[ $key ] ) ? esc_url_raw( $links[ $key ] ) : '';
+            $defaults[ $key ] = '' !== $value ? $value : $url;
+        }
+
+        return $defaults;
+    }
+
+    /**
      * Docs home URL for the Help menu
      *
      * @return string

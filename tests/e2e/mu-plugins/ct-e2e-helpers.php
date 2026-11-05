@@ -45,3 +45,13 @@ add_filter(
     10,
     3
 );
+
+// The ct_e2e_notice cookie prints a core-style admin notice, so the admin specs can check where notices land.
+add_action(
+    'admin_notices',
+    static function () {
+        if ( isset( $_COOKIE['ct_e2e_notice'] ) ) {
+            echo '<div class="notice notice-info" id="ct-e2e-notice"><p>CT e2e admin notice</p></div>';
+        }
+    }
+);

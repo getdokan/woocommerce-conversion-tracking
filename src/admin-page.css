@@ -1,0 +1,35 @@
+/* WordPress chrome around the app; the app itself is styled by Tailwind inside .wcct-app. */
+body.wcct-app-page #wpcontent {
+    padding-left: 0;
+}
+
+body.wcct-app-page #wpbody-content {
+    padding-bottom: 40px;
+}
+
+/* Full width under the admin bar, sticky while the page scrolls. */
+.wcct-topbar-root {
+    position: sticky;
+    top: var(--wp-admin--admin-bar--height, 32px);
+    z-index: 30;
+    min-height: 66px;
+    background: #fff;
+    box-sizing: border-box;
+}
+
+@media screen and (max-width: 600px) {
+    .wcct-topbar-root {
+        top: 0;
+    }
+}
+
+body.wcct-app-page .wcct-wrap {
+    margin: 0;
+}
+
+/* Core admin notices land after .wp-header-end, under the top bar; line them up with the page. */
+body.wcct-app-page .wcct-wrap > .notice,
+body.wcct-app-page .wcct-wrap > div.updated,
+body.wcct-app-page .wcct-wrap > div.error {
+    margin: 16px 32px 0;
+}

@@ -63,6 +63,11 @@ class WCCT_Admin {
      * @return void
      */
     public function conversion_tracking_template() {
+        if ( isset( wcct_init()->admin_assets ) && wcct_init()->admin_assets->is_app_view() ) {
+            include dirname( __FILE__ ) . '/views/app.php';
+            return;
+        }
+
         $integrations = wcct_init()->manager->get_integrations();
 
         include dirname( __FILE__ ) . '/views/admin.php';

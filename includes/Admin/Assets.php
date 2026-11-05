@@ -41,7 +41,6 @@ class Assets {
     public function __construct() {
         add_action( 'admin_enqueue_scripts', array( $this, 'register' ), 5 );
         add_action( 'admin_enqueue_scripts', array( $this, 'enqueue' ) );
-        add_action( 'wcct_before_nav', array( $this, 'render_root' ), 5 );
     }
 
     /**
@@ -89,9 +88,13 @@ class Assets {
      * @return void
      */
     public function enqueue( $hook_suffix ) {
-        if ( ! $this->is_app_page( $hook_suffix ) || ! wp_script_is( 'wcct-admin-app', 'registered' ) ) {
+        if ( ! $this->is_app_page( $hook_suffix ) || ! $this->is_app_view() ) {
             return;
         }
+
+        // Both run after admin_enqueue_scripts in admin-header.php, so only the app page gets them.
+        add_action( 'in_admin_header', array( $this, 'render_header' ) );
+        add_filter( 'admin_body_class', array( $this, 'body_class' ) );
 
         wp_enqueue_script( 'wcct-admin-app' );
         wp_enqueue_style( wp_style_is( 'wcct-admin-app', 'registered' ) ? 'wcct-admin-app' : 'wcct-components' );
@@ -106,17 +109,41 @@ class Assets {
                     'home'  => Docs::home_url(),
                     'tiles' => Docs::tiles(),
                 ),
+                'help'       => Docs::help_links(),
+                'logosUrl'   => WCCT_ASSETS . '/images/platforms/',
+                'classicUrl' => admin_url( 'admin.php?page=conversion-tracking&tab=integrations' ),
             )
         );
     }
 
     /**
-     * Print the element the admin app mounts on
+     * Whether this request shows the React app; any ?tab= still opens the classic screens
+     *
+     * @return bool
+     */
+    public function is_app_view() {
+        // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only view switch.
+        return ! isset( $_GET['tab'] ) && wp_script_is( 'wcct-admin-app', 'registered' );
+    }
+
+    /**
+     * Print the top bar mount point above the admin notices
      *
      * @return void
      */
-    public function render_root() {
-        echo '<div id="wcct-app-root"></div>';
+    public function render_header() {
+        echo '<div id="wcct-topbar-root" class="wcct-topbar-root"></div>';
+    }
+
+    /**
+     * Mark the app page so its stylesheet can drop the WordPress content padding
+     *
+     * @param string $classes Space-separated body classes.
+     *
+     * @return string
+     */
+    public function body_class( $classes ) {
+        return $classes . ' wcct-app-page';
     }
 
     /**

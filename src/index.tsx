@@ -8,6 +8,7 @@ import { createRoot } from '@wordpress/element';
  * Internal dependencies
  */
 import App from './App';
+import './admin-page.css';
 
 domReady( () => {
     const root = document.getElementById( 'wcct-app-root' );
