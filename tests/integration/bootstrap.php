@@ -17,6 +17,7 @@ require_once __DIR__ . '/includes/class-pages.php';
 require_once __DIR__ . '/includes/class-settings.php';
 require_once __DIR__ . '/includes/class-fixture.php';
 require_once __DIR__ . '/includes/class-page-test-case.php';
+require_once __DIR__ . '/includes/class-rest-test-case.php';
 
 $wcct_lite_dir = rtrim( getenv( 'WCCT_LITE_DIR' ) ? getenv( 'WCCT_LITE_DIR' ) : dirname( __DIR__, 2 ), '/' );
 $wcct_pro_dir  = (string) getenv( 'WCCT_PRO_DIR' );

@@ -29,7 +29,16 @@ class Routes {
          *
          * @param string[] $controllers Class names.
          */
-        $controllers = apply_filters( 'wcct_rest_controllers', array( SettingsController::class ) );
+        $controllers = apply_filters(
+            'wcct_rest_controllers',
+            array(
+                SettingsController::class,
+                OnboardingController::class,
+                BackupController::class,
+                CatalogController::class,
+                AccessController::class,
+            )
+        );
 
         foreach ( (array) $controllers as $controller ) {
             // The base class holds the permission check, so nothing else is registered.
