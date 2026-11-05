@@ -7,9 +7,10 @@ Version: 2.1.6
 Author: weDevs
 Author URI: https://wedevs.com/?utm_source=ORG_Author_URI_WCCT
 License: GPL2
+Requires at least: 7.0
 Requires PHP: 7.4
 Requires Plugins: woocommerce
-WC requires at least: 5.0.0
+WC requires at least: 8.5.0
 WC tested up to: 11.1
 */
 

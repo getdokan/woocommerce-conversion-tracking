@@ -2,7 +2,7 @@
 Contributors: tareq1988, wedevs
 Tags: ecommerce, e-commerce, commerce, woocommerce, tracking, facebook, google, adwords, tracking-pixel
 Donate link: https://tareq.co/donate/
-Requires at least: 5.4
+Requires at least: 7.0
 Tested up to: 7.1
 Requires PHP: 7.4
 WC requires at least: 5.0.0
