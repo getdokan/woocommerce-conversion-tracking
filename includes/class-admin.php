@@ -6,6 +6,13 @@
 class WCCT_Admin {
 
     /**
+     * Hook suffix of the Conversion Tracking page
+     *
+     * @var string
+     */
+    public $page_hook = '';
+
+    /**
      * Constructor for WCCT_Admin class
      */
     function __construct() {
@@ -47,7 +54,7 @@ class WCCT_Admin {
         $menu_page      = apply_filters( 'wcct_menu_page', 'woocommerce' );
         $capability     = wcct_manage_cap();
 
-        add_submenu_page( $menu_page, __( 'Conversion Tracking', 'woocommerce-conversion-tracking' ), __( 'Conversion Tracking', 'woocommerce-conversion-tracking' ), $capability, 'conversion-tracking', array( $this, 'conversion_tracking_template' ) );
+        $this->page_hook = (string) add_submenu_page( $menu_page, __( 'Conversion Tracking', 'woocommerce-conversion-tracking' ), __( 'Conversion Tracking', 'woocommerce-conversion-tracking' ), $capability, 'conversion-tracking', array( $this, 'conversion_tracking_template' ) );
     }
 
     /**

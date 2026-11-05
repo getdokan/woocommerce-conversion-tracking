@@ -6,17 +6,40 @@
     "license": "GPL",
     "private": true,
     "scripts": {
-        "build": "lessc assets/less/style.less assets/css/style.css",
-        "start": "node --watch-path=assets/less node_modules/less/bin/lessc assets/less/style.less assets/css/style.css",
-        "makepot": "wp i18n make-pot . languages/woocommerce-conversion-tracking.pot --domain=woocommerce-conversion-tracking --include=conversion-tracking.php,includes",
+        "build": "npm run build:less && npm run build:js",
+        "build:less": "lessc assets/less/style.less assets/css/style.css",
+        "build:js": "wp-scripts build --progress",
+        "start": "wp-scripts start --progress",
+        "start:less": "node --watch-path=assets/less node_modules/less/bin/lessc assets/less/style.less assets/css/style.css",
+        "typecheck": "tsc --noEmit",
+        "lint": "npm run lint:js",
+        "lint:js": "wp-scripts lint-js src webpack.config.js webpack-dependency-mapping.js",
+        "format": "wp-scripts format src",
+        "makepot": "wp i18n make-pot . languages/woocommerce-conversion-tracking.pot --domain=woocommerce-conversion-tracking --include=conversion-tracking.php,includes,dist",
         "version": "node bin/version-replace.js",
         "clean": "node bin/clean.js",
         "zip": "node bin/zip.js",
-        "release": "npm run clean && npm install && npm run build && npm run makepot && npm run version && npm run zip",
+        "release": "npm run clean && npm install && npm run version && npm run build && npm run makepot && npm run zip",
         "release:dev": "npm run clean && npm install && npm run build && npm run makepot && npm run zip"
     },
     "devDependencies": {
+        "@tailwindcss/postcss": "^4.1.18",
+        "@types/react": "^18.3.27",
+        "@types/react-dom": "^18.3.7",
+        "@wordpress/dependency-extraction-webpack-plugin": "^6.32.0",
+        "@wordpress/scripts": "^30.25.0",
         "archiver": "^7.0.1",
-        "less": "^4.9.1"
+        "eslint-import-resolver-typescript": "^3.7.0",
+        "less": "^4.9.1",
+        "tailwindcss": "^4.1.18",
+        "tw-animate-css": "^1.4.0",
+        "typescript": "^5.9.3"
+    },
+    "dependencies": {
+        "@wedevs/plugin-ui": "github:getdokan/plugin-ui",
+        "@wordpress/browserslist-config": "^6.32.0",
+        "@wordpress/dom-ready": "^4.32.0",
+        "@wordpress/element": "^6.32.0",
+        "@wordpress/i18n": "^6.5.0"
     }
 }

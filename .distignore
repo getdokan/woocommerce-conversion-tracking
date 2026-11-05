@@ -28,3 +28,10 @@ phpunit.xml
 /bin
 /assets/less
 /README.md
+/src
+.eslintrc
+.prettierrc.js
+postcss.config.js
+tsconfig.json
+webpack.config.js
+webpack-dependency-mapping.js

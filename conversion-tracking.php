@@ -207,6 +207,7 @@ class WeDevs_WC_Conversion_Tracking {
         $this->container['ajax']                = new WCCT_Ajax();
         $this->container['event_dispatcher']    = new WCCT_Event_Dispatcher();
         $this->container['admin']               = new WCCT_Admin();
+        $this->container['admin_assets']        = new \StorePulse\ConversionTracking\Admin\Assets();
 
         new WCCT_Welcome_20();
 
