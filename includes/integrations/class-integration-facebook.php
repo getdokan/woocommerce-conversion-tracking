@@ -87,6 +87,9 @@ class WCCT_Integration_Facebook extends WCCT_Integration {
             document,'script','https://connect.facebook.net/en_US/fbevents.js');
 
             <?php
+            // With consent mode on: revoke before init until marketing consent, grant on consent.
+            echo $this->consent_sync_js( "fbq('consent', granted ? 'grant' : 'revoke');" ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+
             if ( is_user_logged_in() ) {
                 $user_email = wp_get_current_user()->user_email;
 
@@ -101,16 +104,13 @@ class WCCT_Integration_Facebook extends WCCT_Integration {
         <?php
 
         $this->print_event_script();
-
-        if ( ! class_exists( 'WeDevs_WC_Conversion_Tracking_Pro' ) ) {
-            $this->add_to_cart_ajax();
-        }
+        $this->print_consent_script( $this->consent_wrap_js( 'wcfbq' ) );
     }
 
     /**
      * Enqueue add to cart event
      *
-     * @return void
+     * @return string|void JavaScript for the pipeline
      */
     public function add_to_cart() {
 
@@ -118,56 +118,42 @@ class WCCT_Integration_Facebook extends WCCT_Integration {
             return;
         }
 
-        $product_ids = $this->get_content_ids_from_cart( WC()->cart->get_cart() );
+        $event = $this->current_event;
+
+        // The product just added; the whole cart only when the event has no product.
+        if ( $event && $event->get_product() ) {
+            $product_ids = array( \StorePulse\ConversionTracking\Events\ProductId::for_product( $event->get_product(), $this->id ) );
+            $value       = wc_format_decimal( $event->get_value(), wc_get_price_decimals() );
+        } else {
+            $product_ids = $this->get_content_ids_from_cart( WC()->cart->get_cart() );
+            $value       = WC()->cart->total ? WC()->cart->total : 0;
+        }
 
         $code = $this->build_event( 'AddToCart', array(
             'content_ids'  => json_encode( $product_ids ),
             'content_type' => 'product',
-            'value'        => WC()->cart->total ? WC()->cart->total : 0,
+            'value'        => $value,
             'currency'     => get_woocommerce_currency()
         ) );
 
-        wc_enqueue_js( $code );
+        return $code;
     }
 
     /**
      * Added to cart
      *
+     * @deprecated 3.0.0 Add to cart reaches the browser through the pipeline's pending events.
+     *
      * @return void
      */
     public function add_to_cart_ajax() {
-        if ( ! $this->event_enabled( 'AddToCart' ) ) {
-            return;
-        }
-
-        $integration_settins    = $this->get_integration_settings();
-        $facebook_pixel_id      = ! empty( $integration_settins[0]['pixel_id'] ) ? $integration_settins[0]['pixel_id'] : '';
-        ?>
-        <script type="text/javascript">
-            jQuery(function($) {
-                $(document).on('added_to_cart', function (event, fragments, dhash, button) {
-                    var currencySymbol = $($(button.get()[0]).closest('.product')
-                        .find('.woocommerce-Price-currencySymbol').get()[0]).text();
-
-                    var price = $(button.get()[0]).closest('.product').find('.amount').text();
-                    var originalPrice = price.split(currencySymbol).slice(-1).pop();
-
-                    wcfbq('<?php echo esc_attr( $facebook_pixel_id ) ?>', 'AddToCart', {
-                        content_ids: [ $(button).data('product_id') ],
-                        content_type: 'product',
-                        value: originalPrice,
-                        currency: '<?php echo esc_attr( get_woocommerce_currency() ) ?>'
-                    });
-                });
-            });
-        </script>
-        <?php
+        _deprecated_function( __METHOD__, '3.0.0' );
     }
 
     /**
      * Fire initiate checkout events
      *
-     * @return void
+     * @return string|void JavaScript for the pipeline
      */
     public function initiate_checkout() {
         if ( ! $this->event_enabled( 'InitiateCheckout' ) ) {
@@ -184,7 +170,7 @@ class WCCT_Integration_Facebook extends WCCT_Integration {
             'currency'     => get_woocommerce_currency()
         ) );
 
-        wc_enqueue_js( $code );
+        return $code;
     }
 
     /**
@@ -192,41 +178,54 @@ class WCCT_Integration_Facebook extends WCCT_Integration {
      *
      * @param  integer $order_id
      *
-     * @return void
+     * @return string|void JavaScript for the pipeline
      */
     public function checkout( $order_id ) {
         if ( ! $this->event_enabled( 'Purchase' ) ) {
             return;
         }
 
-        $order        = wc_get_order( $order_id );
-        $content_type = 'product';
-        $product_ids  = array();
+        $order = wc_get_order( $order_id );
 
-        foreach ( $order->get_items() as $item ) {
-            $product = wc_get_product( $item['product_id'] );
-
-            $product_ids[] = $product->get_id();
-
-            if ( $product->get_type() === 'variable' ) {
-                $content_type = 'product_group';
-            }
+        if ( ! $order ) {
+            return;
         }
+
+        // Variations send their own ID, so the IDs are products, never groups.
+        $product_ids = \StorePulse\ConversionTracking\Events\ProductId::for_order( $order, $this->id );
 
         $code = $this->build_event( 'Purchase', array(
             'content_ids'  => json_encode($product_ids),
-            'content_type' => $content_type,
-            'value'        => $order->get_total() ? $order->get_total() : 0,
-            'currency'     => get_woocommerce_currency()
+            'content_type' => 'product',
+            'value'        => $this->purchase_value( $order ),
+            'currency'     => $order->get_currency()
         ) );
 
-        wc_enqueue_js( $code );
+        return $code;
+    }
+
+    /**
+     * The Purchase is taken once fbevents.js has loaded and run the queue
+     *
+     * @return string
+     */
+    protected function purchase_sent_check() {
+        return "window.fbq && typeof window.fbq.callMethod === 'function'";
+    }
+
+    /**
+     * Under consent mode the Purchase only leaves once marketing is allowed
+     *
+     * @return string
+     */
+    protected function purchase_consent_category() {
+        return 'marketing';
     }
 
     /**
      * Registration script
      *
-     * @return void
+     * @return string|void JavaScript for the pipeline
      */
     public function registration() {
         if ( ! $this->event_enabled( 'Registration' ) ) {
@@ -234,7 +233,7 @@ class WCCT_Integration_Facebook extends WCCT_Integration {
         }
 
         $code = $this->build_event( 'CompleteRegistration' );
-        wc_enqueue_js( $code );
+        return $code;
     }
 
     /**
@@ -264,22 +263,7 @@ class WCCT_Integration_Facebook extends WCCT_Integration {
         <script>
             (function (window, document) {
                 if (window.wcfbq) return;
-                var cleanUrl = function (url) {
-                    try {
-                        var hashPos = url.indexOf('#');
-                        var hash = hashPos > -1 ? url.substring(hashPos) : '';
-                        var base = hashPos > -1 ? url.substring(0, hashPos) : url;
-                        var queryPos = base.indexOf('?');
-                        if (queryPos == -1) return url;
-                        var pairs = base.substring(queryPos + 1).split('&'), kept = [];
-                        for (var i = 0; i < pairs.length; i++) {
-                            if (decodeURIComponent(pairs[i].split('=')[0].replace(/\+/g, ' ')) != 'key') kept.push(pairs[i]);
-                        }
-                        return base.substring(0, queryPos) + (kept.length ? '?' + kept.join('&') : '') + hash;
-                    } catch (e) {
-                        return String(url).split('?')[0];
-                    }
-                };
+                var cleanUrl = <?php echo \StorePulse\ConversionTracking\Privacy\OrderUrl::cleaner_js(); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>;
                 window.wcfbq = (function () {
                     if (arguments.length > 0) {
                         var pixelId, trackType, contentObj;
@@ -342,5 +326,3 @@ class WCCT_Integration_Facebook extends WCCT_Integration {
         <?php
     }
 }
-
-return new WCCT_Integration_Facebook();

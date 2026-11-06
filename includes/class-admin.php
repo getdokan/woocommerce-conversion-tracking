@@ -6,6 +6,13 @@
 class WCCT_Admin {
 
     /**
+     * Hook suffix of the Conversion Tracking page
+     *
+     * @var string
+     */
+    public $page_hook = '';
+
+    /**
      * Constructor for WCCT_Admin class
      */
     function __construct() {
@@ -47,7 +54,7 @@ class WCCT_Admin {
         $menu_page      = apply_filters( 'wcct_menu_page', 'woocommerce' );
         $capability     = wcct_manage_cap();
 
-        add_submenu_page( $menu_page, __( 'Conversion Tracking', 'woocommerce-conversion-tracking' ), __( 'Conversion Tracking', 'woocommerce-conversion-tracking' ), $capability, 'conversion-tracking', array( $this, 'conversion_tracking_template' ) );
+        $this->page_hook = (string) add_submenu_page( $menu_page, __( 'Conversion Tracking', 'woocommerce-conversion-tracking' ), __( 'Conversion Tracking', 'woocommerce-conversion-tracking' ), $capability, 'conversion-tracking', array( $this, 'conversion_tracking_template' ) );
     }
 
     /**
@@ -56,6 +63,11 @@ class WCCT_Admin {
      * @return void
      */
     public function conversion_tracking_template() {
+        if ( isset( wcct_init()->admin_assets ) && wcct_init()->admin_assets->is_app_view() ) {
+            include dirname( __FILE__ ) . '/views/app.php';
+            return;
+        }
+
         $integrations = wcct_init()->manager->get_integrations();
 
         include dirname( __FILE__ ) . '/views/admin.php';
@@ -92,19 +104,21 @@ class WCCT_Admin {
             return;
         }
 
-        $html = '<h2 class="nav-tab-wrapper">';
-        foreach ( $tabs as $tab ) {
-            $active_class   = ( $tab['id'] == $active ) ? 'nav-tab-active' : '';
+        echo '<h2 class="nav-tab-wrapper">';
 
-            if ( !empty( $tab['id'] ) ) {
-                $html  .= sprintf( '<a href="admin.php?page=conversion-tracking&tab=%s" class="nav-tab %s">%s</a>', $tab['id'], $active_class, $tab['title'] );
+        foreach ( $tabs as $tab ) {
+            $active_class = ( $tab['id'] == $active ) ? 'nav-tab-active' : '';
+
+            if ( ! empty( $tab['id'] ) ) {
+                printf( '<a href="%s" class="nav-tab %s">%s</a>', esc_url( 'admin.php?page=conversion-tracking&tab=' . rawurlencode( $tab['id'] ) ), esc_attr( $active_class ), esc_html( $tab['title'] ) );
+            } elseif ( ! empty( $tab['url'] ) ) {
+                // Pro tabs open the upgrade page.
+                printf( '<a href="%s" class="nav-tab disabled" target="_blank" rel="noopener noreferrer">%s<span class="screen-reader-text"> %s</span></a>', esc_url( $tab['url'] ), esc_html( $tab['title'] ), esc_html__( '(opens in a new tab)', 'woocommerce-conversion-tracking' ) );
             } else {
-                $html  .= sprintf( '<a href="#" class="nav-tab disabled">%s</a>', $tab['title'] );
+                printf( '<a href="#" class="nav-tab disabled">%s</a>', esc_html( $tab['title'] ) );
             }
         }
 
-        $html   .= '</h2>';
-
-        echo $html;
+        echo '</h2>';
     }
 }

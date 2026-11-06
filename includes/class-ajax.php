@@ -1,5 +1,9 @@
 <?php
 
+use StorePulse\ConversionTracking\Access\CustomScripts;
+use StorePulse\ConversionTracking\Access\SettingsIds;
+use StorePulse\ConversionTracking\Admin\PostedSettings;
+
 /**
  * Ajax handler class
  */
@@ -21,15 +25,21 @@ class WCCT_Ajax {
      * @return void
      */
     public function wcct_save_settings() {
-        if ( ! current_user_can( 'manage_options' ) ) {
-            return;
+        if ( ! current_user_can( wcct_manage_cap() ) ) {
+            wp_send_json_error(
+                [
+                    'message' => __( 'You do not have permission to change these settings.', 'woocommerce-conversion-tracking' ),
+                ],
+                403
+            );
         }
 
         if ( ! isset( $_REQUEST['_wpnonce'] ) || ! wp_verify_nonce( sanitize_key( wp_unslash( $_REQUEST['_wpnonce'] ) ), 'wcct-settings' ) ) {
             wp_send_json_error(
                 [
                     'message' => __( 'nonce verification failed', 'woocommerce-conversion-tracking' )
-                ]
+                ],
+                403
             );
         }
 
@@ -37,26 +47,57 @@ class WCCT_Ajax {
             wp_send_json_error();
         }
 
-        $integration_settings = array();
+        $posted               = is_array( $_POST['settings'] ) ? wp_unslash( $_POST['settings'] ) : array(); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- PostedSettings cleans it field by field.
+        $integration_settings = PostedSettings::clean( $posted, $this->integration_fields() );
+        $stored_settings      = get_option( 'wcct_settings', array() );
+        $stored_settings      = is_array( $stored_settings ) ? $stored_settings : array();
+        $can_edit_script      = current_user_can( CustomScripts::CAPABILITY );
 
-        if ( ! empty( $_POST['settings'] ) ) {
-
-            foreach ( $_POST['settings'] as $field_id => $settings ) {
-                $is_enabled = isset( $settings['enabled'] ) ? true : false;
-
-                $settings = array_merge( $settings, array( 'enabled' => $is_enabled ) );
-                $integration_settings[ $field_id ] = $settings;
-            }
+        if ( ! $can_edit_script && CustomScripts::changed( $integration_settings, $stored_settings ) ) {
+            wp_send_json_error(
+                [
+                    'message' => __( 'Only administrators can change custom scripts.', 'woocommerce-conversion-tracking' ),
+                ],
+                403
+            );
         }
 
+        // Callbacks have always received slashed data. Their output is trusted: only SettingsIds and the script guard run after.
+        $integration_settings = wp_unslash( apply_filters( 'wcct_save_integrations_settings', wp_slash( $integration_settings ) ) );
+        $integration_settings = SettingsIds::clean( is_array( $integration_settings ) ? $integration_settings : array() );
 
-        $integration_settings = apply_filters( 'wcct_save_integrations_settings', $integration_settings );
-        update_option( 'wcct_settings', stripslashes_deep( $integration_settings ) );
+        if ( ! $can_edit_script ) {
+            $integration_settings = CustomScripts::keep( $integration_settings, $stored_settings );
+        }
+
+        update_option( 'wcct_settings', $integration_settings );
+
+        // The classic page has no wcct_settings_saved; its saves purge the page caches too.
+        \StorePulse\ConversionTracking\Cache\PageCache::purge();
+
         wp_send_json_success( array(
             'message' => __( 'Settings has been saved successfully!', 'woocommerce-conversion-tracking' )
         ) );
 
     }
+
+    /**
+     * Settings fields of every integration, keyed by integration ID
+     *
+     * @return array
+     */
+    private function integration_fields() {
+        $fields = array();
+
+        foreach ( wcct_init()->manager->get_integrations() as $integration ) {
+            if ( $integration instanceof WCCT_Integration ) {
+                $fields[ $integration->get_id() ] = (array) $integration->get_settings();
+            }
+        }
+
+        return $fields;
+    }
+
     /**
      * Install the Happy addons via ajax
      *

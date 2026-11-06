@@ -11,7 +11,7 @@
                 $id              = $integration->get_id();
                 $settings_fields = $integration->get_settings();
                 $settings        = $integration->get_integration_settings();
-                $active          = ( $integration->is_enabled() ) ? 'Deactivate' : 'Activate';
+                $active          = ( $integration->is_switched_on() ) ? 'Deactivate' : 'Activate';
                 $border          = ( isset( $integration->multiple ) ) ? 'wcct-border' : '';
                 ?>
                 <div class="integration-wrap">
@@ -22,7 +22,7 @@
                             <h3 class="gateway-text"><?php echo esc_attr( $name ); ?></h3>
 
                             <label class="switch" title="" data-original-title="Make Inactive">
-                                <input type="checkbox" class="toogle-seller" name="settings[<?php echo esc_attr( $id ); ?>][enabled]" id="integration-<?php echo esc_attr( $id ); ?>" data-id="<?php echo esc_attr( $id ); ?>" value="1" <?php checked( true, $integration->is_enabled() ); ?> >
+                                <input type="checkbox" class="toogle-seller" name="settings[<?php echo esc_attr( $id ); ?>][enabled]" id="integration-<?php echo esc_attr( $id ); ?>" data-id="<?php echo esc_attr( $id ); ?>" value="1" <?php checked( true, $integration->is_switched_on() ); ?> >
                                 <span class="slider round wcct-tooltip" data-id="<?php echo esc_attr( $id ); ?>">
                                     <span class="wcct-tooltiptext integration-tooltip"><?php echo esc_attr( $active ); ?> </span>
                                 </span>
@@ -55,7 +55,13 @@
 
                                                 case 'textarea':
                                                     $value = isset( $settings[ $field['name'] ] ) ? $settings[ $field['name'] ] : '';
-                                                    printf( '<textarea type="text" name="settings[%s][%s]" placeholder="%s" id="%s" cols="30" rows="3">%s</textarea>', esc_attr( $id ), esc_attr( $field['name'] ), esc_attr( $placeholder ), esc_attr( $id ) . '-' . esc_attr( $field['name'] ), esc_attr( $value ) );
+                                                    // Disabled fields aren't posted, so the save keeps the stored script.
+                                                    $locked = \StorePulse\ConversionTracking\Access\CustomScripts::INTEGRATION === $id && ! current_user_can( \StorePulse\ConversionTracking\Access\CustomScripts::CAPABILITY );
+                                                    printf( '<textarea type="text" name="settings[%s][%s]" placeholder="%s" id="%s" cols="30" rows="3"%s>%s</textarea>', esc_attr( $id ), esc_attr( $field['name'] ), esc_attr( $placeholder ), esc_attr( $id ) . '-' . esc_attr( $field['name'] ), $locked ? ' disabled' : '', esc_textarea( $value ) );
+
+                                                    if ( $locked ) {
+                                                        echo '<p class="help">' . esc_html__( 'Only administrators can edit custom scripts.', 'woocommerce-conversion-tracking' ) . '</p>';
+                                                    }
                                                     break;
 
                                                 case 'checkbox':
@@ -73,7 +79,7 @@
                                                             $checked = isset( $settings[0][ $field_name ][ $key ] ) ? 'on' : '';
                                                             $disabled = isset( $option['profeature'] ) ? 'disabled' : '';
                                                             $class  = isset( $option['profeature'] ) ? 'disabled-class' : '';
-                                                            $feature = isset( $option['profeature'] ) ? ' (Pro-feature)' : '';
+                                                            $feature = isset( $option['profeature'] ) ? ' <a href="' . esc_url( \StorePulse\ConversionTracking\Admin\Upgrade::url() ) . '" target="_blank" rel="noopener">' . esc_html__( '(Pro feature)', 'woocommerce-conversion-tracking' ) . '<span class="screen-reader-text"> ' . esc_html__( '(opens in a new tab)', 'woocommerce-conversion-tracking' ) . '</span></a>' : '';
                                                             ?>
                                                                 <label for="<?php echo esc_attr( $id . '-' . $key ); ?>" class="<?php echo esc_attr( $class )?>">
                                                                     <input type="checkbox" name="settings[<?php echo esc_attr( $id ); ?>][0][<?php echo esc_attr( $field_name ); ?>][<?php echo esc_attr( $key ); ?>]" <?php checked( 'on', $checked ); ?> id="<?php echo esc_attr( $id . '-' . $key ); ?>" class="event <?php echo esc_attr( $class );?>" <?php echo esc_attr( $disabled ) ?>>
@@ -95,7 +101,7 @@
                                                                         <?php
 
                                                                         if ( isset( $option['help'] ) && ! empty( $option['help'] ) ) {
-                                                                            echo '<p class="help">' . $option['help'] . '</p>';
+                                                                            echo '<p class="help">' . wp_kses_post( $option['help'] ) . '</p>';
                                                                         }
                                                                         ?>
                                                                         </div>
@@ -114,7 +120,7 @@
                                             }
 
                                             if ( isset( $field['help'] ) && ! empty( $field['help'] ) ) {
-                                                echo '<p class="help">' . $field['help'] . '</p>';
+                                                echo '<p class="help">' . wp_kses_post( $field['help'] ) . '</p>';
                                             }
                                             ?>
                                         </td>
@@ -146,13 +152,12 @@
             <h3 class="wcct-doc-title"><?php esc_html_e( 'Documentation', 'woocommerce-conversion-tracking' ); ?></h3>
 
             <ul class="wcct-doc-list">
-                <li><a href="https://wedevs.com/docs/woocommerce-conversion-tracking/getting-started/installation/" target="_blank"><img src="<?php echo esc_attr( plugins_url( 'assets/images/getting_started.png', WCCT_FILE ) ); ?>" alt="" class="doc-list-icon"><span><?php esc_html_e( 'Getting Started', 'woocommerce-conversion-tracking' ) ?></span></a></li>
-                <li><a href="https://wedevs.com/docs/woocommerce-conversion-tracking/facebook/?utm_source=wp-admin&utm_medium=docs-link&utm_campaign=wcct_docs&utm_content=Facebook" target="_blank"><img src="<?php echo esc_attr( plugins_url( 'assets/images/facebook.png', WCCT_FILE ) ); ?>" alt="" class="doc-list-icon"><span><?php esc_html_e( 'Facebook', 'woocommerce-conversion-tracking' ) ?></span></a></li>
-                <li><a href="https://wedevs.com/docs/woocommerce-conversion-tracking/twitter/?utm_source=wp-admin&utm_medium=docs-link&utm_campaign=wcct_docs&utm_content=Twitter" target="_blank"><img src="<?php echo esc_attr( plugins_url( 'assets/images/twitter.png', WCCT_FILE ) ); ?>" alt="" class="doc-list-icon"><span><?php esc_html_e( 'Twitter', 'woocommerce-conversion-tracking' ) ?></span></a></li>
-                <li><a href="https://wedevs.com/docs/woocommerce-conversion-tracking/google-adwords/?utm_source=wp-admin&utm_medium=docs-link&utm_campaign=wcct_docs&utm_content=Adwords" target="_blank"><img src="<?php echo esc_attr( plugins_url( 'assets/images/adwords.png', WCCT_FILE ) ); ?>" alt="" class="doc-list-icon"><span><?php esc_html_e( 'Google Ads', 'woocommerce-conversion-tracking' ) ?></span></a></li>
-                <li><a href="https://wedevs.com/docs/woocommerce-conversion-tracking/bing-ads" target="_blank"><img src="<?php echo esc_attr( plugins_url( 'assets/images/bing_ads.png', WCCT_FILE ) ); ?>" alt="" class="doc-list-icon"><span><?php esc_html_e( 'Microsoft Advertising', 'woocommerce-conversion-tracking' ) ?></span></a></li>
-                <li><a href="https://wedevs.com/docs/woocommerce-conversion-tracking/custom/?utm_source=wp-admin&utm_medium=docs-link&utm_campaign=wcct_docs&utm_content=Custom" target="_blank"><img src="<?php echo esc_attr( plugins_url( 'assets/images/custom.png', WCCT_FILE ) ); ?>" alt="" class="doc-list-icon"><span><?php esc_html_e( 'Custom', 'woocommerce-conversion-tracking' ) ?></span></a></li>
+                <?php foreach ( \StorePulse\ConversionTracking\Admin\Docs::tiles() as $tile ) : ?>
+                    <li><a href="<?php echo esc_url( $tile['url'] ); ?>" target="_blank"><img src="<?php echo esc_url( $tile['icon'] ); ?>" alt="" class="doc-list-icon"><span><?php echo esc_html( $tile['title'] ); ?><?php echo $tile['pro'] && ! wcct_init()->is_pro() ? ' ' . esc_html__( '(Pro)', 'woocommerce-conversion-tracking' ) : ''; ?></span></a></li>
+                <?php endforeach; ?>
             </ul>
+
+            <p><a href="<?php echo esc_url( \StorePulse\ConversionTracking\Admin\Docs::home_url() ); ?>" target="_blank"><?php esc_html_e( 'All documentation', 'woocommerce-conversion-tracking' ); ?></a></p>
         </div>
 
         <?php do_action( 'wcct_sidebar' ) ?>

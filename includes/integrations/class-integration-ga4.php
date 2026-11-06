@@ -2,45 +2,52 @@
 
 require_once WCCT_INCLUDES . '/class-ga4-data.php';
 
+use StorePulse\ConversionTracking\Events\Event;
+use StorePulse\ConversionTracking\Events\EventFactory;
+use StorePulse\ConversionTracking\Events\PurchaseConfirmation;
+use StorePulse\ConversionTracking\Events\PurchaseGate;
+use StorePulse\ConversionTracking\Platforms\GoogleTag;
+
 /**
  * Google Analytics 4 integration
  */
 class WCCT_Integration_GA4 extends WCCT_Integration {
 
     /**
-     * WooCommerce session key for add to cart events waiting for the next page view
+     * Old session key for add to cart events; the pipeline's pending events replace it
+     *
+     * @deprecated 3.0.0
      *
      * @var string
      */
     const SESSION_KEY = 'wcct_ga4_pending_add_to_cart';
 
     /**
-     * Order meta key that marks the purchase event as sent
+     * Old cart fragment key for add to cart data; the pipeline's fragment replaces it
      *
-     * @var string
-     */
-    const TRACKED_META_KEY = '_wcct_ga4_tracked';
-
-    /**
-     * Cart fragment key that carries add to cart data in AJAX responses
+     * @deprecated 3.0.0
      *
      * @var string
      */
     const FRAGMENT_KEY = 'wcct_ga4_add_to_cart';
 
     /**
-     * AJAX action the browser calls after the purchase event is sent
+     * Old AJAX action for the purchase confirmation, answered as a no-op by AjaxCheckIn; the wcct/v1/events check-in replaces it
+     *
+     * @deprecated 3.0.0
      *
      * @var string
      */
     const PURCHASE_SENT_ACTION = 'wcct_ga4_purchase_sent';
 
     /**
-     * Adds made during the current AJAX request, as {id, params}
+     * GA4 event names => the google platform's event switches, when they differ
      *
      * @var array
      */
-    private $ajax_added_items = array();
+    const EVENT_SWITCHES = array(
+        'view_item' => 'view_product',
+    );
 
     /**
      * Saved measurement ID for this request, see get_measurement_id()
@@ -56,14 +63,12 @@ class WCCT_Integration_GA4 extends WCCT_Integration {
         $this->id       = 'ga4';
         $this->name     = __( 'Google Analytics 4', 'woocommerce-conversion-tracking' );
         $this->enabled  = true;
-        $this->supports = array();
+        $this->supports = array( 'add_to_cart' );
+
+        // Google consent mode covers GA4; this is the category for wcct_consent_allows().
+        $this->consent_category = 'statistics';
 
         add_filter( 'wcct_save_integrations_settings', array( $this, 'sanitize_settings' ) );
-        add_action( 'woocommerce_add_to_cart', array( $this, 'capture_add_to_cart' ), 10, 6 );
-        add_filter( 'woocommerce_add_to_cart_fragments', array( $this, 'add_to_cart_fragment' ) );
-        add_action( 'wp_footer', array( $this, 'print_footer_events' ), 30 );
-        add_action( 'wp_ajax_' . self::PURCHASE_SENT_ACTION, array( $this, 'mark_purchase_sent' ) );
-        add_action( 'wp_ajax_nopriv_' . self::PURCHASE_SENT_ACTION, array( $this, 'mark_purchase_sent' ) );
     }
 
     /**
@@ -75,14 +80,14 @@ class WCCT_Integration_GA4 extends WCCT_Integration {
         $help = sprintf(
             /* translators: 1: example measurement ID, 2: Google help link */
             __( 'Your GA4 Measurement ID, for example %1$s. Find it in Google Analytics under Admin &rarr; Data streams &rarr; your web stream. <a href="%2$s" target="_blank">Learn more</a>.', 'woocommerce-conversion-tracking' ),
-            '<code>G-XXXXXXXXXX</code>',
+            '<code>G-XXXXXXXXXX</code> or <code>GT-XXXXXXX</code>',
             'https://support.google.com/analytics/answer/12270356'
         );
 
         $help .= '<br><br>' . __( '<strong>Avoid double counting:</strong> if this GA4 property is already a destination of the Google tag you use for Google Ads (Google tag settings &rarr; Destinations), page views can be counted twice. Remove that destination, or turn on "Ignore duplicate instances of on-page configuration" in your Google tag settings.', 'woocommerce-conversion-tracking' );
 
         if ( $this->is_enabled() && '' === $this->get_measurement_id() ) {
-            $help .= '<br><br><strong>' . __( 'The saved Measurement ID is missing or invalid, so nothing is sent to Google Analytics. Only IDs that start with G- are accepted.', 'woocommerce-conversion-tracking' ) . '</strong>';
+            $help .= '<br><br><strong>' . __( 'The saved Measurement ID is missing or invalid, so nothing is sent to Google Analytics. Only IDs that start with G- or GT- are accepted.', 'woocommerce-conversion-tracking' ) . '</strong>';
         }
 
         $settings = array(
@@ -104,6 +109,8 @@ class WCCT_Integration_GA4 extends WCCT_Integration {
                     'add_to_cart'    => __( 'Add to Cart', 'woocommerce-conversion-tracking' ),
                     'begin_checkout' => __( 'Begin Checkout', 'woocommerce-conversion-tracking' ),
                     'purchase'       => __( 'Purchase', 'woocommerce-conversion-tracking' ),
+                    'search'         => __( 'Search', 'woocommerce-conversion-tracking' ),
+                    'sign_up'        => __( 'Sign up', 'woocommerce-conversion-tracking' ),
                 ),
             ),
         );
@@ -140,7 +147,7 @@ class WCCT_Integration_GA4 extends WCCT_Integration {
                     array(
                         'message' => sprintf(
                             /* translators: %s: the rejected measurement ID */
-                            __( 'Google Analytics 4: "%s" is not a valid Measurement ID. Use the ID that starts with G-, for example G-XXXXXXXXXX. Settings were not saved.', 'woocommerce-conversion-tracking' ),
+                            __( 'Google Analytics 4: "%s" is not a valid Measurement ID. Use the ID that starts with G- or GT-, for example G-XXXXXXXXXX. Settings were not saved.', 'woocommerce-conversion-tracking' ),
                             sanitize_text_field( wp_unslash( $raw_id ) )
                         ),
                     )
@@ -154,122 +161,92 @@ class WCCT_Integration_GA4 extends WCCT_Integration {
     }
 
     /**
-     * Enqueue script
+     * Whether GA4 is on in the google platform settings (mode Analytics or Both with a measurement ID) and not paused
      *
-     * The gtag.js loader is shared with the other gtag integrations, see
-     * WCCT_Integration::print_gtag_loader().
+     * @return boolean
+     */
+    public function is_active() {
+        return ! empty( GoogleTag::settings( $this->id )['enabled'] ) && ! $this->is_paused();
+    }
+
+    /**
+     * Whether a GA4 event is switched on in the google platform settings
      *
-     * The `key` query parameter (the order key on the order received and
-     * order pay pages) is removed from the page location and referrer.
+     * @param  string $event GA4 event name, or the platform event name.
+     *
+     * @return boolean
+     */
+    public function event_enabled( $event ) {
+        $event = isset( self::EVENT_SWITCHES[ $event ] ) ? self::EVENT_SWITCHES[ $event ] : $event;
+
+        return in_array( $event, GoogleTag::settings( $this->id )['events'], true );
+    }
+
+    /**
+     * Config ID for the shared Google tag: the Google tag ID when set, else the measurement ID
+     *
+     * @return string[]
+     */
+    public function get_gtag_ids() {
+        if ( ! $this->is_tracking_page() ) {
+            return array();
+        }
+
+        $tag_id = GoogleTag::tag_id( GoogleTag::settings( $this->id )['tag_id'] ?? '' );
+
+        return array( '' !== $tag_id ? $tag_id : $this->get_measurement_id() );
+    }
+
+    /**
+     * Print the shared Google tag, see GoogleTag; order parameters are removed from the page location and referrer, see OrderUrl
      *
      * @return void
      */
     public function enqueue_script() {
-        if ( ! $this->is_tracking_page() ) {
-            return;
+        if ( $this->is_tracking_page() ) {
+            $this->print_google_tag();
+        }
+    }
+
+    /**
+     * Add to cart event for the product the pipeline is sending
+     *
+     * @return string JavaScript for the pipeline
+     */
+    public function add_to_cart() {
+        $event = $this->current_event;
+
+        if ( ! $event || ! $event->get_product() instanceof WC_Product || ! $this->is_tracking_event( 'add_to_cart' ) ) {
+            return '';
         }
 
-        $measurement_id = $this->get_measurement_id();
-        $loader_printed = $this->print_gtag_loader( $measurement_id );
-        ?>
-        <script>
-            window.dataLayer = window.dataLayer || [];
-            window.wcctGtag = window.wcctGtag || function () { window.dataLayer.push(arguments); };
-            <?php if ( $loader_printed ) { ?>
-            wcctGtag('js', new Date());
-            <?php } ?>
-            (function () {
-                var cleanUrl = function (url) {
-                    try {
-                        var hashPos = url.indexOf('#');
-                        var hash = hashPos > -1 ? url.substring(hashPos) : '';
-                        var base = hashPos > -1 ? url.substring(0, hashPos) : url;
-                        var queryPos = base.indexOf('?');
-                        if (queryPos == -1) return url;
-                        var pairs = base.substring(queryPos + 1).split('&'), kept = [];
-                        for (var i = 0; i < pairs.length; i++) {
-                            if (decodeURIComponent(pairs[i].split('=')[0].replace(/\+/g, ' ')) != 'key') kept.push(pairs[i]);
-                        }
-                        return base.substring(0, queryPos) + (kept.length ? '?' + kept.join('&') : '') + hash;
-                    } catch (e) {
-                        return String(url).split('?')[0];
-                    }
-                };
-                var config = {};
-                var pageLocation = cleanUrl(window.location.href);
-                if (pageLocation != window.location.href) config.page_location = pageLocation;
-                if (document.referrer) {
-                    var referrer = cleanUrl(document.referrer);
-                    if (referrer != document.referrer) config.page_referrer = referrer;
-                }
-                wcctGtag('config', <?php echo $this->encode( $measurement_id ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>, config);
-            })();
-        </script>
-        <?php
+        $params = $this->get_event_params( array( $this->get_product_item( $event->get_product(), $event->get( 'quantity', 1 ) ) ) );
+
+        return '(window.wcctGtag || function () { (window.dataLayer = window.dataLayer || []).push(arguments); })(\'event\', \'add_to_cart\', ' . $this->encode( $params ) . ');';
     }
 
     /**
      * Remember a product added to the cart
      *
-     * Every add is stored in the session with an ID and sent on the next page
-     * view. AJAX adds are also sent back in the cart fragments, and sent at
-     * once when add-to-cart.js fires added_to_cart. The browser remembers the
-     * IDs it sent that way and skips them on the next page view.
-     *
-     * So an add is sent once whether the page fires added_to_cart, redirects
-     * (redirect to cart, buy now buttons) or uses another AJAX action or the
-     * Store API.
-     *
-     * @param  string $cart_item_key
-     * @param  int    $product_id
-     * @param  int    $quantity
-     * @param  int    $variation_id
-     * @param  array  $variation
-     * @param  array  $cart_item_data
+     * @deprecated 3.0.0 The pipeline queues add to cart, see add_to_cart().
      *
      * @return void
      */
-    public function capture_add_to_cart( $cart_item_key, $product_id, $quantity, $variation_id = 0, $variation = array(), $cart_item_data = array() ) {
-        if ( ! $this->is_tracking_event( 'add_to_cart' ) ) {
-            return;
-        }
-
-        $product = wc_get_product( $variation_id ? $variation_id : $product_id );
-
-        if ( ! $product ) {
-            return;
-        }
-
-        $entry = array(
-            'id'     => wp_generate_uuid4(),
-            'params' => $this->get_event_params( array( $this->get_product_item( $product, $quantity ) ) ),
-        );
-
-        if ( wp_doing_ajax() ) {
-            $this->ajax_added_items[] = $entry;
-        }
-
-        if ( WC()->session ) {
-            $pending   = (array) WC()->session->get( self::SESSION_KEY, array() );
-            $pending[] = $entry;
-
-            WC()->session->set( self::SESSION_KEY, $pending );
-        }
+    public function capture_add_to_cart() {
+        _deprecated_function( __METHOD__, '3.0.0' );
     }
 
     /**
      * Add the adds from this AJAX request to the cart fragments
+     *
+     * @deprecated 3.0.0 The pipeline adds its own fragment.
      *
      * @param  array $fragments
      *
      * @return array
      */
     public function add_to_cart_fragment( $fragments ) {
-        if ( ! empty( $this->ajax_added_items ) && $this->is_tracking_event( 'add_to_cart' ) ) {
-            $fragments[ self::FRAGMENT_KEY ] = $this->ajax_added_items;
-        }
-
-        $this->ajax_added_items = array();
+        _deprecated_function( __METHOD__, '3.0.0' );
 
         return $fragments;
     }
@@ -277,122 +254,118 @@ class WCCT_Integration_GA4 extends WCCT_Integration {
     /**
      * Print the events for this page in the footer
      *
+     * @deprecated 3.0.0 The pipeline prints the footer script, see get_footer_script().
+     *
      * @return void
      */
     public function print_footer_events() {
+        _deprecated_function( __METHOD__, '3.0.0', 'WCCT_Integration_GA4::get_footer_script()' );
+    }
+
+    /**
+     * Footer script for the events on this page
+     *
+     * @param Event[] $page_events Events decided on page load.
+     *
+     * @return string
+     */
+    public function get_footer_script( array $page_events ) {
         if ( ! $this->is_tracking_page() ) {
-            return;
+            return '';
         }
 
-        $events      = array();
-        $listen_ajax = $this->event_allowed( 'add_to_cart' );
-        $pending     = $this->get_pending_add_to_cart_items();
+        $events   = array();
+        $confirms = array();
 
-        if ( ! $listen_ajax ) {
-            $pending = array();
-        }
-
-        if ( is_product() && $this->event_allowed( 'view_item' ) ) {
-            $product = wc_get_product( get_queried_object_id() );
-
-            if ( $product ) {
-                $events[] = array( 'view_item', $this->get_event_params( array( $this->get_product_item( $product, 1 ) ) ) );
+        foreach ( $page_events as $page_event ) {
+            if ( Event::VIEW_PRODUCT === $page_event->get_name() && $page_event->get_product() && $this->event_allowed( 'view_item' ) ) {
+                $events[] = array( 'view_item', $this->get_event_params( array( $this->get_product_item( $page_event->get_product(), 1 ) ) ) );
             }
-        }
 
-        if ( is_checkout() && ! is_order_received_page() && ! is_wc_endpoint_url( 'order-pay' ) && $this->event_allowed( 'begin_checkout' ) ) {
-            $params = $this->get_begin_checkout_params();
+            if ( Event::SEARCH === $page_event->get_name() && $this->event_allowed( 'search' ) ) {
+                $params = $this->get_search_params( $page_event );
 
-            if ( $params ) {
-                $events[] = array( 'begin_checkout', $params );
+                if ( $params ) {
+                    $events[] = array( 'search', $params );
+                }
             }
-        }
 
-        if ( is_order_received_page() && $this->event_allowed( 'purchase' ) ) {
-            $order = $this->get_purchase_order();
-
-            if ( $order ) {
+            if ( Event::SIGN_UP === $page_event->get_name() && $this->event_allowed( 'sign_up' ) ) {
                 $events[] = array(
-                    'purchase',
-                    $this->get_purchase_params( $order ),
+                    'sign_up',
                     array(
-                        'order_id' => $order->get_id(),
-                        'key'      => $order->get_order_key(),
+                        'send_to' => $this->get_measurement_id(),
+                        'method'  => 'WooCommerce',
                     ),
                 );
             }
+
+            if ( Event::BEGIN_CHECKOUT === $page_event->get_name() && $this->event_allowed( 'begin_checkout' ) ) {
+                $params = $this->get_begin_checkout_params();
+
+                if ( $params ) {
+                    $events[] = array( 'begin_checkout', $params );
+                }
+            }
+
+            if ( Event::PURCHASE === $page_event->get_name() && $this->event_allowed( 'purchase' ) ) {
+                $order = $this->get_purchase_order( $page_event->get_order() );
+
+                if ( $order ) {
+                    $confirms[ count( $events ) ] = $this->purchase_sent_callback( $order );
+                    $events[]                     = array( 'purchase', $this->get_purchase_params( $order, $page_event ) );
+                }
+            }
         }
 
-        if ( ! $events && ! $pending && ! $listen_ajax ) {
-            return;
+        if ( ! $events ) {
+            return '';
         }
+
+        $callbacks = array();
+
+        foreach ( $confirms as $index => $callback ) {
+            $callbacks[] = (int) $index . ': ' . $callback;
+        }
+
+        ob_start();
         ?>
-        <script>
             (function () {
                 window.dataLayer = window.dataLayer || [];
                 var gtag = window.wcctGtag || function () { window.dataLayer.push(arguments); };
                 var events = <?php echo $this->encode( $events ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>;
-                var pending = <?php echo $this->encode( array_values( $pending ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>;
-                // IDs of adds already sent from the AJAX response, skipped
-                // when the same adds come back from the session.
-                var sentKey = 'wcct_ga4_sent_add_to_cart';
-                var readSent = function () {
-                    try { return JSON.parse(window.sessionStorage.getItem(sentKey)) || []; } catch (e) { return []; }
-                };
-                var sendAdds = function (entries, remember) {
-                    var sent = readSent();
-                    for (var i = 0; i < entries.length; i++) {
-                        if (!entries[i] || !entries[i].params || sent.indexOf(entries[i].id) > -1) continue;
-                        gtag('event', 'add_to_cart', entries[i].params);
-                        if (remember) sent.push(entries[i].id);
-                    }
-                    if (remember) {
-                        try { window.sessionStorage.setItem(sentKey, JSON.stringify(sent.slice(-50))); } catch (e) {}
-                    }
-                };
-                sendAdds(pending, false);
-                // Tells the server the purchase was sent, so it is not sent again.
-                // Runs only once gtag.js has handled the event, so a blocked or
-                // abandoned page sends the purchase again on the next view.
-                // gtag also runs the callback when event_timeout passes, even if
-                // the hit failed, so the timeout is long enough that the callback
-                // in practice comes from the hit being sent.
-                var confirmSent = function (order) {
-                    var done = false;
-                    return function () {
-                        if (done) return;
-                        done = true;
-                        var url = <?php echo $this->encode( admin_url( 'admin-ajax.php' ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>;
-                        var body = new FormData();
-                        body.append('action', <?php echo $this->encode( self::PURCHASE_SENT_ACTION ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>);
-                        body.append('order_id', order.order_id);
-                        body.append('key', order.key);
-                        if (navigator.sendBeacon && navigator.sendBeacon(url, body)) return;
-                        var xhr = new XMLHttpRequest();
-                        xhr.open('POST', url);
-                        xhr.send(body);
-                    };
-                };
+                // gtag.js calls event_callback once it has handled the purchase; the check-in writes the sent flag then.
+                // gtag also runs it when event_timeout passes, so the timeout is long enough that it in practice means the hit was sent.
+                var confirms = {<?php echo implode( ', ', $callbacks ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- JSON-encoded in PurchaseConfirmation::callback(). ?>};
                 for (var i = 0; i < events.length; i++) {
-                    if (events[i][2]) {
-                        events[i][1].event_callback = confirmSent(events[i][2]);
+                    if (confirms[i]) {
+                        events[i][1].event_callback = confirms[i];
                         events[i][1].event_timeout = 60000;
                     }
                     gtag('event', events[i][0], events[i][1]);
                 }
-                <?php if ( $listen_ajax ) { ?>
-                if (window.jQuery) {
-                    window.jQuery(document.body).on('added_to_cart', function (e, fragments) {
-                        if (fragments && fragments['<?php echo esc_js( self::FRAGMENT_KEY ); ?>']) {
-                            sendAdds(fragments['<?php echo esc_js( self::FRAGMENT_KEY ); ?>'], true);
-                            delete fragments['<?php echo esc_js( self::FRAGMENT_KEY ); ?>'];
-                        }
-                    });
-                }
-                <?php } ?>
             })();
-        </script>
         <?php
+        $code = trim( ob_get_clean() );
+
+        return $confirms ? PurchaseConfirmation::helper() . "\n" . $code : $code;
+    }
+
+    /**
+     * Search parameters for a store (product) search with a search term
+     *
+     * @param Event $event Search event.
+     *
+     * @return array|false
+     */
+    private function get_search_params( $event ) {
+        $term = $event->get( 'search_string', '' );
+
+        if ( ! in_array( 'product', (array) $event->get( 'post_types', array() ), true ) || ! is_string( $term ) || '' === trim( $term ) ) {
+            return false;
+        }
+
+        return WCCT_GA4_Data::search_params( $this->get_measurement_id(), $term );
     }
 
     /**
@@ -427,17 +400,14 @@ class WCCT_Integration_GA4 extends WCCT_Integration {
     }
 
     /**
-     * Order on the order received page that still needs a purchase event
+     * The purchase event's order, unless its status is skipped or it was already sent (see PurchaseGate)
      *
-     * The order key must match, failed and cancelled orders are skipped, and
-     * orders already sent are skipped.
+     * @param  WC_Order|null $order Order the pipeline found on the order received page.
      *
      * @return WC_Order|false
      */
-    private function get_purchase_order() {
-        $order = $this->get_order_by_key( absint( get_query_var( 'order-received' ) ), isset( $_GET['key'] ) ? wp_unslash( $_GET['key'] ) : '' ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- sanitized in get_order_by_key()
-
-        if ( ! $order || ! WCCT_GA4_Data::is_trackable_status( $order->get_status() ) || $order->get_meta( self::TRACKED_META_KEY ) ) {
+    private function get_purchase_order( $order ) {
+        if ( ! $order instanceof WC_Order || ! PurchaseGate::should_send( $order, $this->id ) ) {
             return false;
         }
 
@@ -447,72 +417,42 @@ class WCCT_Integration_GA4 extends WCCT_Integration {
     /**
      * Mark an order's purchase event as sent
      *
-     * Called by the browser after gtag.js has handled the purchase event.
-     * The order key is the credential, as on the order received page.
+     * @deprecated 3.0.0 The thank-you page checks in through wcct/v1/events, see CheckIn.
      *
      * @return void
      */
     public function mark_purchase_sent() {
-        $order_id  = isset( $_POST['order_id'] ) ? absint( $_POST['order_id'] ) : 0; // phpcs:ignore WordPress.Security.NonceVerification.Missing
-        $order_key = isset( $_POST['key'] ) ? wp_unslash( $_POST['key'] ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Missing, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- sanitized in get_order_by_key()
-        $order     = $this->get_order_by_key( $order_id, $order_key );
-
-        if ( ! $order ) {
-            wp_send_json_error( null, 403 );
-        }
-
-        if ( ! $order->get_meta( self::TRACKED_META_KEY ) ) {
-            $order->update_meta_data( self::TRACKED_META_KEY, 1 );
-            $order->save_meta_data();
-        }
+        _deprecated_function( __METHOD__, '3.0.0' );
 
         wp_send_json_success();
     }
 
     /**
-     * Order for an ID, only when the order key matches
+     * Purchase parameters for an order; value is the item total (fees excluded), tax and shipping are sent on their own
      *
-     * @param  int   $order_id
-     * @param  mixed $order_key Unsanitized key
-     *
-     * @return WC_Order|false
-     */
-    private function get_order_by_key( $order_id, $order_key ) {
-        $order_key = is_string( $order_key ) ? wc_clean( $order_key ) : '';
-        $order     = $order_id ? wc_get_order( $order_id ) : false;
-
-        if ( ! $order instanceof WC_Order || '' === $order_key || ! hash_equals( $order->get_order_key(), $order_key ) ) {
-            return false;
-        }
-
-        return $order;
-    }
-
-    /**
-     * Purchase parameters for an order
-     *
-     * @param  WC_Order $order
+     * @param  WC_Order   $order
+     * @param  Event|null $event The purchase event.
      *
      * @return array
      */
-    private function get_purchase_params( $order ) {
+    private function get_purchase_params( $order, $event = null ) {
         $decimals = wc_get_price_decimals();
         $items    = array();
-        $value    = 0;
+        $event    = $event instanceof Event ? $event : EventFactory::purchase( $order );
+        $value    = $event->get_items_total_value( $this->id );
 
         foreach ( $order->get_items() as $order_item ) {
             if ( ! $order_item instanceof WC_Order_Item_Product ) {
                 continue;
             }
 
-            $value  += (float) $order_item->get_total();
             $values  = WCCT_GA4_Data::line_item_values( $order_item->get_subtotal(), $order_item->get_total(), $order_item->get_quantity(), $decimals );
             $product = $order_item->get_product();
 
             if ( $product ) {
                 $items[] = $this->get_product_item( $product, $order_item->get_quantity(), $values['price'], $values['discount'] );
             } else {
-                $item_id = $order_item->get_variation_id() ? $order_item->get_variation_id() : $order_item->get_product_id();
+                $item_id = \StorePulse\ConversionTracking\Events\ProductId::for_order_item( $order_item, \StorePulse\ConversionTracking\Events\ProductId::mode_for( $this->id ) );
                 $items[] = WCCT_GA4_Data::build_item(
                     array(
                         'id'   => apply_filters( 'wcct_ga4_item_id', (string) $item_id, false ),
@@ -540,38 +480,10 @@ class WCCT_Integration_GA4 extends WCCT_Integration {
     }
 
     /**
-     * Read and clear the adds stored in the session
-     *
-     * @return array List of {id, params}
-     */
-    private function get_pending_add_to_cart_items() {
-        if ( ! WC()->session ) {
-            return array();
-        }
-
-        $pending = WC()->session->get( self::SESSION_KEY, array() );
-
-        if ( $pending ) {
-            WC()->session->set( self::SESSION_KEY, null );
-        }
-
-        if ( ! is_array( $pending ) ) {
-            return array();
-        }
-
-        return array_filter(
-            $pending,
-            function ( $entry ) {
-                return is_array( $entry ) && isset( $entry['id'], $entry['params'] );
-            }
-        );
-    }
-
-    /**
      * Build a GA4 item for a product
      *
-     * Variations use the variation ID, the same ID the Meta integration
-     * sends for cart items.
+     * Variations use their own ID or SKU, per the Product ID sent setting,
+     * the same ID the Meta integration sends.
      *
      * @param  WC_Product $product
      * @param  int        $quantity
@@ -594,7 +506,7 @@ class WCCT_Integration_GA4 extends WCCT_Integration {
 
         return WCCT_GA4_Data::build_item(
             array(
-                'id'         => apply_filters( 'wcct_ga4_item_id', (string) $product->get_id(), $product ),
+                'id'         => apply_filters( 'wcct_ga4_item_id', (string) \StorePulse\ConversionTracking\Events\ProductId::for_product( $product, $this->id ), $product ),
                 'name'       => $product->get_title(),
                 'variant'    => $variant,
                 'categories' => $this->get_category_path( $parent_id ? $parent_id : $product->get_id() ),
@@ -658,9 +570,9 @@ class WCCT_Integration_GA4 extends WCCT_Integration {
      */
     private function get_measurement_id() {
         if ( null === $this->measurement_id ) {
-            $settings = $this->get_integration_settings();
+            $settings = GoogleTag::settings( $this->id );
 
-            $this->measurement_id = WCCT_GA4_Data::sanitize_measurement_id( isset( $settings[0]['measurement_id'] ) ? $settings[0]['measurement_id'] : '' );
+            $this->measurement_id = WCCT_GA4_Data::sanitize_measurement_id( isset( $settings['measurement_id'] ) ? $settings['measurement_id'] : '' );
         }
 
         return $this->measurement_id;
@@ -672,7 +584,7 @@ class WCCT_Integration_GA4 extends WCCT_Integration {
      * @return boolean
      */
     private function is_tracking_page() {
-        if ( ! $this->is_enabled() || '' === $this->get_measurement_id() ) {
+        if ( ! $this->is_active() || '' === $this->get_measurement_id() ) {
             return false;
         }
 
@@ -715,6 +627,13 @@ class WCCT_Integration_GA4 extends WCCT_Integration {
     private function encode( $data ) {
         return wp_json_encode( $data, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT );
     }
-}
 
-return new WCCT_Integration_GA4();
+    /**
+     * gtag.js has loaded once it has set up google_tag_data
+     *
+     * @return string
+     */
+    public function library_loaded_check() {
+        return '!!window.google_tag_data';
+    }
+}

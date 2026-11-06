@@ -205,42 +205,6 @@
 .wcct-admin .sidebar-wrap .premium-box.box-green {
   background: #ffffff;
 }
-.wcct-admin .sidebar-wrap .premium-box.box-blue {
-  color: #444;
-  background: #fff;
-  padding-bottom: 27px;
-}
-.wcct-admin .sidebar-wrap .premium-box.box-blue p {
-  font-size: 15px;
-  font-weight: normal;
-}
-.wcct-admin .sidebar-wrap .premium-box.box-blue h3 {
-  color: #444;
-}
-.wcct-admin .sidebar-wrap .premium-box.box-blue .pro-button {
-  text-decoration: none;
-  padding: 5px 20px;
-  background: #fff;
-  border-radius: 50px;
-  color: #F37599;
-}
-.wcct-admin .sidebar-wrap .premium-box.box-blue .dashicons-yes {
-  color: green;
-  font-size: 1.5em;
-}
-.wcct-admin .sidebar-wrap .premium-box.box-blue ul.premium-feature-list {
-  margin-bottom: 15px;
-}
-.wcct-admin .sidebar-wrap .premium-box.box-blue .premium-feature-list li:before {
-  content: "\f147";
-  font-family: dashicons;
-  display: inline-block;
-  background: #64b450;
-  color: #fff;
-  padding: 0 3px;
-  margin-right: 10px;
-  border-radius: 50%;
-}
 .wcct-admin .sidebar-wrap .premium-box .wcct-doc-title {
   color: #444;
 }

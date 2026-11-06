@@ -1,0 +1,17 @@
+{
+    "meta": {
+        "pixelId": "123456789012345"
+    },
+    "ga4": {
+        "measurementId": "G-CTE2ETEST"
+    },
+    "ads": {
+        "conversionId": "AW-123456789",
+        "purchaseLabel": "CtE2ePurchase",
+        "registrationLabel": "CtE2eRegistration"
+    },
+    "x": {
+        "pixelId": "cte2x",
+        "purchaseEventId": "tw-cte2x-ctpur"
+    }
+}
