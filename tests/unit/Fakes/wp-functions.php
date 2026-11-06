@@ -74,3 +74,33 @@ if ( ! function_exists( 'wp_doing_ajax' ) ) {
         return ! empty( $GLOBALS['wcct_test_doing_ajax'] );
     }
 }
+
+if ( ! function_exists( 'add_option' ) ) {
+    function add_option( $name, $value = '' ) {
+        if ( isset( $GLOBALS['wcct_test_options'] ) && array_key_exists( $name, $GLOBALS['wcct_test_options'] ) ) {
+            return false;
+        }
+
+        $GLOBALS['wcct_test_options'][ $name ] = $value;
+
+        return true;
+    }
+}
+
+if ( ! function_exists( 'admin_url' ) ) {
+    function admin_url( $path = '' ) {
+        return 'https://shop.test/wp-admin/' . ltrim( $path, '/' );
+    }
+}
+
+if ( ! function_exists( 'wp_json_encode' ) ) {
+    function wp_json_encode( $data, $flags = 0 ) {
+        return json_encode( $data, $flags );
+    }
+}
+
+if ( ! function_exists( 'wc_get_price_decimals' ) ) {
+    function wc_get_price_decimals() {
+        return isset( $GLOBALS['wcct_test_decimals'] ) ? $GLOBALS['wcct_test_decimals'] : 2;
+    }
+}

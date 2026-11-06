@@ -3,6 +3,8 @@
 namespace StorePulse\ConversionTracking\Settings;
 
 use StorePulse\ConversionTracking\Access\CustomScripts;
+use StorePulse\ConversionTracking\Events\ValueMode;
+use StorePulse\ConversionTracking\Install;
 
 /**
  * The 3.0 settings schema: global fields plus one plugin-ui element list per platform.
@@ -332,6 +334,8 @@ class Schema {
                     self::event( 'add_to_wishlist', __( 'Add to wishlist', 'woocommerce-conversion-tracking' ), __( 'When a shopper saves a product to a wishlist.', 'woocommerce-conversion-tracking' ), array( 'pro' => true ) ),
                 )
             ),
+            self::section( 'facebook', 'facebook_advanced', __( 'Advanced settings', 'woocommerce-conversion-tracking' ), array( 'collapsible' => true, 'collapsed' => true ) ),
+            self::value_mode_field( 'facebook_advanced', 'facebook' ),
         );
     }
 
@@ -432,6 +436,7 @@ class Schema {
                 10,
                 array( 'case' => 'upper' )
             ),
+            self::value_mode_field( 'google_advanced', 'adwords', $ads ),
         );
     }
 
@@ -463,6 +468,8 @@ class Schema {
                     self::event( 'sign_up', __( 'Registration', 'woocommerce-conversion-tracking' ), __( 'A new account on your store.', 'woocommerce-conversion-tracking' ), array( 'pro' => true, 'needs' => 'signup_event_id' ) ),
                 )
             ),
+            self::section( 'twitter', 'twitter_advanced', __( 'Advanced settings', 'woocommerce-conversion-tracking' ), array( 'collapsible' => true, 'collapsed' => true ) ),
+            self::value_mode_field( 'twitter_advanced', 'twitter' ),
         );
     }
 
@@ -624,6 +631,48 @@ class Schema {
             'always'      => ! empty( $flags['always'] ),
             'needs'       => isset( $flags['needs'] ) ? $flags['needs'] : '',
         );
+    }
+
+    /**
+     * "Order value includes" for a platform's Purchase; the default follows the install type (D8).
+     *
+     * @param string $section      Section ID.
+     * @param string $integration  Integration ID the mode is for.
+     * @param array  $dependencies Field dependencies.
+     *
+     * @return array
+     */
+    public static function value_mode_field( string $section, string $integration, array $dependencies = array() ): array {
+        $field = array(
+            'id'          => 'value_mode',
+            'type'        => 'field',
+            'variant'     => 'select',
+            'section_id'  => $section,
+            'label'       => __( 'Order value includes', 'woocommerce-conversion-tracking' ),
+            'description' => __( 'Sent with Purchase. Items only keeps ad results in line with product revenue. Fees count as items; tax is never part of items.', 'woocommerce-conversion-tracking' ),
+            'default'     => ValueMode::default_for( $integration, Install::is_upgrade() ),
+            'priority'    => 50,
+            'options'     => array(
+                array(
+                    'value' => ValueMode::ITEMS,
+                    'label' => __( 'Items only (recommended)', 'woocommerce-conversion-tracking' ),
+                ),
+                array(
+                    'value' => ValueMode::SHIPPING,
+                    'label' => __( 'Items and shipping', 'woocommerce-conversion-tracking' ),
+                ),
+                array(
+                    'value' => ValueMode::ALL,
+                    'label' => __( 'Items, tax and shipping', 'woocommerce-conversion-tracking' ),
+                ),
+            ),
+        );
+
+        if ( $dependencies ) {
+            $field['dependencies'] = $dependencies;
+        }
+
+        return $field;
     }
 
     /**

@@ -184,6 +184,7 @@ class ValuesTest extends TestCase {
             case 'textarea':
                 return "<script>console.log('{order_number}', \"{$field['id']}\");</script>";
             case 'radio_capsule':
+            case 'select':
                 foreach ( $field['options'] as $option ) {
                     if ( $option['value'] !== $field['default'] ) {
                         return $option['value'];

@@ -6,6 +6,13 @@
 class WCCT_Integration_Google extends WCCT_Integration {
 
     /**
+     * Stands in for the event_callback function in the encoded parameters
+     *
+     * @var string
+     */
+    const CALLBACK_PLACEHOLDER = '__wcct_purchase_sent__';
+
+    /**
      * Constructor for WC_Conversion_Tracking_Gateway_Google
      */
     function __construct() {
@@ -96,6 +103,15 @@ class WCCT_Integration_Google extends WCCT_Integration {
     }
 
     /**
+     * The conversion's event_callback confirms the Purchase
+     *
+     * @return false
+     */
+    protected function purchase_sent_check() {
+        return false;
+    }
+
+    /**
      * Check Out google adwords
      *
      * @return string|void JavaScript for the pipeline
@@ -115,13 +131,20 @@ class WCCT_Integration_Google extends WCCT_Integration {
 
         $order = wc_get_order( $order_id );
 
+        if ( ! $order ) {
+            return;
+        }
+
         $code = $this->build_event( 'conversion', array(
             'send_to'        => sprintf( "%s/%s", $account_id, $label ),
             'transaction_id' => $order_id,
-            'value'          => $order->get_total() ? $order->get_total() : 0,
-            'currency'       => get_woocommerce_currency()
+            'value'          => $this->purchase_value( $order ),
+            'currency'       => $order->get_currency(),
+            'event_callback' => self::CALLBACK_PLACEHOLDER,
+            'event_timeout'  => 60000,
         ) );
 
-        return $code;
+        // gtag.js calls event_callback once it has sent the conversion; the flag is written then.
+        return str_replace( '"' . self::CALLBACK_PLACEHOLDER . '"', $this->purchase_sent_callback( $order ), $code );
     }
 }

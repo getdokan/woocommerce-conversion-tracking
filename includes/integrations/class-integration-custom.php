@@ -1,5 +1,7 @@
 <?php
 
+use StorePulse\ConversionTracking\Events\PurchaseConfirmation;
+
 /**
  * WCCT gate way custom
  */
@@ -97,8 +99,28 @@ class WCCT_Integration_Custom extends WCCT_Integration {
         $code = $this->get_integration_settings();
 
         if ( isset( $code['checkout'] ) && ! empty( $code['checkout'] ) ) {
-            return $this->process_order_markdown( $code['checkout'], $order_id );
+            $html  = $this->process_order_markdown( $code['checkout'], $order_id );
+            $order = wc_get_order( $order_id );
+
+            // Confirms once the merchant's inline script has run; an async or external script may not have sent yet.
+            if ( $order instanceof WC_Order ) {
+                $html .= '<script data-no-optimize="1">' . PurchaseConfirmation::helper() . "\n" . PurchaseConfirmation::confirm_script( $this->id, $order ) . '</script>';
+            }
+
+            return $html;
         }
+    }
+
+    /**
+     * The checkout markup carries its own confirmation, after the merchant's script
+     *
+     * @param string   $code  Purchase markup.
+     * @param WC_Order $order Order.
+     *
+     * @return string
+     */
+    protected function with_purchase_confirmation( $code, $order ) {
+        return $code;
     }
 
     /**

@@ -36,6 +36,9 @@ foreach ( $wcct_options as $wcct_name => $wcct_value ) {
     update_option( $wcct_name, $wcct_value );
 }
 
+// The fixtures stand for a store upgraded from 2.x (its settings are 2.x settings), so 3.0 keeps its order values (D8).
+update_option( 'wcct_install_type', 'upgrade' );
+
 // Rules are rebuilt on each request (inside its rolled-back transaction) with the structure above.
 delete_option( 'rewrite_rules' );
 

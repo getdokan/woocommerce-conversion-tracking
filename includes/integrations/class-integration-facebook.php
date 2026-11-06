@@ -206,11 +206,29 @@ class WCCT_Integration_Facebook extends WCCT_Integration {
         $code = $this->build_event( 'Purchase', array(
             'content_ids'  => json_encode($product_ids),
             'content_type' => $content_type,
-            'value'        => $order->get_total() ? $order->get_total() : 0,
-            'currency'     => get_woocommerce_currency()
+            'value'        => $this->purchase_value( $order ),
+            'currency'     => $order->get_currency()
         ) );
 
         return $code;
+    }
+
+    /**
+     * The Purchase is taken once fbevents.js has loaded and run the queue
+     *
+     * @return string
+     */
+    protected function purchase_sent_check() {
+        return "window.fbq && typeof window.fbq.callMethod === 'function'";
+    }
+
+    /**
+     * Under consent mode the Purchase only leaves once marketing is allowed
+     *
+     * @return string
+     */
+    protected function purchase_consent_category() {
+        return 'marketing';
     }
 
     /**

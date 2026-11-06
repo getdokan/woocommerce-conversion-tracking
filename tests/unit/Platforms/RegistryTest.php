@@ -104,9 +104,9 @@ class RegistryTest extends TestCase {
         );
 
         $pipeline->add_script( 'facebook', 'queued();' );
-        $scripts = $pipeline->build_footer_scripts( array( new Event( Event::PURCHASE, array( 'order_id' => 9 ) ) ) );
+        $scripts = $pipeline->build_footer_scripts( array( new Event( Event::VIEW_PRODUCT, array( 'product_ids' => array( 9 ) ) ) ) );
 
-        $this->assertSame( array( 'twitter' => "twitter.purchase(9);\n" ), $scripts );
+        $this->assertSame( array( 'twitter' => "twitter.view(9);\n" ), $scripts );
     }
 
     public function test_footer_scripts_follow_platform_order_with_queued_code_first() {

@@ -7,7 +7,38 @@
 <!-- body -->
 
 <!-- footer -->
-<script>ctCustom('purchase', { id: '{customer_id}', email: '{customer_email}', first: '{customer_first_name}', last: '{customer_last_name}', number: '3001', total: '78.00', subtotal: '78', discount: '5', shipping: '5', currency: 'USD', payment: 'cod', coupons: 'ctsave5' });</script>
+<script>ctCustom('purchase', { id: '{customer_id}', email: '{customer_email}', first: '{customer_first_name}', last: '{customer_last_name}', number: '3001', total: '78.00', subtotal: '78', discount: '5', shipping: '5', currency: 'USD', payment: 'cod', coupons: 'ctsave5' });</script><script data-no-optimize="1">window.wcctPurchaseSent = window.wcctPurchaseSent || function (url, platform, orderId, key) {
+    var sent = window.wcctPurchaseSent, all = sent.all = sent.all || {}, id = platform + ":" + orderId;
+    if (all[id]) return all[id];
+    var done = false;
+    var confirm = all[id] = function () {
+        if (done) return;
+        done = true;
+        var body = new FormData();
+        body.append("action", "wcct_purchase_sent");
+        body.append("platform", platform);
+        body.append("order_id", orderId);
+        body.append("key", key);
+        if (navigator.sendBeacon && navigator.sendBeacon(url, body)) return;
+        var xhr = new XMLHttpRequest();
+        xhr.open("POST", url);
+        xhr.send(body);
+    };
+    confirm.when = function (check, category) {
+        var consent = window.wcctConsent, tries = Math.ceil(30000 / 250);
+        var allowed = function () { return !category || !consent || !consent.allows || consent.allows(category); };
+        (function poll() {
+            if (done) return;
+            var ready = false;
+            try { ready = allowed() && !!check(); } catch (e) {}
+            if (ready) return confirm();
+            if (!allowed() && consent.when) return consent.when(category, function () { tries = Math.ceil(30000 / 250); poll(); });
+            if (--tries > 0) setTimeout(poll, 250);
+        })();
+    };
+    return confirm;
+};
+window.wcctPurchaseSent("{home}/wp-admin/admin-ajax.php", "custom", 3001, "wc_order_ctguest0001")();</script>
 <!-- footer: wc_enqueue_js -->
 
 <!-- scripts -->

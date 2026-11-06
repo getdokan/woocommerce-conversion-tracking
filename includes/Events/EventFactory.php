@@ -133,11 +133,13 @@ class EventFactory {
      * @return Event
      */
     public static function purchase( $order ) {
-        $ids = array();
+        $ids         = array();
+        $items_total = 0.0;
 
         foreach ( $order->get_items() as $item ) {
             if ( $item instanceof \WC_Order_Item_Product ) {
-                $ids[] = $item->get_variation_id() ? $item->get_variation_id() : $item->get_product_id();
+                $ids[]        = $item->get_variation_id() ? $item->get_variation_id() : $item->get_product_id();
+                $items_total += (float) $item->get_total();
             }
         }
 
@@ -147,6 +149,7 @@ class EventFactory {
                 'value'       => $order->get_total(),
                 'tax'         => $order->get_total_tax(),
                 'shipping'    => $order->get_shipping_total(),
+                'items_total' => $items_total,
                 'currency'    => $order->get_currency(),
                 'decimals'    => wc_get_price_decimals(),
                 'order'       => $order,

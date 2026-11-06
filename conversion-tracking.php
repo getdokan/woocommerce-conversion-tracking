@@ -239,7 +239,12 @@ class WeDevs_WC_Conversion_Tracking {
      * @return void
      */
     public function plugin_upgrades() {
+        // Before the migration, so 2.x settings still tell an upgrade from a new install.
+        \StorePulse\ConversionTracking\Install::record();
         \StorePulse\ConversionTracking\Migration\SettingsMigration::maybe_run();
+
+        // Orders created before 3.0 first ran count as already sent.
+        \StorePulse\ConversionTracking\Events\PurchaseGate::ensure_since();
     }
 
     /**

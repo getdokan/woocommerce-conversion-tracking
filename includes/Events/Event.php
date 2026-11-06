@@ -31,7 +31,7 @@ class Event {
     private $event_id;
 
     /**
-     * Value sent with the event, in $currency.
+     * Value sent with the event, in $currency; the order total for Purchase.
      *
      * @var float
      */
@@ -57,6 +57,20 @@ class Event {
      * @var string
      */
     private $currency;
+
+    /**
+     * Product line totals after discounts, without tax, fees or shipping.
+     *
+     * @var float
+     */
+    private $items_total;
+
+    /**
+     * Price decimals the amounts are rounded to.
+     *
+     * @var int
+     */
+    private $decimals;
 
     /**
      * The order, for order events.
@@ -104,15 +118,17 @@ class Event {
      * Build an event.
      *
      * @param string $name Event name.
-     * @param array  $args event_id, value, tax, shipping, currency, decimals, order, order_id, product, product_ids, data, user_data.
+     * @param array  $args event_id, value, tax, shipping, items_total, currency, decimals, order, order_id, product, product_ids, data, user_data.
      */
     public function __construct( string $name, array $args = array() ) {
         $decimals = isset( $args['decimals'] ) && is_numeric( $args['decimals'] ) ? max( 0, (int) $args['decimals'] ) : 2;
 
         $this->name        = $name;
+        $this->decimals    = $decimals;
         $this->value       = self::amount( isset( $args['value'] ) ? $args['value'] : 0, $decimals );
         $this->tax         = self::amount( isset( $args['tax'] ) ? $args['tax'] : 0, $decimals );
         $this->shipping    = self::amount( isset( $args['shipping'] ) ? $args['shipping'] : 0, $decimals );
+        $this->items_total = self::amount( isset( $args['items_total'] ) ? $args['items_total'] : 0, $decimals );
         $this->currency    = self::currency_code( isset( $args['currency'] ) ? $args['currency'] : '' );
         $this->order       = isset( $args['order'] ) && is_object( $args['order'] ) ? $args['order'] : null;
         $this->product     = isset( $args['product'] ) && is_object( $args['product'] ) ? $args['product'] : null;
@@ -171,6 +187,73 @@ class Event {
      */
     public function get_shipping() {
         return $this->shipping;
+    }
+
+    /**
+     * The value a platform sends in a value mode (see ValueMode), filtered through wcct_event_value.
+     *
+     * @param string $mode     Value mode: items, shipping or all.
+     * @param string $platform Platform ID.
+     *
+     * @return float
+     */
+    public function get_value_for( $mode, $platform = '' ) {
+        $mode = ValueMode::is_mode( $mode ) ? $mode : ValueMode::ITEMS;
+
+        return $this->filter_value( ValueMode::value( $this->value, $this->tax, $this->shipping, $mode, $this->decimals ), $mode, $platform );
+    }
+
+    /**
+     * The product line total (fees excluded), filtered through wcct_event_value as mode items; what GA4 sends.
+     *
+     * @param string $platform Platform ID.
+     *
+     * @return float
+     */
+    public function get_items_total_value( $platform = '' ) {
+        return $this->filter_value( $this->items_total, ValueMode::ITEMS, $platform );
+    }
+
+    /**
+     * Product line totals after discounts, without tax, fees or shipping.
+     *
+     * @return float
+     */
+    public function get_items_total() {
+        return $this->items_total;
+    }
+
+    /**
+     * Run a value through wcct_event_value.
+     *
+     * @param float  $value    Value.
+     * @param string $mode     Value mode.
+     * @param string $platform Platform ID.
+     *
+     * @return float
+     */
+    private function filter_value( $value, $mode, $platform ) {
+        /**
+         * Value sent with an event.
+         *
+         * @since 3.0.0
+         *
+         * @param float          $value    Value for the mode.
+         * @param string         $mode     Value mode: items, shipping or all.
+         * @param Event          $event    Event.
+         * @param \WC_Order|null $order    The order, for order events.
+         * @param string         $platform Platform ID.
+         */
+        return self::amount( apply_filters( 'wcct_event_value', $value, $mode, $this, $this->order, (string) $platform ), $this->decimals );
+    }
+
+    /**
+     * Price decimals.
+     *
+     * @return int
+     */
+    public function get_decimals() {
+        return $this->decimals;
     }
 
     /**

@@ -109,7 +109,11 @@ Appsero is provided by Appsero: [Privacy Policy](https://appsero.com/privacy-pol
 
 = Will a purchase be counted twice if the shopper reloads the thank-you page? =
 
-No. Each purchase is sent once per order to each platform.
+No. Each purchase is sent once per order to each platform. Failed and cancelled orders are never sent. Orders waiting for payment (pending, on hold) are sent on the thank-you page.
+
+= What order value is sent with a purchase? =
+
+For Meta, Google Ads, X and Microsoft you choose: items only, items and shipping, or items, tax and shipping (the order total). New stores start with items only; stores updating from 2.x keep the order total. Items are the line items after discounts plus any fees (a negative fee lowers the value). Google Analytics always sends the line items after discounts, without fees, with tax and shipping as separate fields. With prices entered including tax, WooCommerce stores items without their tax, so "items only" is the price without tax. The value is always in the order's currency. Developers can change it with the `wcct_event_value` filter.
 
 = Does it work with the block checkout? =
 

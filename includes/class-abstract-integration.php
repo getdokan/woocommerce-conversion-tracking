@@ -1,5 +1,11 @@
 <?php
 
+use StorePulse\ConversionTracking\Events\Event;
+use StorePulse\ConversionTracking\Events\EventFactory;
+use StorePulse\ConversionTracking\Events\PurchaseConfirmation;
+use StorePulse\ConversionTracking\Events\PurchaseGate;
+use StorePulse\ConversionTracking\Events\ValueMode;
+
 /**
  * Abstract Class
  */
@@ -69,6 +75,13 @@ abstract class WCCT_Integration {
      * @var \StorePulse\ConversionTracking\Events\Event|null
      */
     protected $current_event = null;
+
+    /**
+     * Order IDs whose Purchase this request already rendered
+     *
+     * @var array
+     */
+    private $purchases_rendered = array();
 
     /**
      * Get settings for all integration
@@ -199,12 +212,102 @@ abstract class WCCT_Integration {
             return '';
         }
 
-        $method              = static::$event_methods[ $name ];
+        $method   = static::$event_methods[ $name ];
+        $purchase = Event::PURCHASE === $name;
+
+        // Once per order and platform, also when two hooks raise it on one page; skipped statuses never send.
+        if ( $purchase && ( isset( $this->purchases_rendered[ $event->get_order_id() ] ) || ! PurchaseGate::should_send( $event->get_order(), $this->id ) ) ) {
+            return '';
+        }
+
         $this->current_event = $event;
-        $code                = $this->$method( 'purchase' === $name ? $event->get_order_id() : '' );
+        $code                = $this->$method( $purchase ? $event->get_order_id() : '' );
         $this->current_event = null;
 
-        return is_string( $code ) ? $code : '';
+        if ( ! is_string( $code ) ) {
+            return '';
+        }
+
+        if ( $purchase && '' !== trim( $code ) ) {
+            $this->purchases_rendered[ $event->get_order_id() ] = true;
+        }
+
+        return $purchase && '' !== trim( $code ) ? $this->with_purchase_confirmation( $code, $event->get_order() ) : $code;
+    }
+
+    /**
+     * Purchase code with the confirmation that writes the sent flag once the platform library has taken it
+     *
+     * @param string    $code  Purchase code.
+     * @param \WC_Order $order Order.
+     *
+     * @return string
+     */
+    protected function with_purchase_confirmation( $code, $order ) {
+        $check = $this->purchase_sent_check();
+
+        if ( false === $check ) {
+            return PurchaseConfirmation::helper() . "\n" . $code;
+        }
+
+        return PurchaseConfirmation::helper() . "\n" . $code . "\n" . PurchaseConfirmation::confirm_script( $this->id, $order, (string) $check, $this->purchase_consent_category() );
+    }
+
+    /**
+     * Consent category the Purchase needs before it counts as sent, when consent mode is on; empty for none
+     *
+     * @return string
+     */
+    protected function purchase_consent_category() {
+        return '';
+    }
+
+    /**
+     * JS expression, true once the platform library has taken the Purchase; '' confirms at once, false when the code calls purchase_sent_callback()
+     *
+     * @return string|false
+     */
+    protected function purchase_sent_check() {
+        return '';
+    }
+
+    /**
+     * JS expression for the function that confirms this Purchase, for library callbacks
+     *
+     * @param \WC_Order $order Order.
+     *
+     * @return string
+     */
+    protected function purchase_sent_callback( $order ) {
+        return PurchaseConfirmation::callback( $this->id, $order );
+    }
+
+    /**
+     * The Purchase event being rendered, or one built from the order
+     *
+     * @param \WC_Order $order Order.
+     *
+     * @return Event
+     */
+    protected function purchase_event( $order ) {
+        if ( $this->current_event && Event::PURCHASE === $this->current_event->get_name() ) {
+            return $this->current_event;
+        }
+
+        return EventFactory::purchase( $order );
+    }
+
+    /**
+     * Purchase value in this platform's value mode, as a decimal string
+     *
+     * @param \WC_Order $order Order.
+     *
+     * @return string
+     */
+    protected function purchase_value( $order ) {
+        $event = $this->purchase_event( $order );
+
+        return number_format( $event->get_value_for( ValueMode::for_platform( $this->id ), $this->id ), $event->get_decimals(), '.', '' );
     }
 
     /**

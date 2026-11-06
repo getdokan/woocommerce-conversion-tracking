@@ -2,6 +2,7 @@
 
 use StorePulse\ConversionTracking\Events\EventFactory;
 use StorePulse\ConversionTracking\Events\Pipeline;
+use StorePulse\ConversionTracking\Events\PurchaseConfirmation;
 use StorePulse\ConversionTracking\Events\SignUp;
 
 /**
@@ -33,6 +34,8 @@ class WCCT_Event_Dispatcher {
 
         $this->pipeline = new Pipeline( array( $this, 'get_integrations' ) );
         $this->pipeline->init_hooks();
+
+        ( new PurchaseConfirmation( array( $this, 'get_integrations' ) ) )->init_hooks();
 
         add_action( 'wp_head', array( $this, 'enqueue_scripts' ) );
 

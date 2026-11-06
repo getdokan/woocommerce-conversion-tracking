@@ -3,8 +3,10 @@
 require_once WCCT_INCLUDES . '/class-ga4-data.php';
 
 use StorePulse\ConversionTracking\Events\Event;
+use StorePulse\ConversionTracking\Events\EventFactory;
+use StorePulse\ConversionTracking\Events\PurchaseConfirmation;
+use StorePulse\ConversionTracking\Events\PurchaseGate;
 use StorePulse\ConversionTracking\Events\SentFlags;
-use StorePulse\ConversionTracking\Events\SkippedStatuses;
 
 /**
  * Google Analytics 4 integration
@@ -286,7 +288,7 @@ class WCCT_Integration_GA4 extends WCCT_Integration {
                 if ( $order ) {
                     $events[] = array(
                         'purchase',
-                        $this->get_purchase_params( $order ),
+                        $this->get_purchase_params( $order, $page_event ),
                         array(
                             'order_id' => $order->get_id(),
                             'key'      => $order->get_order_key(),
@@ -372,14 +374,14 @@ class WCCT_Integration_GA4 extends WCCT_Integration {
     }
 
     /**
-     * The purchase event's order, unless its status is skipped or it was already sent
+     * The purchase event's order, unless its status is skipped or it was already sent (see PurchaseGate)
      *
      * @param  WC_Order|null $order Order the pipeline found on the order received page.
      *
      * @return WC_Order|false
      */
     private function get_purchase_order( $order ) {
-        if ( ! $order instanceof WC_Order || SkippedStatuses::is_skipped( $order->get_status() ) || SentFlags::is_sent( $order, $this->id ) ) {
+        if ( ! $order instanceof WC_Order || ! PurchaseGate::should_send( $order, $this->id ) ) {
             return false;
         }
 
@@ -417,34 +419,28 @@ class WCCT_Integration_GA4 extends WCCT_Integration {
      * @return WC_Order|false
      */
     private function get_order_by_key( $order_id, $order_key ) {
-        $order_key = is_string( $order_key ) ? wc_clean( $order_key ) : '';
-        $order     = $order_id ? wc_get_order( $order_id ) : false;
-
-        if ( ! $order instanceof WC_Order || '' === $order_key || ! hash_equals( $order->get_order_key(), $order_key ) ) {
-            return false;
-        }
-
-        return $order;
+        return PurchaseConfirmation::order_by_key( $order_id, $order_key );
     }
 
     /**
-     * Purchase parameters for an order
+     * Purchase parameters for an order; value is the item total (fees excluded), tax and shipping are sent on their own
      *
-     * @param  WC_Order $order
+     * @param  WC_Order   $order
+     * @param  Event|null $event The purchase event.
      *
      * @return array
      */
-    private function get_purchase_params( $order ) {
+    private function get_purchase_params( $order, $event = null ) {
         $decimals = wc_get_price_decimals();
         $items    = array();
-        $value    = 0;
+        $event    = $event instanceof Event ? $event : EventFactory::purchase( $order );
+        $value    = $event->get_items_total_value( $this->id );
 
         foreach ( $order->get_items() as $order_item ) {
             if ( ! $order_item instanceof WC_Order_Item_Product ) {
                 continue;
             }
 
-            $value  += (float) $order_item->get_total();
             $values  = WCCT_GA4_Data::line_item_values( $order_item->get_subtotal(), $order_item->get_total(), $order_item->get_quantity(), $decimals );
             $product = $order_item->get_product();
 

@@ -33,6 +33,12 @@ class PageOutputTest extends WCCT_Test_Page_Case {
         return dirname( __DIR__, 2 ) . '/fixtures';
     }
 
+    protected function captured_page_additions() {
+        return array(
+            '~<script data-no-optimize="1">window\.wcctPurchaseSent = .*?</script>~s' => '#83: the Custom thank-you script is followed by the script that confirms the Purchase',
+        );
+    }
+
     private function request( $integration, $page ) {
         return $this->request_page( $page, WCCT_Test_Settings::only( WCCT_Test_Settings::lite_all(), $integration ) );
     }

@@ -203,6 +203,24 @@ wcct_test_early_hook(
     0
 );
 
+// A job's own set-up file (for example an order status), run before the page inside the request's transaction.
+wcct_test_early_hook(
+    'wp_loaded',
+    function () {
+        global $wcct_job, $wcct_recorder;
+
+        if ( empty( $wcct_job['before'] ) ) {
+            return;
+        }
+
+        $wcct_recorder->pause();
+        include $wcct_job['before'];
+        $wcct_recorder->resume();
+    },
+    5,
+    0
+);
+
 // The cart from earlier requests, filled without add to cart events.
 wcct_test_early_hook(
     'wp_loaded',

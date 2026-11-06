@@ -165,6 +165,15 @@ abstract class WCCT_Test_Page_Case extends TestCase {
     }
 
     /**
+     * Markup added to the output on purpose, taken out of the output before comparing, regex => reason
+     *
+     * @return array
+     */
+    protected function captured_page_additions() {
+        return array();
+    }
+
+    /**
      * Assert today's output is all in the page captured from the released versions (html/<page>.html in the fixtures)
      *
      * The captured pages are the full storefront HTML the fixtures were derived from. WCCT_CAPTURE_HTML=1
@@ -212,6 +221,17 @@ abstract class WCCT_Test_Page_Case extends TestCase {
         if ( $result['queued_js'] ) {
             $outputs[] = implode( '', $result['queued_js'] );
         }
+
+        $additions = array_keys( $this->captured_page_additions() );
+        $outputs   = array_filter(
+            array_map(
+                function ( $output ) use ( $additions ) {
+                    return $additions ? preg_replace( $additions, '', $output ) : $output;
+                },
+                $outputs
+            ),
+            'strlen'
+        );
 
         foreach ( $outputs as $output ) {
             $this->assertStringContainsString( WCCT_Test_Fixture::normalise( $output, $result['home'] ), $captured, "Output of $page is not in the captured page html/$page.html" );

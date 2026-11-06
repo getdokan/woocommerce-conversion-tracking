@@ -8,15 +8,18 @@ use PHPUnit\Framework\TestCase;
  */
 class ThankyouFallbackTest extends TestCase {
 
-    private function run_job( $order_id, $user_id ) {
+    private function run_job( $order_id, $user_id, array $state = array() ) {
         $result = WCCT_Test_WP::run(
-            array(
-                'type'     => 'file',
-                'file'     => dirname( __DIR__ ) . '/jobs/thankyou-fallback.php',
-                'rollback' => true,
-                'order_id' => $order_id,
-                'user_id'  => $user_id,
-                'options'  => array( 'wcct_settings' => WCCT_Test_Settings::lite_all() ),
+            array_merge(
+                array(
+                    'type'     => 'file',
+                    'file'     => dirname( __DIR__ ) . '/jobs/thankyou-fallback.php',
+                    'rollback' => true,
+                    'order_id' => $order_id,
+                    'user_id'  => $user_id,
+                    'options'  => array( 'wcct_settings' => WCCT_Test_Settings::lite_all() ),
+                ),
+                $state
             )
         );
 
@@ -46,5 +49,17 @@ class ThankyouFallbackTest extends TestCase {
         $value = $this->run_job( 3002, 501 );
 
         $this->assertSame( 1, substr_count( $value['scripts']['facebook'], "fbq('track', 'Purchase'" ) );
+    }
+
+    public function test_sent_or_failed_orders_send_nothing() {
+        foreach ( array( array( 'sent' => array( 'facebook', 'adwords', 'twitter', 'ga4', 'custom' ) ), array( 'status' => 'failed' ) ) as $state ) {
+            $value = $this->run_job( 3001, 0, $state );
+
+            $this->assertArrayNotHasKey( 'facebook', $value['scripts'] );
+            $this->assertArrayNotHasKey( 'adwords', $value['scripts'] );
+            $this->assertArrayNotHasKey( 'twitter', $value['scripts'] );
+            $this->assertArrayNotHasKey( 'custom', $value['markup'] );
+            $this->assertStringNotContainsString( '"purchase"', isset( $value['scripts']['ga4'] ) ? $value['scripts']['ga4'] : '' );
+        }
     }
 }
