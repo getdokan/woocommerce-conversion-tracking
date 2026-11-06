@@ -79,6 +79,11 @@ jobs:
               working-directory: tests/integration
               run: npm test
 
+            # Deletes the plugin with wp plugin uninstall on throwaway sites and checks nothing is left (#121).
+            - name: Run uninstall test
+              working-directory: tests/integration
+              run: npm run test:uninstall
+
             # The actual output of every fixture that did not match, to diff against tests/fixtures.
             - name: Upload changed output
               if: failure()

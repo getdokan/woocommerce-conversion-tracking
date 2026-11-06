@@ -135,6 +135,14 @@ Pro is sold on [WooCommerce.com](https://woocommerce.com/products/woocommerce-co
 
 Yes. Click "Skip & Deactivate" and the plugin deactivates at once without sending anything.
 
+= What is removed when I delete the plugin? =
+
+Deactivating keeps everything. Deleting the plugin from the Plugins page removes its settings, logs and scheduled jobs on every site of the network. The note on each order of the platforms its purchase was sent to stays, so a reinstall never counts a purchase twice. While Conversion Tracking Pro is installed, Pro's settings and catalog feed stay until you delete Pro too. On a large multisite network, delete it with WP-CLI (`wp plugin uninstall woocommerce-conversion-tracking`) so the cleanup isn't cut short by a web request time limit.
+
+= Is there text for my privacy policy? =
+
+Yes. Go to Settings > Privacy > Policy Guide in WordPress for suggested text that names the platforms your store can send data to.
+
 == Screenshots ==
 
 1. Dashboard

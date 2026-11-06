@@ -15,6 +15,7 @@
         "test": "wp-env run cli --env-cwd=wp-content/plugins/woocommerce-conversion-tracking composer test",
         "test:integration": "wp-env run cli --env-cwd=wp-content/plugins/woocommerce-conversion-tracking composer test:integration",
         "test:pro": "wp-env run cli --env-cwd=wp-content/plugins/wc-conversion-tracking-pro composer test",
+        "test:uninstall": "wp-env run cli --env-cwd=wp-content/plugins/woocommerce-conversion-tracking bash tests/integration/uninstall/run.sh",
         "fixtures:update": "wp-env run cli --env-cwd=wp-content/plugins/woocommerce-conversion-tracking env WCCT_UPDATE_FIXTURES=1 composer test:integration"
     },
     "devDependencies": {

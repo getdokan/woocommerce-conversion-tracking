@@ -117,6 +117,12 @@ if ( ! function_exists( '__' ) ) {
     }
 }
 
+if ( ! function_exists( 'esc_html__' ) ) {
+    function esc_html__( $text, $domain = 'default' ) {
+        return htmlspecialchars( $text, ENT_QUOTES );
+    }
+}
+
 if ( ! function_exists( 'update_option' ) ) {
     function update_option( $name, $value ) {
         $changed = ! isset( $GLOBALS['wcct_test_options'] ) || ! array_key_exists( $name, $GLOBALS['wcct_test_options'] ) || $GLOBALS['wcct_test_options'][ $name ] !== $value;

@@ -198,6 +198,8 @@ class WeDevs_WC_Conversion_Tracking {
         // Until the 2.x settings page is removed, its saves write through to the 3.0 settings.
         \StorePulse\ConversionTracking\Settings\LegacySync::register();
 
+        \StorePulse\ConversionTracking\Privacy\PolicyText::register();
+
         add_action( 'plugins_loaded', array( $this, 'plugin_upgrades' ) );
         add_action( 'init', array( $this, 'localization_setup' ) );
         add_action( 'init', array( $this, 'init_classes' ) );
