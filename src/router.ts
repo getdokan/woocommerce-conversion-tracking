@@ -112,10 +112,63 @@ export const replaceHash = ( hash: string ) => {
     window.dispatchEvent( new HashChangeEvent( 'hashchange' ) );
 };
 
-const subscribe = ( onChange: () => void ) => {
-    window.addEventListener( 'hashchange', onChange );
+// Returns true to stay on the current route (see useUnsavedChanges).
+type NavigationBlocker = () => boolean;
 
-    return () => window.removeEventListener( 'hashchange', onChange );
+let blocker: NavigationBlocker | null = null;
+
+/**
+ * Let a page veto hash route changes, for example while it has unsaved changes.
+ *
+ * @param {NavigationBlocker} check Returns true to stay.
+ * @return {Function} Removes the blocker.
+ */
+export const setNavigationBlocker = ( check: NavigationBlocker ) => {
+    blocker = check;
+
+    return () => {
+        if ( blocker === check ) {
+            blocker = null;
+        }
+    };
+};
+
+const listeners = new Set< () => void >();
+let lastHash = '';
+
+// One hashchange listener asks the blocker once, before any route subscriber re-renders.
+const onHashChange = () => {
+    const hash = window.location.hash;
+
+    if ( hash !== lastHash && blocker?.() ) {
+        window.history.replaceState(
+            window.history.state,
+            '',
+            lastHash || window.location.pathname + window.location.search
+        );
+
+        return;
+    }
+
+    lastHash = hash;
+    listeners.forEach( ( listener ) => listener() );
+};
+
+const subscribe = ( onChange: () => void ) => {
+    if ( ! listeners.size ) {
+        lastHash = window.location.hash;
+        window.addEventListener( 'hashchange', onHashChange );
+    }
+
+    listeners.add( onChange );
+
+    return () => {
+        listeners.delete( onChange );
+
+        if ( ! listeners.size ) {
+            window.removeEventListener( 'hashchange', onHashChange );
+        }
+    };
 };
 
 const getHash = () => window.location.hash;

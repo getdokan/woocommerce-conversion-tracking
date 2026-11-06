@@ -16,6 +16,7 @@ import { __ } from '@wordpress/i18n';
 import { useAppData } from '../data/AppData';
 import { isKnownPlatform } from '../data/platforms';
 import { replaceHash, routePath, useRoute, type Route } from '../router';
+import Catalog from '../pages/catalog/Catalog';
 import Dashboard from '../pages/dashboard/Dashboard';
 import Placeholder from '../pages/Placeholder';
 import Settings from '../pages/settings/Settings';
@@ -35,6 +36,10 @@ const BASE_TITLE = document.title;
 const RoutePage = ( { route }: { route: Route } ) => {
     if ( route.name === 'dashboard' ) {
         return <Dashboard />;
+    }
+
+    if ( route.name === 'catalog' ) {
+        return <Catalog />;
     }
 
     if ( route.name === 'settings' ) {
