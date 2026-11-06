@@ -11,7 +11,7 @@
                 $id              = $integration->get_id();
                 $settings_fields = $integration->get_settings();
                 $settings        = $integration->get_integration_settings();
-                $active          = ( $integration->is_enabled() ) ? 'Deactivate' : 'Activate';
+                $active          = ( $integration->is_switched_on() ) ? 'Deactivate' : 'Activate';
                 $border          = ( isset( $integration->multiple ) ) ? 'wcct-border' : '';
                 ?>
                 <div class="integration-wrap">
@@ -22,7 +22,7 @@
                             <h3 class="gateway-text"><?php echo esc_attr( $name ); ?></h3>
 
                             <label class="switch" title="" data-original-title="Make Inactive">
-                                <input type="checkbox" class="toogle-seller" name="settings[<?php echo esc_attr( $id ); ?>][enabled]" id="integration-<?php echo esc_attr( $id ); ?>" data-id="<?php echo esc_attr( $id ); ?>" value="1" <?php checked( true, $integration->is_enabled() ); ?> >
+                                <input type="checkbox" class="toogle-seller" name="settings[<?php echo esc_attr( $id ); ?>][enabled]" id="integration-<?php echo esc_attr( $id ); ?>" data-id="<?php echo esc_attr( $id ); ?>" value="1" <?php checked( true, $integration->is_switched_on() ); ?> >
                                 <span class="slider round wcct-tooltip" data-id="<?php echo esc_attr( $id ); ?>">
                                     <span class="wcct-tooltiptext integration-tooltip"><?php echo esc_attr( $active ); ?> </span>
                                 </span>

@@ -224,6 +224,11 @@ class CustomerDetailsTest extends TestCase {
         }
     }
 
+    public function test_values_cannot_end_or_interpolate_a_template_literal() {
+        $this->assertSame( 'a\x60b\x24{alert(1)}', CustomerDetails::js_string( 'a`b${alert(1)}' ) );
+        $this->assertSame( '\\\\\x60', CustomerDetails::js_string( '\`' ), 'a backslash before it stays escaped' );
+    }
+
     public function test_a_bad_order_never_fatals() {
         $this->turn_on();
 

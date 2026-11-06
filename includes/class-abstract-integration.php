@@ -123,6 +123,15 @@ abstract class WCCT_Integration {
     }
 
     /**
+     * Whether the settings page switch is on
+     *
+     * @return boolean
+     */
+    public function is_switched_on() {
+        return $this->is_enabled();
+    }
+
+    /**
      * Check the integration enable or not
      *
      * @return boolean

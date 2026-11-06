@@ -13,6 +13,8 @@ The store runs in Docker with [wp-env](https://www.npmjs.com/package/@wordpress/
 
 `specs/add-to-cart.spec.ts` adds to the cart from the product form, a shop-page AJAX button and a block Product Button (the `/block-shop/` page), and expects exactly one add to cart hit per tag, also after one more page view. Its last test turns on the `ct-e2e-page-cache.php` mu-plugin (a worst-case page cache that serves the same HTML to every browser) and checks a second browser never sends the first browser's add to cart. `specs/sign-up.spec.ts` signs up on My account and at classic checkout and expects one Meta `CompleteRegistration`, and none on the next page view.
 
+`specs/custom-scripts.spec.ts` turns on the Custom script's three placements for its browser (the `ct_e2e_custom_scripts` cookie of `ct-e2e-helpers.php`), each sending a hit to `custom.ct-e2e.test`, and expects the header script once on every page, the thank-you script once per order (none after a reload) with the order placeholders filled, and the sign-up script once per new account.
+
 `specs/begin-checkout.spec.ts` loads block and classic checkout and checks that Meta `InitiateCheckout` and GA4 `begin_checkout` are each sent once, and none on the thank-you page. With Pro active, setup also saves X's Start checkout event ID and a Microsoft UET tag (`config/checkout-ids.json`), and the spec checks their hits too; `utils/stubs` has stand-ins for X's `uwt.js` and Microsoft's `bat.js` too.
 
 `specs/settings.spec.ts` covers Settings > Integration access and Settings > Plan. On Free (no Pro mapped) it checks the locked access preview, the plan comparison with no price, and that every Upgrade, See pricing, Compare plans and plugins-list Get PRO link opens the WooCommerce.com product page. With Pro it checks Manage subscription, the confirmation before a role is granted (Cancel and Escape leave it off), the save, the Dokan vendor warning, and that a granted shop manager (`ct_e2e_shop_manager` / `password`, seeded by setup) sees the list read-only and gets 403 from the access route. Run it once without and once with Pro to cover both.
@@ -58,7 +60,7 @@ The tracker serves small stand-ins for `fbevents.js`, `gtag.js`, X's `uwt.js` an
 | --- | --- |
 | `.wp-env.json` | The store. WordPress and WooCommerce versions are pinned here; CI uses the current releases unless asked for the pinned ones. |
 | `setup/` | Seeding, run inside the wp-env cli container. |
-| `mu-plugins/ct-e2e-helpers.php` | Test-site helpers: the `ct_e2e_checkout=classic` cookie makes the shortcode page the checkout page, and wordpress.org calls are blocked. |
+| `mu-plugins/ct-e2e-helpers.php` | Test-site helpers: the `ct_e2e_checkout=classic` cookie makes the shortcode page the checkout page, the `ct_e2e_custom_scripts` cookie turns on the Custom script placements, and wordpress.org calls are blocked. |
 | `mu-plugins/ct-e2e-page-cache.php` | With the `ct_e2e_page_cache` cookie, caches logged-out GET pages per URL and serves them to every browser (`X-CT-Cache: HIT`); `/?ct_e2e_page_cache_flush=1` empties it. |
 | `config/test-ids.json` | Test IDs. A tag listed here is enabled in the store and must send a Purchase hit. |
 | `utils/fixtures.ts` | `test` and `expect` with the `tracker` and `jsErrors` fixtures. Import these in every spec. |

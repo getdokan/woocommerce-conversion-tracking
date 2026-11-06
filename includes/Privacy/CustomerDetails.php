@@ -68,7 +68,7 @@ class CustomerDetails {
     }
 
     /**
-     * A value escaped for a JavaScript string in single or double quotes, without the quotes; it can't close the script tag.
+     * A value escaped for a JavaScript string in quotes or backticks, without the quotes; it can't close the script tag.
      *
      * @param mixed $value Value.
      *
@@ -77,7 +77,8 @@ class CustomerDetails {
     public static function js_string( $value ): string {
         $json = wp_json_encode( (string) $value, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES );
 
-        return is_string( $json ) ? substr( $json, 1, -1 ) : '';
+        // Backtick and $ too, so a value can't end or interpolate in a template literal.
+        return is_string( $json ) ? str_replace( array( '`', '$' ), array( '\\x60', '\\x24' ), substr( $json, 1, -1 ) ) : '';
     }
 
     /**

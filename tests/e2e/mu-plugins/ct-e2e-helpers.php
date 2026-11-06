@@ -55,3 +55,30 @@ add_action(
         }
     }
 );
+
+// The ct_e2e_custom_scripts cookie turns on the Custom script's three placements (3.0 settings); each script sends a hit to custom.ct-e2e.test.
+add_filter(
+    'pre_option_wcct_settings_v3',
+    static function ( $pre ) {
+        if ( ! isset( $_COOKIE['ct_e2e_custom_scripts'] ) ) {
+            return $pre;
+        }
+
+        $hit = static function ( $placement, $query ) {
+            return "<script>(new Image()).src = 'https://custom.ct-e2e.test/{$placement}?{$query}&page=' + encodeURIComponent(location.pathname);</script>";
+        };
+
+        return array(
+            'platforms' => array(
+                'custom' => array(
+                    'thankyou_enabled' => true,
+                    'thankyou_script'  => $hit( 'thankyou', 'order={order_number}&id={order_id}&total={order_total}&currency={currency}&payment={payment_method}&coupons={used_coupons}&email={customer_email}' ),
+                    'header_enabled'   => true,
+                    'header_script'    => $hit( 'header', 'order={order_number}&email={customer_email}' ),
+                    'signup_enabled'   => true,
+                    'signup_script'    => $hit( 'signup', 'customer={customer_id}&email={customer_email}' ),
+                ),
+            ),
+        );
+    }
+);
