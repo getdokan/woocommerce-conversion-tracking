@@ -93,6 +93,12 @@ if ( ! function_exists( 'admin_url' ) ) {
     }
 }
 
+if ( ! function_exists( 'rest_url' ) ) {
+    function rest_url( $path = '' ) {
+        return 'https://shop.test/wp-json/' . ltrim( $path, '/' );
+    }
+}
+
 if ( ! function_exists( 'wp_json_encode' ) ) {
     function wp_json_encode( $data, $flags = 0 ) {
         return json_encode( $data, $flags );

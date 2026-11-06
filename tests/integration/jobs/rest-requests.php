@@ -3,7 +3,7 @@
  * Runs a list of wcct/v1 REST steps as given users and returns each result. Runs in a test store process (see WCCT_Test_Rest_Case, REST/RoutesTest).
  *
  * Steps: [ 'request', method, path, body|null, user ], [ 'option', name ], [ 'set_option', name, value|null ], [ 'action', hook, arg ],
- * [ 'shutdown', class ] (runs that class's shutdown callbacks, returns how many), [ 'global', name ].
+ * [ 'shutdown', class ] (runs that class's shutdown callbacks, returns how many), [ 'global', name ], [ 'call', callable, args ].
  * Users: admin, shop_manager, customer, subscriber, seller, logged_out. A string '{term:slug}' in a body becomes that product category's ID.
  */
 
@@ -49,6 +49,55 @@ $wcct_terms = function ( $value ) use ( &$wcct_terms ) {
     return $value;
 };
 
+/**
+ * Each platform's sent flag on an order, for 'call' steps.
+ *
+ * @param int $order_id Order ID.
+ *
+ * @return string[] Platforms whose flag is set.
+ */
+function wcct_test_sent_flags( $order_id ) {
+    $order = wc_get_order( $order_id );
+
+    return array_values(
+        array_filter(
+            array( 'facebook', 'adwords', 'ga4', 'twitter', 'custom' ),
+            function ( $platform ) use ( $order ) {
+                return \StorePulse\ConversionTracking\Events\SentFlags::is_sent( $order, $platform );
+            }
+        )
+    );
+}
+
+/**
+ * Set an order's status, for 'call' steps.
+ *
+ * @param int    $order_id Order ID.
+ * @param string $status   Status.
+ *
+ * @return null
+ */
+function wcct_test_order_status( $order_id, $status ) {
+    $order = wc_get_order( $order_id );
+    $order->set_status( $status );
+    $order->save();
+
+    return null;
+}
+
+/**
+ * Rows of a read-only query, for 'call' steps.
+ *
+ * @param string $sql Query; {log} becomes the order log table.
+ *
+ * @return array[]
+ */
+function wcct_test_query( $sql ) {
+    global $wpdb;
+
+    return $wpdb->get_results( str_replace( '{log}', \StorePulse\ConversionTracking\Log\OrderLog::table(), $sql ), ARRAY_A );
+}
+
 $wcct_results = array();
 
 foreach ( $GLOBALS['wcct_job']['steps'] as $wcct_step ) {
@@ -81,6 +130,11 @@ foreach ( $GLOBALS['wcct_job']['steps'] as $wcct_step ) {
 
     if ( 'global' === $wcct_step[0] ) {
         $wcct_results[] = isset( $GLOBALS[ $wcct_step[1] ] ) ? $GLOBALS[ $wcct_step[1] ] : null;
+        continue;
+    }
+
+    if ( 'call' === $wcct_step[0] ) {
+        $wcct_results[] = call_user_func_array( $wcct_step[1], isset( $wcct_step[2] ) ? $wcct_step[2] : array() );
         continue;
     }
 

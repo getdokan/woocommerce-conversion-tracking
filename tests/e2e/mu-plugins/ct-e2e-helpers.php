@@ -121,3 +121,81 @@ add_action(
         }
     }
 );
+
+// Test-only routes for the check-in spec: the order log rows and sent flags of an order, and the Verify step's test link.
+add_action(
+    'rest_api_init',
+    static function () {
+        register_rest_route(
+            'ct-e2e/v1',
+            '/order-log/(?P<id>\d+)',
+            array(
+                'methods'             => 'GET',
+                'permission_callback' => '__return_true',
+                'callback'            => static function ( $request ) {
+                    $order = wc_get_order( (int) $request['id'] );
+                    $flags = array();
+
+                    foreach ( array( 'facebook', 'adwords', 'ga4', 'twitter', 'bing_ads', 'custom' ) as $platform ) {
+                        $flags[ $platform ] = $order ? \StorePulse\ConversionTracking\Events\SentFlags::is_sent( $order, $platform ) : false;
+                    }
+
+                    return array(
+                        'rows'          => \StorePulse\ConversionTracking\Log\OrderLog::for_orders( array( (int) $request['id'] ) ),
+                        'flags'         => $flags,
+                        'thankyou_seen' => \StorePulse\ConversionTracking\Log\CheckIn::thankyou_seen( $order ),
+                    );
+                },
+            )
+        );
+        register_rest_route(
+            'ct-e2e/v1',
+            '/verify',
+            array(
+                array(
+                    'methods'             => 'POST',
+                    'permission_callback' => '__return_true',
+                    'callback'            => static function () {
+                        return \StorePulse\ConversionTracking\Onboarding\Verify::start();
+                    },
+                ),
+                array(
+                    'methods'             => 'GET',
+                    'permission_callback' => '__return_true',
+                    'callback'            => static function () {
+                        return \StorePulse\ConversionTracking\Onboarding\Verify::state();
+                    },
+                ),
+            )
+        );
+    }
+);
+
+// The ct_e2e_block_rest cookie answers 403 on wcct/v1/events, like a security plugin that blocks REST for guests.
+add_filter(
+    'rest_pre_dispatch',
+    static function ( $result, $server, $request ) {
+        if ( isset( $_COOKIE['ct_e2e_block_rest'] ) && 0 === strpos( $request->get_route(), '/wcct/v1/events' ) ) {
+            return new WP_Error( 'rest_forbidden', 'Blocked for the e2e test', array( 'status' => 403 ) );
+        }
+
+        return $result;
+    },
+    10,
+    3
+);
+
+// Check-in specs: the ct_e2e_consent_api=optin cookie adds a minimal opt-in WP Consent API (a category is allowed only when its wp_consent_<category> cookie is 'allow'). Pair it with ct_e2e_consent=on. To merge with the Meta branch's ct-e2e-consent.php stub, whichever lands second.
+if ( isset( $_COOKIE['ct_e2e_consent_api'] ) && 'optin' === $_COOKIE['ct_e2e_consent_api'] ) {
+    if ( ! function_exists( 'wp_has_consent' ) ) {
+        function wp_has_consent( $category ) {
+            return isset( $_COOKIE[ 'wp_consent_' . $category ] ) && 'allow' === $_COOKIE[ 'wp_consent_' . $category ];
+        }
+    }
+
+    if ( ! function_exists( 'wp_get_consent_type' ) ) {
+        function wp_get_consent_type() {
+            return 'optin';
+        }
+    }
+}

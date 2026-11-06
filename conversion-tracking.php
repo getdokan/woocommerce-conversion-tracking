@@ -85,6 +85,7 @@ class WeDevs_WC_Conversion_Tracking {
         $this->init_tracker();
 
         register_activation_hook( __FILE__, array( $this, 'activate' ) );
+        register_deactivation_hook( __FILE__, array( \StorePulse\ConversionTracking\Log\Prune::class, 'unschedule' ) );
 
         // Add High Performance Order Storage Support
         add_action( 'before_woocommerce_init', [ $this, 'declare_woocommerce_feature_compatibility' ] );
@@ -181,6 +182,9 @@ class WeDevs_WC_Conversion_Tracking {
         }
 
         update_option( 'wcct_version', WCCT_VERSION );
+
+        \StorePulse\ConversionTracking\Log\OrderLog::install();
+        \StorePulse\ConversionTracking\Log\Prune::schedule();
     }
 
     /**
@@ -205,6 +209,8 @@ class WeDevs_WC_Conversion_Tracking {
 
         $this->container['doctor_recheck'] = new \StorePulse\ConversionTracking\Doctor\Recheck();
         $this->container['doctor_recheck']->register();
+
+        \StorePulse\ConversionTracking\Log\Prune::init_hooks();
 
         add_action( 'plugins_loaded', array( $this, 'plugin_upgrades' ) );
         add_action( 'init', array( $this, 'localization_setup' ) );
@@ -259,6 +265,8 @@ class WeDevs_WC_Conversion_Tracking {
 
         // Orders created before 3.0 first ran count as already sent.
         \StorePulse\ConversionTracking\Events\PurchaseGate::ensure_since();
+        // The order log table, created or updated when its schema version changes.
+        \StorePulse\ConversionTracking\Log\OrderLog::maybe_install();
     }
 
     /**

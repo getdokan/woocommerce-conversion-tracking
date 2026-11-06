@@ -50,9 +50,22 @@ if ( is_multisite() && is_main_site() ) {
     update_network_option( null, 'wcct_network_example', 'yes' );
 }
 
-// The order log table (#112) as dbDelta creates it.
-$wpdb->query( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}wcct_order_log ( id bigint(20) unsigned NOT NULL AUTO_INCREMENT, order_id bigint(20) unsigned NOT NULL, PRIMARY KEY (id) )" );
-$wpdb->insert( $wpdb->prefix . 'wcct_order_log', array( 'order_id' => 1 ) );
+// The order log table (#112), created by the plugin itself (activation or the schema version check), with one real row.
+\StorePulse\ConversionTracking\Log\OrderLog::install();
+\StorePulse\ConversionTracking\Log\OrderLog::upsert(
+    array(
+        'order_id'       => 1,
+        'platform'       => 'facebook',
+        'source'         => 'browser',
+        'library_loaded' => 1,
+        'created_at'     => gmdate( 'Y-m-d H:i:s' ),
+        'updated_at'     => gmdate( 'Y-m-d H:i:s' ),
+    )
+);
+
+if ( 1 !== (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->prefix}wcct_order_log" ) ) {
+    WP_CLI::error( 'The order log row was not written.' );
+}
 
 as_schedule_recurring_action( time() + HOUR_IN_SECONDS, DAY_IN_SECONDS, 'wcct_prune_order_log', array(), 'wcct' );
 as_enqueue_async_action( 'wcct_feed_build', array(), 'wcct-product-feed' );

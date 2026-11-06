@@ -54,7 +54,7 @@ test('the Ads conversion is sent once per order, also after a reload', async ({ 
     const confirmed: string[] = [];
 
     page.on('requestfinished', (request: Request) => {
-        if (request.url().includes('admin-ajax.php') && request.method() === 'POST') {
+        if (request.url().includes('/wcct/v1/events') && request.method() === 'POST') {
             confirmed.push(request.postData() ?? '');
         }
     });
@@ -64,7 +64,7 @@ test('the Ads conversion is sent once per order, also after a reload', async ({ 
 
     await expect.poll(async () => (await conversions()).length, { message: 'Ads conversion' }).toBe(1);
     await expect
-        .poll(() => confirmed.some(body => body.includes('name="platform"\r\n\r\nadwords') && body.includes(String(order.id))), {
+        .poll(() => confirmed.some(body => body.includes('&platform=adwords&loaded=1') && body.startsWith(`order_id=${order.id}&`)), {
             message: `Ads confirmation for order ${order.id}`,
             timeout: 15_000,
         })

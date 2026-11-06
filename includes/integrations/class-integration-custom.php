@@ -12,6 +12,13 @@ use StorePulse\ConversionTracking\Settings\Google;
 class WCCT_Integration_Custom extends WCCT_Integration {
 
     /**
+     * Orders whose thank-you script this request printed, for the check-in
+     *
+     * @var WC_Order[]
+     */
+    private $checkin_orders = array();
+
+    /**
      * Constructor for WC_Conversion_Tracking_Gateway_Custom class
      */
     function __construct() {
@@ -93,7 +100,20 @@ class WCCT_Integration_Custom extends WCCT_Integration {
         }
 
         // With consent mode on, the scripts wait for marketing consent.
-        return \StorePulse\ConversionTracking\Consent\ConsentMode::hold_markup( $html, $this->get_consent_category() );
+        $held = \StorePulse\ConversionTracking\Consent\ConsentMode::hold_markup( $html, $this->get_consent_category() );
+
+        if ( $held === $html || ! $this->checkin_orders ) {
+            return $held;
+        }
+
+        // The held markup confirms once released; this unheld part still checks in "not handed over" while consent is denied.
+        $arm = PurchaseConfirmation::helper();
+
+        foreach ( $this->checkin_orders as $order ) {
+            $arm .= "\n" . $this->purchase_sent_callback( $order ) . ';';
+        }
+
+        return '<script data-no-optimize="1">' . $arm . '</script>' . $held;
     }
 
     /**
@@ -149,6 +169,8 @@ class WCCT_Integration_Custom extends WCCT_Integration {
         }
 
         $html = $this->fill_for_order( $script, $order );
+
+        $this->checkin_orders[ $order->get_id() ] = $order;
 
         // Confirms once the merchant's inline script has run; an async or external script may not have sent yet.
         return $html . '<script data-no-optimize="1">' . PurchaseConfirmation::helper() . "\n" . PurchaseConfirmation::confirm_script( $this->id, $order ) . '</script>';

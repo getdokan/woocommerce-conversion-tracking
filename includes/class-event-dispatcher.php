@@ -2,8 +2,10 @@
 
 use StorePulse\ConversionTracking\Events\EventFactory;
 use StorePulse\ConversionTracking\Events\Pipeline;
-use StorePulse\ConversionTracking\Events\PurchaseConfirmation;
 use StorePulse\ConversionTracking\Events\SignUp;
+use StorePulse\ConversionTracking\Log\AjaxCheckIn;
+use StorePulse\ConversionTracking\Log\ThankYouSeen;
+use StorePulse\ConversionTracking\Onboarding\Verify;
 use StorePulse\ConversionTracking\Privacy\OrderUrl;
 
 /**
@@ -43,7 +45,10 @@ class WCCT_Event_Dispatcher {
         $this->pipeline = new Pipeline( array( $this, 'get_integrations' ) );
         $this->pipeline->init_hooks();
 
-        ( new PurchaseConfirmation( array( $this, 'get_integrations' ) ) )->init_hooks();
+        // The thank-you page checks in through wcct/v1/events (REST\EventsController), else admin-ajax; the server flag is written here.
+        ( new ThankYouSeen( array( $this, 'get_integrations' ) ) )->init_hooks();
+        ( new AjaxCheckIn() )->init_hooks();
+        ( new Verify( array( $this, 'get_integrations' ) ) )->init_hooks();
 
         $this->order_url = new OrderUrl( array( $this, 'get_integrations' ) );
         $this->order_url->init_hooks();

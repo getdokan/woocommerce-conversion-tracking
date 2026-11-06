@@ -6,7 +6,6 @@ use StorePulse\ConversionTracking\Events\Event;
 use StorePulse\ConversionTracking\Events\EventFactory;
 use StorePulse\ConversionTracking\Events\PurchaseConfirmation;
 use StorePulse\ConversionTracking\Events\PurchaseGate;
-use StorePulse\ConversionTracking\Events\SentFlags;
 use StorePulse\ConversionTracking\Platforms\GoogleTag;
 
 /**
@@ -33,7 +32,9 @@ class WCCT_Integration_GA4 extends WCCT_Integration {
     const FRAGMENT_KEY = 'wcct_ga4_add_to_cart';
 
     /**
-     * AJAX action the browser calls after the purchase event is sent
+     * Old AJAX action for the purchase confirmation, answered as a no-op by AjaxCheckIn; the wcct/v1/events check-in replaces it
+     *
+     * @deprecated 3.0.0
      *
      * @var string
      */
@@ -68,8 +69,6 @@ class WCCT_Integration_GA4 extends WCCT_Integration {
         $this->consent_category = 'statistics';
 
         add_filter( 'wcct_save_integrations_settings', array( $this, 'sanitize_settings' ) );
-        add_action( 'wp_ajax_' . self::PURCHASE_SENT_ACTION, array( $this, 'mark_purchase_sent' ) );
-        add_action( 'wp_ajax_nopriv_' . self::PURCHASE_SENT_ACTION, array( $this, 'mark_purchase_sent' ) );
     }
 
     /**
@@ -275,7 +274,8 @@ class WCCT_Integration_GA4 extends WCCT_Integration {
             return '';
         }
 
-        $events = array();
+        $events   = array();
+        $confirms = array();
 
         foreach ( $page_events as $page_event ) {
             if ( Event::VIEW_PRODUCT === $page_event->get_name() && $page_event->get_product() && $this->event_allowed( 'view_item' ) ) {
@@ -312,14 +312,8 @@ class WCCT_Integration_GA4 extends WCCT_Integration {
                 $order = $this->get_purchase_order( $page_event->get_order() );
 
                 if ( $order ) {
-                    $events[] = array(
-                        'purchase',
-                        $this->get_purchase_params( $order, $page_event ),
-                        array(
-                            'order_id' => $order->get_id(),
-                            'key'      => $order->get_order_key(),
-                        ),
-                    );
+                    $confirms[ count( $events ) ] = $this->purchase_sent_callback( $order );
+                    $events[]                     = array( 'purchase', $this->get_purchase_params( $order, $page_event ) );
                 }
             }
         }
@@ -328,44 +322,33 @@ class WCCT_Integration_GA4 extends WCCT_Integration {
             return '';
         }
 
+        $callbacks = array();
+
+        foreach ( $confirms as $index => $callback ) {
+            $callbacks[] = (int) $index . ': ' . $callback;
+        }
+
         ob_start();
         ?>
             (function () {
                 window.dataLayer = window.dataLayer || [];
                 var gtag = window.wcctGtag || function () { window.dataLayer.push(arguments); };
                 var events = <?php echo $this->encode( $events ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>;
-                // Tells the server the purchase was sent, so it is not sent again.
-                // Runs only once gtag.js has handled the event, so a blocked or
-                // abandoned page sends the purchase again on the next view.
-                // gtag also runs the callback when event_timeout passes, even if
-                // the hit failed, so the timeout is long enough that the callback
-                // in practice comes from the hit being sent.
-                var confirmSent = function (order) {
-                    var done = false;
-                    return function () {
-                        if (done) return;
-                        done = true;
-                        var url = <?php echo $this->encode( admin_url( 'admin-ajax.php' ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>;
-                        var body = new FormData();
-                        body.append('action', <?php echo $this->encode( self::PURCHASE_SENT_ACTION ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>);
-                        body.append('order_id', order.order_id);
-                        body.append('key', order.key);
-                        if (navigator.sendBeacon && navigator.sendBeacon(url, body)) return;
-                        var xhr = new XMLHttpRequest();
-                        xhr.open('POST', url);
-                        xhr.send(body);
-                    };
-                };
+                // gtag.js calls event_callback once it has handled the purchase; the check-in writes the sent flag then.
+                // gtag also runs it when event_timeout passes, so the timeout is long enough that it in practice means the hit was sent.
+                var confirms = {<?php echo implode( ', ', $callbacks ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- JSON-encoded in PurchaseConfirmation::callback(). ?>};
                 for (var i = 0; i < events.length; i++) {
-                    if (events[i][2]) {
-                        events[i][1].event_callback = confirmSent(events[i][2]);
+                    if (confirms[i]) {
+                        events[i][1].event_callback = confirms[i];
                         events[i][1].event_timeout = 60000;
                     }
                     gtag('event', events[i][0], events[i][1]);
                 }
             })();
         <?php
-        return trim( ob_get_clean() );
+        $code = trim( ob_get_clean() );
+
+        return $confirms ? PurchaseConfirmation::helper() . "\n" . $code : $code;
     }
 
     /**
@@ -434,35 +417,14 @@ class WCCT_Integration_GA4 extends WCCT_Integration {
     /**
      * Mark an order's purchase event as sent
      *
-     * Called by the browser after gtag.js has handled the purchase event.
-     * The order key is the credential, as on the order received page.
+     * @deprecated 3.0.0 The thank-you page checks in through wcct/v1/events, see CheckIn.
      *
      * @return void
      */
     public function mark_purchase_sent() {
-        $order_id  = isset( $_POST['order_id'] ) ? absint( $_POST['order_id'] ) : 0; // phpcs:ignore WordPress.Security.NonceVerification.Missing
-        $order_key = isset( $_POST['key'] ) ? wp_unslash( $_POST['key'] ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Missing, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- sanitized in get_order_by_key()
-        $order     = $this->get_order_by_key( $order_id, $order_key );
-
-        if ( ! $order ) {
-            wp_send_json_error( null, 403 );
-        }
-
-        SentFlags::mark_sent( $order, $this->id );
+        _deprecated_function( __METHOD__, '3.0.0' );
 
         wp_send_json_success();
-    }
-
-    /**
-     * Order for an ID, only when the order key matches
-     *
-     * @param  int   $order_id
-     * @param  mixed $order_key Unsanitized key
-     *
-     * @return WC_Order|false
-     */
-    private function get_order_by_key( $order_id, $order_key ) {
-        return PurchaseConfirmation::order_by_key( $order_id, $order_key );
     }
 
     /**
@@ -664,5 +626,14 @@ class WCCT_Integration_GA4 extends WCCT_Integration {
      */
     private function encode( $data ) {
         return wp_json_encode( $data, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT );
+    }
+
+    /**
+     * gtag.js has loaded once it has set up google_tag_data
+     *
+     * @return string
+     */
+    public function library_loaded_check() {
+        return '!!window.google_tag_data';
     }
 }

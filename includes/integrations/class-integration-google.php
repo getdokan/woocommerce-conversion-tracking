@@ -182,4 +182,13 @@ class WCCT_Integration_Google extends WCCT_Integration {
         // gtag.js calls event_callback once it has sent the conversion; the flag is written then.
         return str_replace( '"' . self::CALLBACK_PLACEHOLDER . '"', $this->purchase_sent_callback( $order ), $code );
     }
+
+    /**
+     * gtag.js has loaded once it has set up google_tag_data
+     *
+     * @return string
+     */
+    public function library_loaded_check() {
+        return '!!window.google_tag_data';
+    }
 }

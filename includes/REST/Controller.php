@@ -7,7 +7,7 @@ use WP_REST_Controller;
 use WP_REST_Request;
 
 /**
- * Base for every wcct/v1 controller: routes are open to users with the manage capability only.
+ * Base for every wcct/v1 controller: routes are open to users with the manage capability, unless a controller says it is public (EventsController).
  */
 abstract class Controller extends WP_REST_Controller {
 

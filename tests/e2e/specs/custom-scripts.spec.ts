@@ -32,7 +32,7 @@ test('the thank-you script runs once per order with the order placeholders', asy
     const confirmations: string[] = [];
 
     page.on('requestfinished', (request: Request) => {
-        if (request.url().includes('admin-ajax.php') && request.method() === 'POST') {
+        if (request.url().includes('/wcct/v1/events') && request.method() === 'POST') {
             confirmations.push(request.postData() ?? '');
         }
     });
@@ -52,7 +52,7 @@ test('the thank-you script runs once per order with the order placeholders', asy
     expect(hit.searchParams.get('email')).toBe('');
 
     await expect
-        .poll(() => confirmations.some(body => body.includes('name="platform"\r\n\r\ncustom') && body.includes(String(order.id))), {
+        .poll(() => confirmations.some(body => body.includes('&platform=custom&loaded=1') && body.startsWith(`order_id=${order.id}&`)), {
             message: `Custom Purchase confirmation for order ${order.id}`,
             timeout: 15_000,
         })

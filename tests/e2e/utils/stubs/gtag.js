@@ -1,6 +1,8 @@
 // Stand-in for googletagmanager.com/gtag/js. Turns GA4 gtag() commands into /g/collect GET hits and Google Ads ones into conversion hits.
 ( function ( window, document ) {
     var dataLayer = ( window.dataLayer = window.dataLayer || [] );
+    // Like gtag.js, which the check-ins read as "library loaded".
+    window.google_tag_data = window.google_tag_data || {};
 
     if ( dataLayer.ctE2eStub ) {
         return;

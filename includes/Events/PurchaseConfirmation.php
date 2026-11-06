@@ -2,15 +2,13 @@
 
 namespace StorePulse\ConversionTracking\Events;
 
+use StorePulse\ConversionTracking\Log\AjaxCheckIn;
+use StorePulse\ConversionTracking\Log\CheckIn;
+
 /**
- * The browser confirms each platform's Purchase once the platform library has taken it; only then is the sent flag written.
+ * The thank-you page checks in once per platform through the wcct/v1/events route; the route writes the sent flag and the log row.
  */
 class PurchaseConfirmation {
-
-    /**
-     * AJAX action the browser calls.
-     */
-    const ACTION = 'wcct_purchase_sent';
 
     /**
      * Give up waiting for a platform library after this many milliseconds; the next page view sends again.
@@ -18,57 +16,9 @@ class PurchaseConfirmation {
     const WAIT_MS = 30000;
 
     /**
-     * Returns the active platforms.
-     *
-     * @var callable
+     * Check in as "not handed over" after this many milliseconds, or earlier when the page is hidden.
      */
-    private $platform_source;
-
-    /**
-     * Confirmation over the platforms a callable returns.
-     *
-     * @param callable $platform_source Returns the active platforms.
-     */
-    public function __construct( callable $platform_source ) {
-        $this->platform_source = $platform_source;
-    }
-
-    /**
-     * Hook the AJAX action, for guests too.
-     *
-     * @return void
-     */
-    public function init_hooks() {
-        add_action( 'wp_ajax_' . self::ACTION, array( $this, 'handle' ) );
-        add_action( 'wp_ajax_nopriv_' . self::ACTION, array( $this, 'handle' ) );
-    }
-
-    /**
-     * Mark the platform's Purchase as sent; the order key is the credential, as on the thank-you page.
-     *
-     * @return void
-     */
-    public function handle() {
-        // phpcs:disable WordPress.Security.NonceVerification.Missing -- the order key is checked instead; pages are cached.
-        $platform  = isset( $_POST['platform'] ) && is_string( $_POST['platform'] ) ? sanitize_key( wp_unslash( $_POST['platform'] ) ) : '';
-        $order_id  = isset( $_POST['order_id'] ) ? absint( $_POST['order_id'] ) : 0;
-        $order_key = isset( $_POST['key'] ) ? wp_unslash( $_POST['key'] ) : ''; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- sanitized in order_by_key()
-        // phpcs:enable
-
-        if ( ! $this->is_platform( $platform ) ) {
-            wp_send_json_error( null, 400 );
-        }
-
-        $order = self::order_by_key( $order_id, $order_key );
-
-        if ( ! $order ) {
-            wp_send_json_error( null, 403 );
-        }
-
-        SentFlags::mark_sent( $order, $platform );
-
-        wp_send_json_success();
-    }
+    const CHECKIN_MS = 10000;
 
     /**
      * Order for an ID, only when the order key matches.
@@ -90,37 +40,67 @@ class PurchaseConfirmation {
     }
 
     /**
-     * Defines window.wcctPurchaseSent(url, platform, orderId, key), which returns one confirm function per platform and order; confirm.when(check, category) waits for check() and consent.
+     * Defines window.wcctPurchaseSent(url, platform, orderId, key, eventId, category): one confirm function per platform and order, which checks in once handed over; confirm.when(check, category) waits for check() and consent.
      *
      * @return string
      */
     public static function helper() {
-        return 'window.wcctPurchaseSent = window.wcctPurchaseSent || function (url, platform, orderId, key) {
+        return 'window.wcctPurchaseSent = window.wcctPurchaseSent || function (url, platform, orderId, key, eventId, category) {
     var sent = window.wcctPurchaseSent, all = sent.all = sent.all || {}, id = platform + ":" + orderId;
     if (all[id]) return all[id];
-    var done = false;
+    var order = window.wcctOrder, done = false, missed = "";
+    // Funnel pages may not print the key; the head script kept it before it cleaned the address bar.
+    if (!key && order && order.key && (!+order.id || String(order.id) === String(orderId))) key = order.key;
+    var consentState = function () {
+        var consent = window.wcctConsent;
+        if (!consent || !consent.allows) return "off";
+        try { return consent.allows(category || "marketing") ? "granted" : "denied"; } catch (e) { return "off"; }
+    };
+    var post = function (target, body, retry) {
+        var fallback = function () { if (retry) post(' . self::encode( admin_url( 'admin-ajax.php' ) ) . ', "action=' . AjaxCheckIn::ACTION . '&" + body, false); };
+        try {
+            window.fetch(target, { method: "POST", body: body, keepalive: true, credentials: "same-origin", headers: { "Content-Type": "application/x-www-form-urlencoded" } })
+                .then(function (response) { if (response.status == 401 || response.status == 403 || response.status == 404) fallback(); })
+                .catch(fallback);
+        } catch (e) { fallback(); }
+    };
+    // While the page is alive fetch can see a host that blocks guest REST and retry once on admin-ajax; an unloading page only has sendBeacon.
+    var checkIn = function (loaded, reason, unloading) {
+        if (!key) {
+            if (window.console) console.warn("wcct: no order key on this page, the purchase check-in was skipped");
+            return;
+        }
+        var body = "order_id=" + encodeURIComponent(orderId) + "&key=" + encodeURIComponent(key) + "&platform=" + encodeURIComponent(platform) + "&loaded=" + (loaded ? 1 : 0) + "&consent=" + consentState() + "&event_id=" + encodeURIComponent(eventId || "") + "&reason=" + reason;
+        if (!unloading && window.fetch) return post(url, body, true);
+        try {
+            if (navigator.sendBeacon && navigator.sendBeacon(url, new Blob([body], { type: "application/x-www-form-urlencoded" }))) return;
+        } catch (e) {}
+        if (window.fetch) post(url, body, false);
+    };
     var confirm = all[id] = function () {
         if (done) return;
         done = true;
-        var body = new FormData();
-        body.append("action", ' . self::encode( self::ACTION ) . ');
-        body.append("platform", platform);
-        body.append("order_id", orderId);
-        body.append("key", key);
-        if (navigator.sendBeacon && navigator.sendBeacon(url, body)) return;
-        var xhr = new XMLHttpRequest();
-        xhr.open("POST", url);
-        xhr.send(body);
+        checkIn(true, "", false);
     };
-    confirm.when = function (check, category) {
+    // Not handed over yet: check in anyway, so the server knows the page ran; a later hand-over still checks in, and a timeout still follows a hidden page.
+    var miss = function (reason, unloading) {
+        if (done || missed === reason || missed === "timeout") return;
+        missed = reason;
+        checkIn(false, reason, unloading);
+    };
+    setTimeout(function () { miss("timeout", false); }, ' . (int) self::CHECKIN_MS . ');
+    window.addEventListener("pagehide", function () { miss("hidden", true); });
+    document.addEventListener("visibilitychange", function () { if (document.visibilityState === "hidden") miss("hidden", true); });
+    confirm.when = function (check, needs) {
         var consent = window.wcctConsent, tries = Math.ceil(' . (int) self::WAIT_MS . ' / 250);
-        var allowed = function () { return !category || !consent || !consent.allows || consent.allows(category); };
+        category = needs || category;
+        var allowed = function () { return !needs || !consent || !consent.allows || consent.allows(needs); };
         (function poll() {
             if (done) return;
             var ready = false;
             try { ready = allowed() && !!check(); } catch (e) {}
             if (ready) return confirm();
-            if (!allowed() && consent.when) return consent.when(category, function () { tries = Math.ceil(' . (int) self::WAIT_MS . ' / 250); poll(); });
+            if (!allowed() && consent.when) return consent.when(needs, function () { tries = Math.ceil(' . (int) self::WAIT_MS . ' / 250); poll(); });
             if (--tries > 0) setTimeout(poll, 250);
         })();
     };
@@ -133,16 +113,19 @@ class PurchaseConfirmation {
      *
      * @param string    $platform Platform ID.
      * @param \WC_Order $order    Order.
+     * @param string    $category Consent category reported with the check-in, empty for marketing.
      *
      * @return string
      */
-    public static function callback( $platform, $order ) {
+    public static function callback( $platform, $order, $category = '' ) {
         return sprintf(
-            'window.wcctPurchaseSent(%s, %s, %s, %s)',
-            self::encode( admin_url( 'admin-ajax.php' ) ),
+            'window.wcctPurchaseSent(%s, %s, %s, %s, %s, %s)',
+            self::encode( CheckIn::url() ),
             self::encode( (string) $platform ),
             self::encode( (int) $order->get_id() ),
-            self::encode( (string) $order->get_order_key() )
+            self::encode( (string) $order->get_order_key() ),
+            self::encode( Event::new_event_id( Event::PURCHASE, (int) $order->get_id() ) ),
+            self::encode( (string) $category )
         );
     }
 
@@ -157,7 +140,7 @@ class PurchaseConfirmation {
      * @return string
      */
     public static function confirm_script( $platform, $order, $check = '', $category = '' ) {
-        $callback = self::callback( $platform, $order );
+        $callback = self::callback( $platform, $order, $category );
         $check    = trim( (string) $check );
         $category = (string) $category;
 
@@ -166,27 +149,6 @@ class PurchaseConfirmation {
         }
 
         return $callback . '.when(function () { return ' . ( '' !== $check ? $check : 'true' ) . '; }' . ( '' !== $category ? ', ' . self::encode( $category ) : '' ) . ');';
-    }
-
-    /**
-     * Whether the ID is an active platform.
-     *
-     * @param string $platform Platform ID.
-     *
-     * @return bool
-     */
-    private function is_platform( $platform ) {
-        if ( '' === $platform ) {
-            return false;
-        }
-
-        foreach ( (array) call_user_func( $this->platform_source ) as $integration ) {
-            if ( $integration instanceof \WCCT_Integration && $platform === $integration->get_id() ) {
-                return true;
-            }
-        }
-
-        return false;
     }
 
     /**

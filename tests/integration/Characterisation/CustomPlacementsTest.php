@@ -102,7 +102,8 @@ class CustomPlacementsTest extends WCCT_Test_Page_Case {
         $thankyou = $this->request( 'order-received-customer', array(), array( 'wcct_consent_mode' => 'on' ) )['html'];
 
         $this->assertMatchesRegularExpression( '/<script type="text\/plain" data-wcct-consent="marketing"[^>]*>ctCustom\(\'purchase\'/', $thankyou );
-        $this->assertDoesNotMatchRegularExpression( '/<script(?![^>]*text\/plain)[^>]*>[^<]*wcctPurchaseSent\([^)]*custom/', $thankyou );
+        // The unheld check-in (#111) only arms the "not handed over" check-in; the confirming call waits with the merchant script.
+        $this->assertDoesNotMatchRegularExpression( '/<script(?![^>]*text\/plain)[^>]*>(?:(?!<\/script>).)*wcctPurchaseSent\([^)]*"custom"[^)]*\)\(\)/s', $thankyou );
     }
 
     public function test_the_header_script_is_off_with_its_switch_or_while_paused() {
@@ -142,7 +143,7 @@ class CustomPlacementsTest extends WCCT_Test_Page_Case {
         $first = $request( array() );
 
         $this->assertSame( 1, substr_count( $first, "ctCustom('purchase'" ) );
-        $this->assertStringContainsString( '"custom", 3001, "wc_order_ctguest0001")', $first );
+        $this->assertStringContainsString( '"custom", 3001, "wc_order_ctguest0001", "wcct_3001_purchase", ""', $first );
 
         // Once the browser confirmed it, a reload prints nothing; the header still prints.
         $reload = $request( array( 'sent' => array( 'custom' ) ) );

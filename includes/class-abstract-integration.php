@@ -296,7 +296,29 @@ abstract class WCCT_Integration {
      * @return string
      */
     protected function purchase_sent_callback( $order ) {
-        return PurchaseConfirmation::callback( $this->id, $order );
+        return PurchaseConfirmation::callback( $this->id, $order, $this->checkin_consent_category() );
+    }
+
+    /**
+     * Consent category whose state the check-in reports: the Purchase's own, else the integration's
+     *
+     * @return string
+     */
+    protected function checkin_consent_category() {
+        $category = $this->purchase_consent_category();
+
+        return '' !== $category ? $category : $this->get_consent_category();
+    }
+
+    /**
+     * JS expression, true once the platform library has loaded; the onboarding check reads it
+     *
+     * @return string
+     */
+    public function library_loaded_check() {
+        $check = $this->purchase_sent_check();
+
+        return is_string( $check ) && '' !== trim( $check ) ? $check : 'true';
     }
 
     /**

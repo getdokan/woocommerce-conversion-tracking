@@ -38,6 +38,8 @@ class Routes {
                 CatalogController::class,
                 AccessController::class,
                 DoctorController::class,
+                EventsController::class,
+                VerifyController::class,
             )
         );
 

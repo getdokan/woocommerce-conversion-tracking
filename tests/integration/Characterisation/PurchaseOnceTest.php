@@ -61,7 +61,7 @@ class PurchaseOnceTest extends TestCase {
         );
     }
 
-    public function test_every_platform_sends_the_purchase_with_its_confirmation() {
+    public function test_every_platform_checks_in_on_the_events_route() {
         $result = WCCT_Test_WP::run(
             array(
                 'type'     => 'request',
@@ -73,11 +73,37 @@ class PurchaseOnceTest extends TestCase {
 
         $this->assertNull( $result['error'] );
 
-        foreach ( array( 'facebook', 'adwords', 'twitter', 'custom' ) as $platform ) {
-            $this->assertStringContainsString( sprintf( '"%s", 3001, "wc_order_ctguest0001")', $platform ), $result['html'], $platform );
+        foreach ( array( 'facebook', 'adwords', 'ga4', 'twitter', 'custom' ) as $platform ) {
+            $this->assertStringContainsString( sprintf( '/wp-json/wcct/v1/events", "%s", 3001, "wc_order_ctguest0001", "wcct_3001_purchase", ', $platform ), $result['html'], $platform );
         }
 
-        $this->assertStringContainsString( 'wcct_ga4_purchase_sent', $result['html'] );
+        // The fallback for hosts that block guest REST.
+        $this->assertStringContainsString( '"action=wcct_events&" + body', $result['html'] );
+
+        $this->assertStringNotContainsString( 'wcct_ga4_purchase_sent', $result['html'] );
+        $this->assertStringNotContainsString( 'wcct_purchase_sent', $result['html'] );
+    }
+
+    public function test_the_thank_you_page_records_that_it_rendered() {
+        $seen = function ( $path ) {
+            $result = WCCT_Test_WP::run(
+                array(
+                    'type'     => 'request',
+                    'rollback' => true,
+                    'request'  => array( 'path' => $path ),
+                    'options'  => array( 'wcct_settings' => WCCT_Test_Settings::lite_all() ),
+                    'before'   => dirname( __DIR__ ) . '/jobs/thankyou-seen.php',
+                )
+            );
+
+            $this->assertNull( $result['error'] );
+
+            return preg_match( '/<!--wcct-thankyou-seen:(\d+)-->/', $result['html'], $match ) ? (int) $match[1] : null;
+        };
+
+        $this->assertGreaterThan( time() - 600, $seen( '/checkout/order-received/3001/?key=wc_order_ctguest0001' ) );
+        $this->assertSame( 0, $seen( '/checkout/order-received/3001/?key=wc_order_wrong' ) );
+        $this->assertSame( 0, $seen( '/checkout/order-received/3001/' ) );
     }
 
     public function test_paid_order_sends_on_every_platform() {
@@ -101,36 +127,5 @@ class PurchaseOnceTest extends TestCase {
 
     public function test_orders_created_before_3_0_first_ran_count_as_sent() {
         $this->assertSame( array(), $this->purchases( array(), array( 'wcct_count_once_since' => time() + 86400 ) ) );
-    }
-
-    public function test_confirmation_with_the_order_key_sets_that_platform_flag_only() {
-        $result = $this->confirm( 'twitter', 'wc_order_ctguest0001' );
-
-        $this->assertStringContainsString( '"success":true', $result['response'] );
-        $this->assertSame( array( 'twitter' ), array_keys( array_filter( $result['flags'] ) ) );
-    }
-
-    public function test_confirmation_with_a_wrong_key_or_platform_sets_nothing() {
-        $this->assertSame( array(), array_keys( array_filter( $this->confirm( 'twitter', 'wc_order_wrong' )['flags'] ) ) );
-        $this->assertSame( array(), array_keys( array_filter( $this->confirm( 'bing_ads', 'wc_order_ctguest0001' )['flags'] ) ) );
-    }
-
-    private function confirm( $platform, $key ) {
-        $result = WCCT_Test_WP::run(
-            array(
-                'type'        => 'file',
-                'file'        => dirname( __DIR__ ) . '/jobs/purchase-confirm.php',
-                'rollback'    => true,
-                'options'     => array( 'wcct_settings' => WCCT_Test_Settings::lite_all() ),
-                'before_args' => array(
-                    'platform' => $platform,
-                    'key'      => $key,
-                ),
-            )
-        );
-
-        $this->assertNull( $result['error'] );
-
-        return $result['value'];
     }
 }
