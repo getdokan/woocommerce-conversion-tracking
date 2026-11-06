@@ -12,9 +12,9 @@ use StorePulse\ConversionTracking\Platforms\XSettings;
 class LegacySync {
 
     /**
-     * 3.0 keys a 2.x save never writes: Pause and the X re-setup flags belong to 3.0.
+     * 3.0 keys a 2.x save never writes: Pause, the X re-setup flags and the Custom script's customer details belong to 3.0.
      */
-    const SKIP_KEYS = array( 'paused', 'needs_resetup' );
+    const SKIP_KEYS = array( 'paused', 'needs_resetup', 'customer_details' );
 
     /**
      * Google keys => the 2.x integrations they are read from; written only when the 2.x option holds all of them.

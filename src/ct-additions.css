@@ -25,6 +25,13 @@
     --tone-off-bg: #f3f4f6;
     --tone-off-fg: #4b5563;
     --tone-off-dot: #9ca3af;
+
+    /* Notice colours from the prototype's tokens.css: CT doesn't load plugin-ui's styles.css, so these were unset. */
+    /* Don't use plugin-ui's Alert variant="info": its text would be --info-foreground, low contrast on the info background. */
+    --info: oklch(0.623 0.214 255.09);
+    --info-foreground: oklch(0.42 0.16 255);
+    --warning: oklch(0.769 0.188 70.08);
+    --warning-foreground: oklch(0.21 0.034 32);
 }
 
 /* Utilities for the additions: bg-pro, text-page-muted-foreground, bg-tone-ok-bg, text-tone-ok-fg, ... */

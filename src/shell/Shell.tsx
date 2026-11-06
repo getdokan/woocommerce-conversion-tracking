@@ -20,6 +20,7 @@ import Catalog from '../pages/catalog/Catalog';
 import Dashboard from '../pages/dashboard/Dashboard';
 import Doctor from '../pages/doctor/Doctor';
 import Placeholder from '../pages/Placeholder';
+import Platforms from '../pages/platforms/Platforms';
 import Settings from '../pages/settings/Settings';
 import { pageInfo } from '../pages/titles';
 import { AppTopBar } from './AppTopBar';
@@ -41,6 +42,10 @@ const RoutePage = ( { route }: { route: Route } ) => {
 
     if ( route.name === 'catalog' ) {
         return <Catalog />;
+    }
+
+    if ( route.name === 'platforms' ) {
+        return <Platforms id={ route.id } />;
     }
 
     if ( route.name === 'settings' ) {

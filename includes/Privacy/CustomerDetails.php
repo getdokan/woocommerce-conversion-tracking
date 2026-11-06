@@ -2,6 +2,7 @@
 
 namespace StorePulse\ConversionTracking\Privacy;
 
+use StorePulse\ConversionTracking\Settings\LegacyView;
 use StorePulse\ConversionTracking\Settings\Store;
 
 /**
@@ -40,9 +41,22 @@ class CustomerDetails {
      * @return bool
      */
     public static function is_enabled(): bool {
-        $doc = Store::load();
+        $doc    = Store::load();
+        $custom = isset( $doc['platforms'][ self::PLATFORM ] ) && is_array( $doc['platforms'][ self::PLATFORM ] ) ? $doc['platforms'][ self::PLATFORM ] : array();
 
-        return ! empty( $doc['platforms'][ self::PLATFORM ][ self::SETTING ] );
+        // Like CustomScript::settings(): a 3.0 doc without the key keeps the 2.x default.
+        return array_key_exists( self::SETTING, $custom ) ? ! empty( $custom[ self::SETTING ] ) : self::v1_default();
+    }
+
+    /**
+     * The upgrade default: on when the 2.x checkout script uses a customer placeholder.
+     *
+     * @return bool
+     */
+    public static function v1_default(): bool {
+        $view = LegacyView::from_v1( get_option( Store::V1_OPTION, array() ) );
+
+        return ! empty( $view['platforms'][ self::PLATFORM ][ self::SETTING ] );
     }
 
     /**

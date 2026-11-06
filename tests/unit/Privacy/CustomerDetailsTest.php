@@ -2,6 +2,9 @@
 
 use PHPUnit\Framework\TestCase;
 use StorePulse\ConversionTracking\Privacy\CustomerDetails;
+use StorePulse\ConversionTracking\Settings\Schema;
+use StorePulse\ConversionTracking\Settings\Store;
+use StorePulse\ConversionTracking\Settings\Values;
 
 if ( ! function_exists( 'get_current_user_id' ) ) {
     function get_current_user_id() {
@@ -103,10 +106,30 @@ class CustomerDetailsTest extends TestCase {
     public function test_the_setting_is_off_by_default() {
         $this->assertFalse( CustomerDetails::is_enabled() );
 
-        // 2.x settings read through the legacy view don't turn it on either, until #122 derives it from the saved script.
-        $GLOBALS['wcct_test_options']['wcct_settings'] = array( 'custom' => array( 'enabled' => true, 'checkout' => '{customer_email}' ) );
+        // An upgrader without a customer placeholder in the 2.x checkout script starts off too.
+        $GLOBALS['wcct_test_options']['wcct_settings'] = array( 'custom' => array( 'enabled' => true, 'checkout' => '{order_total}' ) );
 
         $this->assertFalse( CustomerDetails::is_enabled() );
+    }
+
+    public function test_an_upgrader_whose_checkout_script_uses_a_customer_placeholder_starts_on() {
+        $GLOBALS['wcct_test_options']['wcct_settings'] = array( 'custom' => array( 'enabled' => true, 'checkout' => '{customer_email}' ) );
+
+        $this->assertTrue( CustomerDetails::is_enabled() );
+    }
+
+    public function test_a_3_0_doc_without_the_setting_keeps_the_upgrade_default() {
+        $GLOBALS['wcct_test_options']['wcct_settings']    = array( 'custom' => array( 'enabled' => true, 'checkout' => '{customer_email}' ) );
+        $GLOBALS['wcct_test_options']['wcct_settings_v3'] = array( 'platforms' => array( 'facebook' => array( 'pixel_id' => '123456789012345' ), 'custom' => array( 'thankyou_enabled' => true ) ) );
+
+        $this->assertTrue( CustomerDetails::is_enabled() );
+        $this->assertTrue( Values::get( Schema::get(), Store::load() )['platforms']['custom']['customer_details'], 'the page shows what the storefront reads' );
+
+        // A stored value wins.
+        $GLOBALS['wcct_test_options']['wcct_settings_v3']['platforms']['custom']['customer_details'] = false;
+
+        $this->assertFalse( CustomerDetails::is_enabled() );
+        $this->assertFalse( Values::get( Schema::get(), Store::load() )['platforms']['custom']['customer_details'] );
     }
 
     public function test_the_setting_is_read_from_the_custom_platform() {

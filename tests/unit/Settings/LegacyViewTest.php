@@ -4,6 +4,8 @@ require_once dirname( __DIR__ ) . '/Fakes/settings-functions.php';
 
 use PHPUnit\Framework\TestCase;
 use StorePulse\ConversionTracking\Settings\LegacyView;
+use StorePulse\ConversionTracking\Settings\Schema;
+use StorePulse\ConversionTracking\Settings\Values;
 
 /**
  * Tests for reading the 2.x settings as 3.0 settings
@@ -42,6 +44,7 @@ class LegacyViewTest extends TestCase {
                     'thankyou_script'  => '<script>a()</script>',
                     'signup_enabled'   => false,
                     'signup_script'    => '',
+                    'customer_details' => false,
                 ),
             ),
             $view['platforms']
@@ -69,6 +72,22 @@ class LegacyViewTest extends TestCase {
         $this->assertFalse( $view['platforms']['custom']['thankyou_enabled'] );
         $this->assertFalse( $view['platforms']['custom']['signup_enabled'] );
         $this->assertSame( 'x', $view['platforms']['custom']['thankyou_script'] );
+    }
+
+    public function test_customer_details_start_on_only_for_an_upgrader_whose_checkout_script_uses_them() {
+        $values = function ( $v1 ) {
+            return Values::get( Schema::get(), LegacyView::from_v1( $v1 ) )['platforms']['custom']['customer_details'];
+        };
+
+        // New install: nothing saved.
+        $this->assertFalse( $values( false ) );
+        $this->assertFalse( $values( array( 'custom' => array( 'enabled' => true, 'checkout' => '<script>t("{order_total}")</script>', 'registration' => '' ) ) ) );
+        // 2.x never filled them in the registration script.
+        $this->assertFalse( $values( array( 'custom' => array( 'enabled' => true, 'checkout' => '', 'registration' => '{customer_email}' ) ) ) );
+        $this->assertTrue( $values( array( 'custom' => array( 'enabled' => true, 'checkout' => '<script>t("{customer_email}")</script>' ) ) ) );
+        $this->assertTrue( $values( array( 'custom' => array( 'enabled' => false, 'checkout' => '{customer_last_name}' ) ) ) );
+        $this->assertTrue( LegacyView::uses_customer_placeholder( 'id={customer_id}' ) );
+        $this->assertFalse( LegacyView::uses_customer_placeholder( '{customer_phone} {order_id}' ) );
     }
 
     public function test_nothing_saved_reads_as_nothing() {

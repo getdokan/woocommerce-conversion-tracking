@@ -3,6 +3,7 @@
 namespace StorePulse\ConversionTracking\Settings;
 
 use StorePulse\ConversionTracking\Platforms\XSettings;
+use StorePulse\ConversionTracking\Privacy\CustomerDetails;
 
 /**
  * Reads the 2.x wcct_settings option as 3.0 settings, until the migration (#122) has written them.
@@ -71,6 +72,8 @@ class LegacyView {
                 'thankyou_script'  => self::raw( $custom, 'checkout' ),
                 'signup_enabled'   => $enabled && '' !== self::raw( $custom, 'registration' ),
                 'signup_script'    => self::raw( $custom, 'registration' ),
+                // 2.x filled customer placeholders in the checkout script; such scripts keep getting them (also set while 2.x Custom was off; harmless).
+                'customer_details' => self::uses_customer_placeholder( self::raw( $custom, 'checkout' ) ),
             );
         }
 
@@ -101,6 +104,23 @@ class LegacyView {
      */
     public static function paused( array $integration, string $id ): bool {
         return '' !== $id && ! Google::enabled( $integration );
+    }
+
+    /**
+     * Whether a script holds one of the customer placeholders.
+     *
+     * @param string $script Script.
+     *
+     * @return bool
+     */
+    public static function uses_customer_placeholder( string $script ): bool {
+        foreach ( CustomerDetails::PLACEHOLDERS as $placeholder ) {
+            if ( false !== strpos( $script, $placeholder ) ) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

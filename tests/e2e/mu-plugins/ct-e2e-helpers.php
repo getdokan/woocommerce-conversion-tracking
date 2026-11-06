@@ -199,3 +199,16 @@ if ( isset( $_COOKIE['ct_e2e_consent_api'] ) && 'optin' === $_COOKIE['ct_e2e_con
         }
     }
 }
+
+// The ct_e2e_no_unfiltered_html cookie takes unfiltered_html away, as on a multisite site admin or with DISALLOW_UNFILTERED_HTML.
+add_filter(
+    'user_has_cap',
+    static function ( $allcaps ) {
+        if ( isset( $_COOKIE['ct_e2e_no_unfiltered_html'] ) && is_array( $allcaps ) ) {
+            $allcaps['unfiltered_html'] = false;
+        }
+
+        return $allcaps;
+    },
+    99
+);

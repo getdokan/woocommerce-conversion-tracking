@@ -72,6 +72,13 @@ class LegacySyncTest extends TestCase {
         $this->assertTrue( $doc['platforms']['custom']['header_enabled'], 'the 3.0-only header stays' );
     }
 
+    public function test_a_2_x_save_never_changes_the_customer_details_switch() {
+        $v1 = array( 'custom' => array( 'enabled' => true, 'checkout' => '<script>t("{customer_email}")</script>' ) );
+
+        $this->assertFalse( $this->sync( array( 'platforms' => array( 'custom' => array( 'customer_details' => false ) ) ), $v1 )['platforms']['custom']['customer_details'] );
+        $this->assertArrayNotHasKey( 'customer_details', $this->sync( array( 'platforms' => array() ), $v1 )['platforms']['custom'] );
+    }
+
     public function test_without_unfiltered_html_the_3_0_scripts_stay_and_the_switch_still_applies() {
         $v3  = array( 'platforms' => array( 'custom' => array( 'thankyou_enabled' => true, 'thankyou_script' => '<script>rest()</script>' ) ) );
         $doc = $this->sync( $v3, array( 'custom' => array( 'enabled' => false, 'checkout' => '<script>old()</script>' ) ), false );

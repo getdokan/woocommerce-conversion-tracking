@@ -20,7 +20,7 @@ import {
  * Internal dependencies
  */
 import { errorMessage, fetchAppData } from './api';
-import type { AppData } from './types';
+import type { AppData, SettingsValues } from './types';
 
 export type AppDataState = {
     data: AppData | null;
@@ -30,6 +30,8 @@ export type AppDataState = {
     // True while cached data is re-fetched; cards show their own skeletons.
     refreshing: boolean;
     refresh: () => void;
+    // Swap in the settings a save returned, so every page sees them without a refetch.
+    replaceSettings: ( settings: SettingsValues ) => void;
 };
 
 const AppDataContext = createContext< AppDataState | null >( null );
@@ -76,6 +78,20 @@ export const AppDataProvider = ( { children }: { children: ReactNode } ) => {
             } );
     }, [] );
 
+    const replaceSettings = useCallback( ( settings: SettingsValues ) => {
+        setData( ( prev ) =>
+            prev
+                ? {
+                      ...prev,
+                      settings: {
+                          ...settings,
+                          platforms: settings?.platforms ?? {},
+                      },
+                  }
+                : prev
+        );
+    }, [] );
+
     useEffect( () => {
         mounted.current = true;
         load();
@@ -92,8 +108,9 @@ export const AppDataProvider = ( { children }: { children: ReactNode } ) => {
             loading: busy && ! data,
             refreshing: busy && !! data,
             refresh: load,
+            replaceSettings,
         } ),
-        [ data, error, busy, load ]
+        [ data, error, busy, load, replaceSettings ]
     );
 
     return (

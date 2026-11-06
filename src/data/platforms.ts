@@ -79,6 +79,14 @@ const platformMeta = (): Record< string, PlatformMeta > => ( {
     },
 } );
 
+/**
+ * A platform logo's URL, or an empty string.
+ *
+ * @param {string} file File in assets/images/platforms/.
+ */
+export const platformLogoUrl = ( file: string ): string =>
+    file ? `${ window.wcctAdmin?.logosUrl ?? '' }${ file }` : '';
+
 const filled = ( value: unknown ): boolean =>
     typeof value === 'string' && value.trim() !== '';
 

@@ -548,7 +548,7 @@ class Schema {
             'variant'     => 'switch',
             'section_id'  => 'custom_privacy',
             'label'       => __( 'Include customer details in scripts', 'woocommerce-conversion-tracking' ),
-            'description' => __( 'Shares the shopper\'s ID, email and name on a verified order. Values wait for consent when Respect cookie choices is on. Only administrators can edit scripts.', 'woocommerce-conversion-tracking' ),
+            'description' => __( 'Shares the shopper\'s ID, email and name with your scripts on a verified order, and they wait for consent when Respect cookie choices is on. Only administrators can edit scripts.', 'woocommerce-conversion-tracking' ),
             'default'     => false,
             'capability'  => CustomScripts::CAPABILITY,
         );

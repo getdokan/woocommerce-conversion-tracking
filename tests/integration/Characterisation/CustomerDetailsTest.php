@@ -69,9 +69,13 @@ class CustomerDetailsTest extends TestCase {
         return preg_match( "/ctCustom\('purchase', (\{[^}]*\})\);/", $result['html'], $match ) ? $match[1] : '';
     }
 
-    public function test_off_by_default_the_placeholders_render_empty_and_order_values_still_fill() {
-        $this->assertSame( self::EMPTY, $this->purchase_call( self::CUSTOMER_ORDER, 501, $this->options( null ) ) );
+    public function test_off_the_placeholders_render_empty_and_order_values_still_fill() {
         $this->assertSame( self::EMPTY, $this->purchase_call( self::CUSTOMER_ORDER, 501, $this->options( false ) ) );
+    }
+
+    public function test_an_upgrader_whose_checkout_script_uses_them_keeps_getting_them() {
+        // 2.x settings only: the 2.x checkout script holds customer placeholders, so the setting reads as on (#106).
+        $this->assertSame( self::FILLED, $this->purchase_call( self::CUSTOMER_ORDER, 501, $this->options( null ) ) );
     }
 
     public function test_on_the_placeholders_fill_for_the_customer_on_the_verified_page() {

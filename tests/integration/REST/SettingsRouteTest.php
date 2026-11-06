@@ -75,6 +75,58 @@ class SettingsRouteTest extends TestCase {
         $this->assertStringNotContainsString( 'evil', (string) $result['after']['v3'] );
     }
 
+    public function test_customer_details_start_off_unless_the_2_x_checkout_script_uses_a_customer_placeholder() {
+        $read = function ( array $options ) {
+            $result = $this->run_job( array( array( 'as' => 'admin', 'method' => 'GET', 'path' => '/wcct/v1/settings' ) ), $options );
+
+            return $result['responses'][0]['data']['platforms']['custom']['customer_details'];
+        };
+        $v1   = function ( $checkout ) {
+            return array( 'wcct_settings' => array( 'custom' => array( 'enabled' => true, 'checkout' => $checkout, 'registration' => '{customer_email}' ) ) );
+        };
+
+        $this->assertFalse( $read( array() ), 'new install' );
+        $this->assertTrue( $read( $v1( '<script>t("{customer_email}", "{order_total}")</script>' ) ), 'upgrader with a customer placeholder' );
+        $this->assertFalse( $read( $v1( '<script>t("{order_total}")</script>' ) ), 'upgrader without one' );
+    }
+
+    public function test_without_unfiltered_html_the_custom_script_is_read_only_and_every_change_is_refused() {
+        $custom = array( 'thankyou_enabled' => true, 'thankyou_script' => '<script>a()</script>', 'customer_details' => false );
+        $result = $this->run_job(
+            array(
+                array( 'as' => 'shop_manager', 'method' => 'GET', 'path' => '/wcct/v1/settings/schema' ),
+                array( 'as' => 'shop_manager', 'method' => 'GET', 'path' => '/wcct/v1/settings' ),
+                array( 'as' => 'shop_manager', 'method' => 'POST', 'path' => '/wcct/v1/settings', 'body' => array( 'platforms' => array( 'custom' => array( 'customer_details' => true, 'header_enabled' => true ) ) ) ),
+                // Posting the stored values back changes nothing, so it passes.
+                array( 'as' => 'shop_manager', 'method' => 'POST', 'path' => '/wcct/v1/settings', 'body' => array( 'platforms' => array( 'custom' => $custom ) ) ),
+                array( 'as' => 'admin', 'method' => 'GET', 'path' => '/wcct/v1/settings/schema' ),
+            ),
+            array( 'wcct_settings_v3' => array( 'platforms' => array( 'custom' => $custom ) ) ),
+            'shop_manager'
+        );
+
+        $locked = function ( array $schema ) {
+            $platforms = array_column( $schema['platforms'], 'schema', 'id' );
+            $fields    = array();
+
+            foreach ( $platforms['custom'] as $element ) {
+                if ( 'field' === $element['type'] ) {
+                    $fields[ $element['id'] ] = ! empty( $element['readonly'] ) && ! empty( $element['disabled'] );
+                }
+            }
+
+            return $fields;
+        };
+
+        $this->assertSame( array_fill_keys( array( 'thankyou_enabled', 'thankyou_script', 'header_enabled', 'header_script', 'signup_enabled', 'signup_script', 'customer_details' ), true ), $locked( $result['responses'][0]['data'] ) );
+        $this->assertNotContains( true, $locked( $result['responses'][4]['data'] ), 'administrators can edit' );
+        $this->assertSame( '<script>a()</script>', $result['responses'][1]['data']['platforms']['custom']['thankyou_script'], 'scripts stay readable' );
+        $this->assertSame( 403, $result['responses'][2]['status'] );
+        $this->assertSame( array( 'platforms.custom.header_enabled', 'platforms.custom.customer_details' ), $result['responses'][2]['data']['data']['fields'] );
+        $this->assertSame( 200, $result['responses'][3]['status'] );
+        $this->assertSame( serialize( array( 'platforms' => array( 'custom' => $custom ) ) ), $result['after']['v3'] );
+    }
+
     public function test_a_save_writes_wcct_settings_v3_and_leaves_wcct_settings_untouched() {
         $result = $this->run_job(
             array(

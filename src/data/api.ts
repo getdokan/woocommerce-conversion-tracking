@@ -7,7 +7,12 @@ import { __ } from '@wordpress/i18n';
 /**
  * Internal dependencies
  */
-import type { AppData, SettingsSchema, SettingsValues } from './types';
+import type {
+    AppData,
+    PlatformValues,
+    SettingsSchema,
+    SettingsValues,
+} from './types';
 
 export const NAMESPACE = '/wcct/v1';
 
@@ -62,4 +67,26 @@ export const fetchAppData = async (): Promise< AppData > => {
             platforms: schema?.platforms ?? [],
         },
     };
+};
+
+export type SettingsUpdate = {
+    platforms?: Record< string, PlatformValues >;
+    [ key: string ]: unknown;
+};
+
+/**
+ * Save changed settings; resolves with every value after the save.
+ *
+ * @param {SettingsUpdate} update Changed values only.
+ */
+export const saveSettings = async (
+    update: SettingsUpdate
+): Promise< SettingsValues > => {
+    const settings = await apiFetch< SettingsValues >( {
+        path: `${ NAMESPACE }/settings`,
+        method: 'POST',
+        data: update,
+    } );
+
+    return { ...settings, platforms: settings?.platforms ?? {} };
 };

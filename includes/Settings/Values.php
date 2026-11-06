@@ -5,6 +5,7 @@ namespace StorePulse\ConversionTracking\Settings;
 use InvalidArgumentException;
 use StorePulse\ConversionTracking\Access\CustomScripts;
 use StorePulse\ConversionTracking\Platforms\XSettings;
+use StorePulse\ConversionTracking\Privacy\CustomerDetails;
 
 /**
  * Turns the stored settings into the API's values and applies a save to them.
@@ -28,6 +29,11 @@ class Values {
             $stored = self::stored( $doc, $id );
 
             $values['platforms'][ $id ] = self::fill( Schema::fields( $platform['schema'] ), $stored );
+
+            // Shown as the storefront reads it: without a stored value, the 2.x default.
+            if ( CustomerDetails::PLATFORM === $id && isset( $values['platforms'][ $id ][ CustomerDetails::SETTING ] ) && ! array_key_exists( CustomerDetails::SETTING, $stored ) ) {
+                $values['platforms'][ $id ][ CustomerDetails::SETTING ] = CustomerDetails::v1_default();
+            }
 
             // Read-only until #103 adds Pause; a 2.x integration that was switched off reads as paused.
             $values['platforms'][ $id ]['paused'] = ! empty( $stored['paused'] );
