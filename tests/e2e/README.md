@@ -9,6 +9,8 @@ The store runs in Docker with [wp-env](https://www.npmjs.com/package/@wordpress/
 
 `specs/purchase.spec.ts` places one order on classic checkout and one on block checkout, paid by cash on delivery, and fails unless every tag with a test ID in `config/test-ids.json` sent its Purchase hit.
 
+`specs/add-to-cart.spec.ts` adds to the cart from the product form, a shop-page AJAX button and a block Product Button (the `/block-shop/` page), and expects exactly one add to cart hit per tag, also after one more page view. Its last test turns on the `ct-e2e-page-cache.php` mu-plugin (a worst-case page cache that serves the same HTML to every browser) and checks a second browser never sends the first browser's add to cart. `specs/sign-up.spec.ts` signs up on My account and at classic checkout and expects one Meta `CompleteRegistration`, and none on the next page view.
+
 ## Run it locally
 
 You need Docker and Node 22.13 or newer. The plugin also needs its Composer packages and its built admin bundles, so run `composer install` and `npm ci && npm run build` in the plugin root once.
@@ -51,9 +53,10 @@ The tracker serves small stand-ins for `fbevents.js` and `gtag.js` (`utils/stubs
 | `.wp-env.json` | The store. WordPress and WooCommerce versions are pinned here; CI uses the current releases unless asked for the pinned ones. |
 | `setup/` | Seeding, run inside the wp-env cli container. |
 | `mu-plugins/ct-e2e-helpers.php` | Test-site helpers: the `ct_e2e_checkout=classic` cookie makes the shortcode page the checkout page, and wordpress.org calls are blocked. |
+| `mu-plugins/ct-e2e-page-cache.php` | With the `ct_e2e_page_cache` cookie, caches logged-out GET pages per URL and serves them to every browser (`X-CT-Cache: HIT`); `/?ct_e2e_page_cache_flush=1` empties it. |
 | `config/test-ids.json` | Test IDs. A tag listed here is enabled in the store and must send a Purchase hit. |
 | `utils/fixtures.ts` | `test` and `expect` with the `tracker` and `jsErrors` fixtures. Import these in every spec. |
-| `utils/network.ts` | The tracker: `platformRequests(platform?)`, `purchaseHits(tag)`, `expectPurchase(tag)`. |
+| `utils/network.ts` | The tracker: `platformRequests(platform?)`, `purchaseHits(tag)`, `expectPurchase(tag)`, `eventHits(tag, event)`. |
 | `utils/platforms.ts` | Platform hosts and the test IDs. |
 | `utils/checkout.ts` | `addProductToCart()` and `placeGuestOrder(page, 'classic' \| 'block')`. |
 | `specs/` | The tests. |

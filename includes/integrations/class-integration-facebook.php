@@ -101,10 +101,6 @@ class WCCT_Integration_Facebook extends WCCT_Integration {
         <?php
 
         $this->print_event_script();
-
-        if ( ! class_exists( 'WeDevs_WC_Conversion_Tracking_Pro' ) ) {
-            $this->add_to_cart_ajax();
-        }
     }
 
     /**
@@ -118,12 +114,21 @@ class WCCT_Integration_Facebook extends WCCT_Integration {
             return;
         }
 
-        $product_ids = $this->get_content_ids_from_cart( WC()->cart->get_cart() );
+        $event = $this->current_event;
+
+        // The product just added; the whole cart only when the event has no product.
+        if ( $event && $event->get_product() ) {
+            $product_ids = $event->get_product_ids();
+            $value       = wc_format_decimal( $event->get_value(), wc_get_price_decimals() );
+        } else {
+            $product_ids = $this->get_content_ids_from_cart( WC()->cart->get_cart() );
+            $value       = WC()->cart->total ? WC()->cart->total : 0;
+        }
 
         $code = $this->build_event( 'AddToCart', array(
             'content_ids'  => json_encode( $product_ids ),
             'content_type' => 'product',
-            'value'        => WC()->cart->total ? WC()->cart->total : 0,
+            'value'        => $value,
             'currency'     => get_woocommerce_currency()
         ) );
 
@@ -133,35 +138,12 @@ class WCCT_Integration_Facebook extends WCCT_Integration {
     /**
      * Added to cart
      *
+     * @deprecated 3.0.0 Add to cart reaches the browser through the pipeline's pending events.
+     *
      * @return void
      */
     public function add_to_cart_ajax() {
-        if ( ! $this->event_enabled( 'AddToCart' ) ) {
-            return;
-        }
-
-        $integration_settins    = $this->get_integration_settings();
-        $facebook_pixel_id      = ! empty( $integration_settins[0]['pixel_id'] ) ? $integration_settins[0]['pixel_id'] : '';
-        ?>
-        <script type="text/javascript">
-            jQuery(function($) {
-                $(document).on('added_to_cart', function (event, fragments, dhash, button) {
-                    var currencySymbol = $($(button.get()[0]).closest('.product')
-                        .find('.woocommerce-Price-currencySymbol').get()[0]).text();
-
-                    var price = $(button.get()[0]).closest('.product').find('.amount').text();
-                    var originalPrice = price.split(currencySymbol).slice(-1).pop();
-
-                    wcfbq('<?php echo esc_attr( $facebook_pixel_id ) ?>', 'AddToCart', {
-                        content_ids: [ $(button).data('product_id') ],
-                        content_type: 'product',
-                        value: originalPrice,
-                        currency: '<?php echo esc_attr( get_woocommerce_currency() ) ?>'
-                    });
-                });
-            });
-        </script>
-        <?php
+        _deprecated_function( __METHOD__, '3.0.0' );
     }
 
     /**

@@ -193,18 +193,31 @@ abstract class WCCT_Integration {
      * @return string
      */
     public function get_event_script( $event ) {
-        $name   = $event->get_name();
-        $method = isset( static::$event_methods[ $name ] ) ? static::$event_methods[ $name ] : '';
+        $name = $event->get_name();
 
-        if ( ! $method || ! $this->supports( $method ) || ! method_exists( $this, $method ) ) {
+        if ( ! $this->sends_event( $name ) ) {
             return '';
         }
 
+        $method              = static::$event_methods[ $name ];
         $this->current_event = $event;
         $code                = $this->$method( 'purchase' === $name ? $event->get_order_id() : '' );
         $this->current_event = null;
 
         return is_string( $code ) ? $code : '';
+    }
+
+    /**
+     * Whether the integration has a method for a pipeline event
+     *
+     * @param string $name Event name.
+     *
+     * @return boolean
+     */
+    public function sends_event( $name ) {
+        $method = is_string( $name ) && isset( static::$event_methods[ $name ] ) ? static::$event_methods[ $name ] : '';
+
+        return $method && $this->supports( $method ) && method_exists( $this, $method );
     }
 
     /**

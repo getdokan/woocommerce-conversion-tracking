@@ -43,11 +43,12 @@ abstract class WCCT_Test_Page_Case extends TestCase {
         }
 
         $job = array(
-            'type'     => 'request',
-            'rollback' => true,
-            'request'  => array( 'path' => $request['path'] ),
-            'user_id'  => isset( $request['user_id'] ) ? $request['user_id'] : 0,
-            'options'  => array_merge( isset( $request['options'] ) ? $request['options'] : array(), $options, array( 'wcct_settings' => $settings ) ),
+            'type'      => 'request',
+            'rollback'  => true,
+            'request'   => array( 'path' => $request['path'] ),
+            'user_id'   => isset( $request['user_id'] ) ? $request['user_id'] : 0,
+            'user_meta' => isset( $request['user_meta'] ) ? $request['user_meta'] : array(),
+            'options'   => array_merge( isset( $request['options'] ) ? $request['options'] : array(), $options, array( 'wcct_settings' => $settings ) ),
         );
 
         if ( array_key_exists( 'cart', $request ) ) {
@@ -155,6 +156,15 @@ abstract class WCCT_Test_Page_Case extends TestCase {
     }
 
     /**
+     * Like captured_page_removals(), for removed markup that varies: regular expression => reason
+     *
+     * @return array
+     */
+    protected function captured_page_removal_patterns() {
+        return array();
+    }
+
+    /**
      * Assert today's output is all in the page captured from the released versions (html/<page>.html in the fixtures)
      *
      * The captured pages are the full storefront HTML the fixtures were derived from. WCCT_CAPTURE_HTML=1
@@ -187,6 +197,11 @@ abstract class WCCT_Test_Page_Case extends TestCase {
         }
 
         $captured = str_replace( array_keys( $this->captured_page_removals() ), '', file_get_contents( $file ) );
+
+        foreach ( array_keys( $this->captured_page_removal_patterns() ) as $pattern ) {
+            $captured = preg_replace( $pattern, '', $captured );
+        }
+
         $outputs  = array_map(
             function ( $chunk ) {
                 return $chunk[1];

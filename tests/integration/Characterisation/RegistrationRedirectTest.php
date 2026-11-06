@@ -4,11 +4,11 @@
 use PHPUnit\Framework\TestCase;
 
 /**
- * Characterisation test for how the registration page view is marked
+ * The registration redirect is left alone: sign-ups are detected with a user meta flag, not a query argument
  */
 class RegistrationRedirectTest extends TestCase {
 
-    public function test_the_registration_redirect_carries_the_new_customer_flag() {
+    public function test_the_registration_redirect_has_no_new_customer_flag() {
         $result = WCCT_Test_WP::run(
             array(
                 'type'     => 'file',
@@ -18,6 +18,6 @@ class RegistrationRedirectTest extends TestCase {
         );
 
         $this->assertNull( $result['error'] );
-        $this->assertSame( '{home}/my-account/?_wc_user_reg=true', WCCT_Test_Fixture::normalise( $result['value'], $result['home'] ) );
+        $this->assertSame( '{home}/my-account/', WCCT_Test_Fixture::normalise( $result['value'], $result['home'] ) );
     }
 }

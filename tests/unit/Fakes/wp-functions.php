@@ -36,3 +36,41 @@ if ( ! function_exists( 'maybe_unserialize' ) ) {
         return 'a:' === substr( $data, 0, 2 ) || 'b:' === substr( $data, 0, 2 );
     }
 }
+
+if ( ! function_exists( 'get_user_meta' ) ) {
+    function get_user_meta( $user_id, $key = '', $single = false ) {
+        return isset( $GLOBALS['wcct_test_user_meta'][ $user_id ][ $key ] ) ? $GLOBALS['wcct_test_user_meta'][ $user_id ][ $key ] : ( $single ? '' : array() );
+    }
+}
+
+if ( ! function_exists( 'update_user_meta' ) ) {
+    function update_user_meta( $user_id, $key, $value ) {
+        $GLOBALS['wcct_test_user_meta'][ $user_id ][ $key ] = $value;
+
+        return true;
+    }
+}
+
+if ( ! function_exists( 'delete_user_meta' ) ) {
+    function delete_user_meta( $user_id, $key ) {
+        if ( ! isset( $GLOBALS['wcct_test_user_meta'][ $user_id ][ $key ] ) ) {
+            return false;
+        }
+
+        unset( $GLOBALS['wcct_test_user_meta'][ $user_id ][ $key ] );
+
+        return true;
+    }
+}
+
+if ( ! function_exists( 'is_admin' ) ) {
+    function is_admin() {
+        return ! empty( $GLOBALS['wcct_test_is_admin'] );
+    }
+}
+
+if ( ! function_exists( 'wp_doing_ajax' ) ) {
+    function wp_doing_ajax() {
+        return ! empty( $GLOBALS['wcct_test_doing_ajax'] );
+    }
+}

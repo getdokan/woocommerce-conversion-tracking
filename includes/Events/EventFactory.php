@@ -102,6 +102,30 @@ class EventFactory {
     }
 
     /**
+     * Add to cart event for the product just added; the value is its shop price times the quantity.
+     *
+     * @param \WC_Product $product  Product or variation added.
+     * @param int|float   $quantity Quantity added.
+     *
+     * @return Event
+     */
+    public static function add_to_cart( $product, $quantity = 1 ) {
+        $quantity = is_numeric( $quantity ) && $quantity > 0 ? 0 + $quantity : 1;
+
+        return new Event(
+            Event::ADD_TO_CART,
+            array(
+                'value'       => wc_get_price_to_display( $product, array( 'qty' => $quantity ) ),
+                'currency'    => get_woocommerce_currency(),
+                'decimals'    => wc_get_price_decimals(),
+                'product'     => $product,
+                'product_ids' => array( $product->get_id() ),
+                'data'        => array( 'quantity' => $quantity ),
+            )
+        );
+    }
+
+    /**
      * Purchase event for an order.
      *
      * @param \WC_Order $order Order.

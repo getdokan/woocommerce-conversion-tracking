@@ -12,14 +12,18 @@ use StorePulse\ConversionTracking\Events\SkippedStatuses;
 class WCCT_Integration_GA4 extends WCCT_Integration {
 
     /**
-     * WooCommerce session key for add to cart events waiting for the next page view
+     * Old session key for add to cart events; the pipeline's pending events replace it
+     *
+     * @deprecated 3.0.0
      *
      * @var string
      */
     const SESSION_KEY = 'wcct_ga4_pending_add_to_cart';
 
     /**
-     * Cart fragment key that carries add to cart data in AJAX responses
+     * Old cart fragment key for add to cart data; the pipeline's fragment replaces it
+     *
+     * @deprecated 3.0.0
      *
      * @var string
      */
@@ -31,13 +35,6 @@ class WCCT_Integration_GA4 extends WCCT_Integration {
      * @var string
      */
     const PURCHASE_SENT_ACTION = 'wcct_ga4_purchase_sent';
-
-    /**
-     * Adds made during the current AJAX request, as {id, params}
-     *
-     * @var array
-     */
-    private $ajax_added_items = array();
 
     /**
      * Saved measurement ID for this request, see get_measurement_id()
@@ -53,11 +50,9 @@ class WCCT_Integration_GA4 extends WCCT_Integration {
         $this->id       = 'ga4';
         $this->name     = __( 'Google Analytics 4', 'woocommerce-conversion-tracking' );
         $this->enabled  = true;
-        $this->supports = array();
+        $this->supports = array( 'add_to_cart' );
 
         add_filter( 'wcct_save_integrations_settings', array( $this, 'sanitize_settings' ) );
-        add_action( 'woocommerce_add_to_cart', array( $this, 'capture_add_to_cart' ), 10, 6 );
-        add_filter( 'woocommerce_add_to_cart_fragments', array( $this, 'add_to_cart_fragment' ) );
         add_action( 'wp_ajax_' . self::PURCHASE_SENT_ACTION, array( $this, 'mark_purchase_sent' ) );
         add_action( 'wp_ajax_nopriv_' . self::PURCHASE_SENT_ACTION, array( $this, 'mark_purchase_sent' ) );
     }
@@ -205,67 +200,44 @@ class WCCT_Integration_GA4 extends WCCT_Integration {
     }
 
     /**
+     * Add to cart event for the product the pipeline is sending
+     *
+     * @return string JavaScript for the pipeline
+     */
+    public function add_to_cart() {
+        $event = $this->current_event;
+
+        if ( ! $event || ! $event->get_product() instanceof WC_Product || ! $this->is_tracking_event( 'add_to_cart' ) ) {
+            return '';
+        }
+
+        $params = $this->get_event_params( array( $this->get_product_item( $event->get_product(), $event->get( 'quantity', 1 ) ) ) );
+
+        return '(window.wcctGtag || function () { (window.dataLayer = window.dataLayer || []).push(arguments); })(\'event\', \'add_to_cart\', ' . $this->encode( $params ) . ');';
+    }
+
+    /**
      * Remember a product added to the cart
      *
-     * Every add is stored in the session with an ID and sent on the next page
-     * view. AJAX adds are also sent back in the cart fragments, and sent at
-     * once when add-to-cart.js fires added_to_cart. The browser remembers the
-     * IDs it sent that way and skips them on the next page view.
-     *
-     * So an add is sent once whether the page fires added_to_cart, redirects
-     * (redirect to cart, buy now buttons) or uses another AJAX action or the
-     * Store API.
-     *
-     * @param  string $cart_item_key
-     * @param  int    $product_id
-     * @param  int    $quantity
-     * @param  int    $variation_id
-     * @param  array  $variation
-     * @param  array  $cart_item_data
+     * @deprecated 3.0.0 The pipeline queues add to cart, see add_to_cart().
      *
      * @return void
      */
-    public function capture_add_to_cart( $cart_item_key, $product_id, $quantity, $variation_id = 0, $variation = array(), $cart_item_data = array() ) {
-        if ( ! $this->is_tracking_event( 'add_to_cart' ) ) {
-            return;
-        }
-
-        $product = wc_get_product( $variation_id ? $variation_id : $product_id );
-
-        if ( ! $product ) {
-            return;
-        }
-
-        $entry = array(
-            'id'     => wp_generate_uuid4(),
-            'params' => $this->get_event_params( array( $this->get_product_item( $product, $quantity ) ) ),
-        );
-
-        if ( wp_doing_ajax() ) {
-            $this->ajax_added_items[] = $entry;
-        }
-
-        if ( WC()->session ) {
-            $pending   = (array) WC()->session->get( self::SESSION_KEY, array() );
-            $pending[] = $entry;
-
-            WC()->session->set( self::SESSION_KEY, $pending );
-        }
+    public function capture_add_to_cart() {
+        _deprecated_function( __METHOD__, '3.0.0' );
     }
 
     /**
      * Add the adds from this AJAX request to the cart fragments
+     *
+     * @deprecated 3.0.0 The pipeline adds its own fragment.
      *
      * @param  array $fragments
      *
      * @return array
      */
     public function add_to_cart_fragment( $fragments ) {
-        if ( ! empty( $this->ajax_added_items ) && $this->is_tracking_event( 'add_to_cart' ) ) {
-            $fragments[ self::FRAGMENT_KEY ] = $this->ajax_added_items;
-        }
-
-        $this->ajax_added_items = array();
+        _deprecated_function( __METHOD__, '3.0.0' );
 
         return $fragments;
     }
@@ -293,13 +265,7 @@ class WCCT_Integration_GA4 extends WCCT_Integration {
             return '';
         }
 
-        $events      = array();
-        $listen_ajax = $this->event_allowed( 'add_to_cart' );
-        $pending     = $this->get_pending_add_to_cart_items();
-
-        if ( ! $listen_ajax ) {
-            $pending = array();
-        }
+        $events = array();
 
         foreach ( $page_events as $page_event ) {
             if ( Event::VIEW_PRODUCT === $page_event->get_name() && $page_event->get_product() && $this->event_allowed( 'view_item' ) ) {
@@ -330,7 +296,7 @@ class WCCT_Integration_GA4 extends WCCT_Integration {
             }
         }
 
-        if ( ! $events && ! $pending && ! $listen_ajax ) {
+        if ( ! $events ) {
             return '';
         }
 
@@ -340,25 +306,6 @@ class WCCT_Integration_GA4 extends WCCT_Integration {
                 window.dataLayer = window.dataLayer || [];
                 var gtag = window.wcctGtag || function () { window.dataLayer.push(arguments); };
                 var events = <?php echo $this->encode( $events ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>;
-                var pending = <?php echo $this->encode( array_values( $pending ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>;
-                // IDs of adds already sent from the AJAX response, skipped
-                // when the same adds come back from the session.
-                var sentKey = 'wcct_ga4_sent_add_to_cart';
-                var readSent = function () {
-                    try { return JSON.parse(window.sessionStorage.getItem(sentKey)) || []; } catch (e) { return []; }
-                };
-                var sendAdds = function (entries, remember) {
-                    var sent = readSent();
-                    for (var i = 0; i < entries.length; i++) {
-                        if (!entries[i] || !entries[i].params || sent.indexOf(entries[i].id) > -1) continue;
-                        gtag('event', 'add_to_cart', entries[i].params);
-                        if (remember) sent.push(entries[i].id);
-                    }
-                    if (remember) {
-                        try { window.sessionStorage.setItem(sentKey, JSON.stringify(sent.slice(-50))); } catch (e) {}
-                    }
-                };
-                sendAdds(pending, false);
                 // Tells the server the purchase was sent, so it is not sent again.
                 // Runs only once gtag.js has handled the event, so a blocked or
                 // abandoned page sends the purchase again on the next view.
@@ -388,16 +335,6 @@ class WCCT_Integration_GA4 extends WCCT_Integration {
                     }
                     gtag('event', events[i][0], events[i][1]);
                 }
-                <?php if ( $listen_ajax ) { ?>
-                if (window.jQuery) {
-                    window.jQuery(document.body).on('added_to_cart', function (e, fragments) {
-                        if (fragments && fragments['<?php echo esc_js( self::FRAGMENT_KEY ); ?>']) {
-                            sendAdds(fragments['<?php echo esc_js( self::FRAGMENT_KEY ); ?>'], true);
-                            delete fragments['<?php echo esc_js( self::FRAGMENT_KEY ); ?>'];
-                        }
-                    });
-                }
-                <?php } ?>
             })();
         <?php
         return trim( ob_get_clean() );
@@ -538,34 +475,6 @@ class WCCT_Integration_GA4 extends WCCT_Integration {
             $order->get_coupon_codes(),
             $decimals,
             $value
-        );
-    }
-
-    /**
-     * Read and clear the adds stored in the session
-     *
-     * @return array List of {id, params}
-     */
-    private function get_pending_add_to_cart_items() {
-        if ( ! WC()->session ) {
-            return array();
-        }
-
-        $pending = WC()->session->get( self::SESSION_KEY, array() );
-
-        if ( $pending ) {
-            WC()->session->set( self::SESSION_KEY, null );
-        }
-
-        if ( ! is_array( $pending ) ) {
-            return array();
-        }
-
-        return array_filter(
-            $pending,
-            function ( $entry ) {
-                return is_array( $entry ) && isset( $entry['id'], $entry['params'] );
-            }
         );
     }
 

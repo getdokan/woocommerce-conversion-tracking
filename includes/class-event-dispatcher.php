@@ -2,6 +2,7 @@
 
 use StorePulse\ConversionTracking\Events\EventFactory;
 use StorePulse\ConversionTracking\Events\Pipeline;
+use StorePulse\ConversionTracking\Events\SignUp;
 
 /**
  * Event Manager
@@ -35,8 +36,8 @@ class WCCT_Event_Dispatcher {
 
         add_action( 'wp_head', array( $this, 'enqueue_scripts' ) );
 
-        // registration events
-        add_action( 'woocommerce_registration_redirect', array( $this, 'wc_redirect_url' ) );
+        // New accounts are flagged here and sent on the user's next page view.
+        SignUp::init_hooks();
 
         // Wishlist Event
         add_action( 'yith_wcwl_added_to_wishlist', array( $this, 'product_wishlist' ) );
@@ -166,17 +167,14 @@ class WCCT_Event_Dispatcher {
     /**
      * Adds a url query arg to determine newly registered user
      *
-     * @uses woocommerce_registration_redirect action
+     * @deprecated 3.0.0 Sign-ups are detected with a user meta flag, see SignUp.
      *
      * @param string $redirect
      *
-     * @return string
+     * @return string The redirect, unchanged.
      */
     function wc_redirect_url( $redirect ) {
-
-        $redirect = add_query_arg( array(
-            '_wc_user_reg' => 'true'
-        ), $redirect );
+        _deprecated_function( __METHOD__, '3.0.0' );
 
         return $redirect;
     }

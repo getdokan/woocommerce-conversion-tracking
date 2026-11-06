@@ -209,6 +209,9 @@ $wcct_customer->set_props(
 );
 $wcct_customer->save();
 
+// The customer signed up long ago: no sign-up waiting (the registration page sets the flag itself).
+delete_user_meta( $wcct_customer_id, '_wcct_sign_up_pending' );
+
 // Orders go to WooCommerce's order tables (HPOS), as on new stores; orders.php runs in a new process so the setting applies.
 $wcct_sync = wc_get_container()->get( \Automattic\WooCommerce\Internal\DataStores\Orders\DataSynchronizer::class );
 

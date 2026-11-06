@@ -36,6 +36,17 @@ const PURCHASE: Record<Tag, (request: CapturedRequest, ids: Record<string, strin
         request.params.some(p => p.get('en') === 'purchase' && p.get('tid') === ids.measurementId),
 };
 
+const EVENT: Record<Tag, (request: CapturedRequest, ids: Record<string, string>, event: string) => boolean> = {
+    meta: (request, ids, event) =>
+        request.platform === 'meta' &&
+        /\/tr\/?$/.test(new URL(request.url).pathname) &&
+        request.params.some(p => p.get('ev') === event && p.get('id') === ids.pixelId),
+    ga4: (request, ids, event) =>
+        request.platform === 'google' &&
+        new URL(request.url).pathname.endsWith('/g/collect') &&
+        request.params.some(p => p.get('en') === event && p.get('tid') === ids.measurementId),
+};
+
 const paramsOf = (request: Request): URLSearchParams[] => {
     const query = new URL(request.url()).searchParams;
     const lines = (request.postData() ?? '').split(/\r?\n/).filter(Boolean);
@@ -95,6 +106,13 @@ export class NetworkTracker {
         const ids = TEST_IDS[tag] ?? {};
 
         return (await this.platformRequests()).filter(r => PURCHASE[tag](r, ids));
+    }
+
+    // Hits of one event for a tag's test ID, by the platform's own event name (Meta "AddToCart", GA4 "add_to_cart").
+    async eventHits(tag: Tag, event: string): Promise<CapturedRequest[]> {
+        const ids = TEST_IDS[tag] ?? {};
+
+        return (await this.platformRequests()).filter(r => EVENT[tag](r, ids, event));
     }
 
     // Fails unless the tag sent a Purchase hit for its test ID; returns the hits.

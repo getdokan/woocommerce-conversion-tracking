@@ -106,6 +106,7 @@ class WCCT_Test_WP {
                 'roots'      => self::$env['roots'],
                 'theme_root' => self::$env['theme_root'],
                 'options'    => array(),
+                'user_meta'  => array(),
                 'user_id'    => 0,
                 'rollback'   => false,
                 'result'     => self::$env['tmp'] . '/result-' . $count . '.json',

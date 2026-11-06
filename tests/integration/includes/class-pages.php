@@ -66,10 +66,11 @@ class WCCT_Test_Pages {
                 'user_id' => 501,
             ),
             'my-account'                         => array( 'path' => '/my-account/' ),
-            // Where WooCommerce sends a shopper who has just registered (see RegistrationRedirectTest).
+            // The first page view of a shopper who has just registered: user_register left the sign-up flag (see SignUpTest).
             'registration'                       => array(
-                'path'    => '/my-account/?_wc_user_reg=true',
-                'user_id' => 501,
+                'path'      => '/my-account/',
+                'user_id'   => 501,
+                'user_meta' => array( 501 => array( '_wcct_sign_up_pending' => time() ) ),
             ),
         );
     }

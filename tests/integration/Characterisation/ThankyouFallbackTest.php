@@ -41,7 +41,7 @@ class ThankyouFallbackTest extends TestCase {
 
         $this->assertArrayNotHasKey( 'facebook', $value['scripts'] );
         $this->assertArrayNotHasKey( 'custom', $value['markup'] );
-        $this->assertStringContainsString( 'var events = [];', $value['scripts']['ga4'] );
+        $this->assertArrayNotHasKey( 'ga4', $value['scripts'] );
 
         $value = $this->run_job( 3002, 501 );
 

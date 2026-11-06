@@ -144,6 +144,13 @@ wcct_test_early_hook(
             }
         }
 
+        // User meta from earlier requests, e.g. the sign-up flag. Written to the table directly: the user API would load the current user too early.
+        foreach ( $wcct_job['user_meta'] as $user_id => $meta ) {
+            foreach ( $meta as $key => $value ) {
+                $wpdb->insert( $wpdb->usermeta, array( 'user_id' => (int) $user_id, 'meta_key' => $key, 'meta_value' => maybe_serialize( $value ) ) );
+            }
+        }
+
         register_theme_directory( $wcct_job['theme_root'] );
 
         add_filter(

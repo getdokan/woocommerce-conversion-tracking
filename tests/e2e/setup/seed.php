@@ -17,6 +17,14 @@ update_option( 'woocommerce_enable_guest_checkout', 'yes' );
 update_option( 'woocommerce_enable_checkout_login_reminder', 'no' );
 update_option( 'woocommerce_onboarding_profile', array( 'skipped' => true ) );
 
+// AJAX buttons on the shop page, no redirect to the cart, and sign-up on My account and at checkout.
+update_option( 'woocommerce_enable_ajax_add_to_cart', 'yes' );
+update_option( 'woocommerce_cart_redirect_after_add', 'no' );
+update_option( 'woocommerce_enable_myaccount_registration', 'yes' );
+update_option( 'woocommerce_enable_signup_and_login_from_checkout', 'yes' );
+update_option( 'woocommerce_registration_generate_username', 'yes' );
+update_option( 'woocommerce_registration_generate_password', 'yes' );
+
 // Cash on delivery is the non-card payment method the specs use.
 update_option(
     'woocommerce_cod_settings',
@@ -77,6 +85,19 @@ if ( ! get_page_by_path( 'classic-checkout' ) ) {
     );
 }
 
+// Block add to cart: a Product Collection with the Product Button block, which adds through the Store API.
+if ( ! get_page_by_path( 'block-shop' ) ) {
+    wp_insert_post(
+        array(
+            'post_type'    => 'page',
+            'post_status'  => 'publish',
+            'post_title'   => 'Block shop',
+            'post_name'    => 'block-shop',
+            'post_content' => '<!-- wp:woocommerce/product-collection {"queryId":1,"query":{"perPage":4,"pages":0,"offset":0,"postType":"product","order":"asc","orderBy":"title","search":"","exclude":[],"inherit":false,"taxQuery":{},"isProductCollectionBlock":true,"woocommerceOnSale":false,"woocommerceStockStatus":["instock","outofstock","onbackorder"],"woocommerceAttributes":[],"woocommerceHandPickedProducts":[]},"tagName":"div","displayLayout":{"type":"flex","columns":3},"collection":"woocommerce/product-collection/product-catalog"} --><div class="wp-block-woocommerce-product-collection"><!-- wp:woocommerce/product-template --><!-- wp:post-title {"isLink":true,"__woocommerceNamespace":"woocommerce/product-collection/product-title"} /--><!-- wp:woocommerce/product-price {"isDescendentOfQueryLoop":true} /--><!-- wp:woocommerce/product-button {"isDescendentOfQueryLoop":true} /--><!-- /wp:woocommerce/product-template --></div><!-- /wp:woocommerce/product-collection -->',
+        )
+    );
+}
+
 // Tracking settings, in the shape the settings page saves. Test IDs only.
 update_option(
     'wcct_settings',
@@ -89,6 +110,9 @@ update_option(
                     'AddToCart'        => 'on',
                     'InitiateCheckout' => 'on',
                     'Purchase'         => 'on',
+                    'Registration'     => 'on',
+                    // Pro's Meta reads the sign-up switch under this key.
+                    'CompleteRegistration' => 'on',
                 ),
             ),
         ),

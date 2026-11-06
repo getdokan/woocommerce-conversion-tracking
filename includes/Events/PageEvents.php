@@ -47,8 +47,14 @@ class PageEvents {
             $events[] = EventFactory::purchase( $order );
         }
 
-        if ( isset( $_GET['_wc_user_reg'] ) && 'true' === $_GET['_wc_user_reg'] ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+        // Logged-in pages only, so the flag never reaches a shared page cache.
+        if ( is_user_logged_in() && SignUp::take( get_current_user_id() ) ) {
             $events[] = EventFactory::simple( Event::SIGN_UP );
+
+            // A one-shot event: per-user page caches must not replay this page.
+            if ( ! defined( 'DONOTCACHEPAGE' ) ) {
+                define( 'DONOTCACHEPAGE', true );
+            }
         }
 
         $events = array_merge( $events, $extra );

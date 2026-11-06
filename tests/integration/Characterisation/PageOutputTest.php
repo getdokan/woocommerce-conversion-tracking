@@ -23,6 +23,12 @@ class PageOutputTest extends WCCT_Test_Page_Case {
         }
     }
 
+    protected function captured_page_removal_patterns() {
+        return array(
+            '/ *<script type="text\/javascript">\n\s*jQuery\(function\(\$\) \{\n\s*\$\(document\)\.on\(\'added_to_cart\'.*?<\/script>\n/s' => '#70 removed Meta\'s added_to_cart jQuery listener from the head block',
+        );
+    }
+
     protected function fixtures_dir() {
         return dirname( __DIR__, 2 ) . '/fixtures';
     }
@@ -114,7 +120,21 @@ class PageOutputTest extends WCCT_Test_Page_Case {
 
     public function test_ga4_purchase_needs_the_order_key() {
         $this->assertStringContainsString( '[["purchase",{"send_to":"G-CTTEST1234","currency":"USD","value":73', $this->event_js( $this->request( 'ga4', 'order-received-block' ) ) );
-        $this->assertStringContainsString( 'var events = [];', $this->event_js( $this->request( 'ga4', 'order-received-no-key' ) ) );
+        $this->assertStringNotContainsString( '"purchase"', $this->event_js( $this->request( 'ga4', 'order-received-no-key' ) ) );
+    }
+
+    public function test_add_to_cart_is_never_printed_into_the_page() {
+        $output = $this->output_of( $this->request( 'all', 'cart-after-add-to-cart' ) );
+
+        $this->assertStringNotContainsString( "fbq('track', 'AddToCart'", $output );
+        $this->assertStringNotContainsString( "'event', 'add_to_cart'", $output );
+        $this->assertStringNotContainsString( "$(document).on('added_to_cart'", $output );
+        $this->assertStringContainsString( 'wcct-pending-events', $output );
+    }
+
+    public function test_sign_up_is_sent_on_the_first_page_view_after_registering() {
+        $this->assertStringContainsString( "fbq('track', 'CompleteRegistration'", $this->output_of( $this->request( 'facebook', 'registration' ) ) );
+        $this->assertStringNotContainsString( "fbq('track', 'CompleteRegistration'", $this->output_of( $this->request( 'facebook', 'my-account' ) ) );
     }
 
     public function test_meta_purchase_is_queued_on_the_thank_you_page() {
