@@ -1,6 +1,7 @@
 /**
  * External dependencies
  */
+import { Toaster } from '@wedevs/plugin-ui';
 import { ThemeProvider } from '@wcct/components';
 
 /**
@@ -17,6 +18,7 @@ const App = () => (
         <AppDataProvider>
             <Shell />
         </AppDataProvider>
+        <Toaster position="bottom-center" />
     </ThemeProvider>
 );
 

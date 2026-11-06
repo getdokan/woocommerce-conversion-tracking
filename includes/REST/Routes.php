@@ -37,6 +37,7 @@ class Routes {
                 BackupController::class,
                 CatalogController::class,
                 AccessController::class,
+                DoctorController::class,
             )
         );
 

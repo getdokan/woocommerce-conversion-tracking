@@ -18,6 +18,7 @@ import { isKnownPlatform } from '../data/platforms';
 import { replaceHash, routePath, useRoute, type Route } from '../router';
 import Catalog from '../pages/catalog/Catalog';
 import Dashboard from '../pages/dashboard/Dashboard';
+import Doctor from '../pages/doctor/Doctor';
 import Placeholder from '../pages/Placeholder';
 import Settings from '../pages/settings/Settings';
 import { pageInfo } from '../pages/titles';
@@ -44,6 +45,10 @@ const RoutePage = ( { route }: { route: Route } ) => {
 
     if ( route.name === 'settings' ) {
         return <Settings section={ route.section } />;
+    }
+
+    if ( route.name === 'doctor' ) {
+        return <Doctor />;
     }
 
     return <Placeholder { ...pageInfo( route ) } />;

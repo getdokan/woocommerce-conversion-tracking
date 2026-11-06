@@ -203,6 +203,9 @@ class WeDevs_WC_Conversion_Tracking {
 
         \StorePulse\ConversionTracking\Privacy\PolicyText::register();
 
+        $this->container['doctor_recheck'] = new \StorePulse\ConversionTracking\Doctor\Recheck();
+        $this->container['doctor_recheck']->register();
+
         add_action( 'plugins_loaded', array( $this, 'plugin_upgrades' ) );
         add_action( 'init', array( $this, 'localization_setup' ) );
         add_action( 'init', array( $this, 'init_classes' ) );

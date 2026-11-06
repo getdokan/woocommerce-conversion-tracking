@@ -16,15 +16,17 @@ import { Stethoscope } from 'lucide-react';
 /**
  * WordPress dependencies
  */
-import { useState } from '@wordpress/element';
+import { useEffect, useState } from '@wordpress/element';
 import { __ } from '@wordpress/i18n';
 
 /**
  * Internal dependencies
  */
 import { useAppData } from '../../data/AppData';
+import { fetchDoctor, type DoctorReport } from '../../data/doctor';
 import { platformCards } from '../../data/platforms';
 import { CardSkeleton } from '../../shell/PageSkeleton';
+import { DoctorCard } from './DoctorCard';
 import { ConnectedPlatformCard, SetupPlatformCard } from './PlatformCard';
 import { StatCards } from './StatCards';
 import { WelcomeCard } from './WelcomeCard';
@@ -51,6 +53,23 @@ const GRID = 'grid grid-cols-3 gap-4 max-[1100px]:grid-cols-2';
 const Dashboard = () => {
     const { data, refreshing } = useAppData();
     const [ filter, setFilter ] = useState< Filter >( 'all' );
+    const [ doctor, setDoctor ] = useState< DoctorReport | null >( null );
+    const [ doctorLoading, setDoctorLoading ] = useState( true );
+
+    // The last Doctor run; a failed read shows the not-run card.
+    useEffect( () => {
+        let live = true;
+
+        fetchDoctor()
+            .then( ( report ) => live && setDoctor( report ) )
+            .catch( () => {} )
+            .finally( () => live && setDoctorLoading( false ) );
+
+        return () => {
+            live = false;
+        };
+    }, [] );
+
     if ( ! data ) {
         return null;
     }
@@ -123,7 +142,10 @@ const Dashboard = () => {
             }
         >
             <div className="flex flex-col gap-5" data-testid="wcct-dashboard">
-                <StatCards refreshing={ refreshing } />
+                <StatCards
+                    refreshing={ refreshing }
+                    lastDoctorRun={ doctor?.ran_ago ?? '' }
+                />
 
                 <div className="grid grid-cols-[2fr_1fr] items-start gap-4 max-[1100px]:grid-cols-1">
                     <Card>
@@ -151,42 +173,10 @@ const Dashboard = () => {
                         </CardContent>
                     </Card>
 
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>
-                                <h2 className="m-0 text-base font-medium">
-                                    { __(
-                                        'Tracking Doctor',
-                                        'woocommerce-conversion-tracking'
-                                    ) }
-                                </h2>
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent className="flex flex-col items-start gap-3">
-                            { refreshing ? (
-                                <CardSkeleton />
-                            ) : (
-                                <>
-                                    <p className="m-0 text-[13px] text-muted-foreground">
-                                        { __(
-                                            'Want us to check your store for duplicate or broken tracking? Takes a few seconds and changes nothing.',
-                                            'woocommerce-conversion-tracking'
-                                        ) }
-                                    </p>
-                                    <Button
-                                        nativeButton={ false }
-                                        // eslint-disable-next-line jsx-a11y/anchor-has-content -- the button renders the label inside.
-                                        render={ <a href="#/doctor" /> }
-                                    >
-                                        { __(
-                                            'Check my store',
-                                            'woocommerce-conversion-tracking'
-                                        ) }
-                                    </Button>
-                                </>
-                            ) }
-                        </CardContent>
-                    </Card>
+                    <DoctorCard
+                        report={ doctor }
+                        loading={ refreshing || doctorLoading }
+                    />
                 </div>
 
                 <section

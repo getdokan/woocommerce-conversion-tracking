@@ -2,7 +2,8 @@
 /**
  * Runs a list of wcct/v1 REST steps as given users and returns each result. Runs in a test store process (see WCCT_Test_Rest_Case, REST/RoutesTest).
  *
- * Steps: [ 'request', method, path, body|null, user ], [ 'option', name ], [ 'set_option', name, value|null ].
+ * Steps: [ 'request', method, path, body|null, user ], [ 'option', name ], [ 'set_option', name, value|null ], [ 'action', hook, arg ],
+ * [ 'shutdown', class ] (runs that class's shutdown callbacks, returns how many), [ 'global', name ].
  * Users: admin, shop_manager, customer, subscriber, seller, logged_out. A string '{term:slug}' in a body becomes that product category's ID.
  */
 
@@ -53,6 +54,33 @@ $wcct_results = array();
 foreach ( $GLOBALS['wcct_job']['steps'] as $wcct_step ) {
     if ( 'option' === $wcct_step[0] ) {
         $wcct_results[] = get_option( $wcct_step[1], null );
+        continue;
+    }
+
+    if ( 'action' === $wcct_step[0] ) {
+        do_action( $wcct_step[1], $wcct_step[2] );
+        $wcct_results[] = null;
+        continue;
+    }
+
+    if ( 'shutdown' === $wcct_step[0] ) {
+        $wcct_ran = 0;
+
+        foreach ( isset( $GLOBALS['wp_filter']['shutdown'] ) ? $GLOBALS['wp_filter']['shutdown']->callbacks : array() as $wcct_callbacks ) {
+            foreach ( $wcct_callbacks as $wcct_callback ) {
+                if ( is_array( $wcct_callback['function'] ) && $wcct_callback['function'][0] instanceof $wcct_step[1] ) {
+                    call_user_func( $wcct_callback['function'] );
+                    ++$wcct_ran;
+                }
+            }
+        }
+
+        $wcct_results[] = $wcct_ran;
+        continue;
+    }
+
+    if ( 'global' === $wcct_step[0] ) {
+        $wcct_results[] = isset( $GLOBALS[ $wcct_step[1] ] ) ? $GLOBALS[ $wcct_step[1] ] : null;
         continue;
     }
 

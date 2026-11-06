@@ -82,3 +82,42 @@ add_filter(
         );
     }
 );
+
+// Tracking Doctor: the ct_e2e_doctor cookie registers a sample check that finds a duplicate plugin named by the cookie
+// (the name is its evidence) and one whose action asks for confirmation; ct_e2e_consent=on turns consent mode on.
+add_filter(
+    'wcct_doctor_checks',
+    static function ( $checks ) {
+        if ( ! isset( $_COOKIE['ct_e2e_doctor'] ) || ! class_exists( '\StorePulse\ConversionTracking\Doctor\AbstractCheck' ) ) {
+            return $checks;
+        }
+
+        if ( ! class_exists( 'CT_E2E_Doctor_Check' ) ) {
+            require __DIR__ . '/ct-e2e/doctor-checks.php';
+        }
+
+        $checks[] = CT_E2E_Doctor_Check::class;
+        $checks[] = CT_E2E_Doctor_Confirm_Check::class;
+
+        return $checks;
+    }
+);
+
+add_filter(
+    'wcct_consent_mode_enabled',
+    static function ( $enabled ) {
+        return isset( $_COOKIE['ct_e2e_consent'] ) ? 'on' === $_COOKIE['ct_e2e_consent'] : $enabled;
+    }
+);
+
+// /wp-admin/?ct_e2e_doctor_reset=1 forgets every Doctor run, dismissal and badge.
+add_action(
+    'admin_init',
+    static function () {
+        if ( isset( $_GET['ct_e2e_doctor_reset'] ) && current_user_can( 'manage_options' ) ) {
+            delete_option( 'wcct_doctor_results' );
+            delete_option( 'wcct_doctor_dismissed' );
+            delete_option( 'wcct_doctor_new' );
+        }
+    }
+);

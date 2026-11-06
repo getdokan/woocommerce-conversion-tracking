@@ -21,6 +21,7 @@ The store runs in Docker with [wp-env](https://www.npmjs.com/package/@wordpress/
 `specs/settings.spec.ts` covers Settings > Integration access and Settings > Plan. On Free (no Pro mapped) it checks the locked access preview, the plan comparison with no price, and that every Upgrade, See pricing, Compare plans and plugins-list Get PRO link opens the WooCommerce.com product page. With Pro it checks Manage subscription, the confirmation before a role is granted (Cancel and Escape leave it off), the save, the Dokan vendor warning, and that a granted shop manager (`ct_e2e_shop_manager` / `password`, seeded by setup) sees the list read-only and gets 403 from the access route. Run it once without and once with Pro to cover both.
 
 `specs/version-guard.spec.ts` reads the Pro state the app gets: with a Pro older than 3.0 mapped in (Pro 1.1.4), it checks the Update Pro notice, that Settings > Plan and the top bar show Pro as paused, and that the old catalog feed still returns the CSV; otherwise that no notice shows. Setup and the specs count Pro only when it is 3.0 or later, so the whole suite also runs with Pro 1.1.4 mapped in: old Pro stays paused and Free's own tags must pass unchanged.
+`specs/doctor.spec.ts` covers the Tracking Doctor: the first visit runs the checks ("Everything looks good", Working collapsed), findings first with Dismiss and Undo, a changed finding coming back, Check again on one finding, the confirmation before an action that opens another plugin, and the dashboard's "Doctor found something new" after Hello Dolly is activated. Its sample checks (`mu-plugins/ct-e2e/doctor-checks.php`) are registered only with the `ct_e2e_doctor` cookie; `ct_e2e_consent=on|off` sets consent mode and `/wp-admin/?ct_e2e_doctor_reset=1` forgets every run.
 
 ## Run it locally
 
@@ -64,6 +65,7 @@ The tracker serves small stand-ins for `fbevents.js`, `gtag.js`, X's `uwt.js` an
 | `.wp-env.json` | The store. WordPress and WooCommerce versions are pinned here; CI uses the current releases unless asked for the pinned ones. |
 | `setup/` | Seeding, run inside the wp-env cli container. |
 | `mu-plugins/ct-e2e-helpers.php` | Test-site helpers: the `ct_e2e_checkout=classic` cookie makes the shortcode page the checkout page, the `ct_e2e_custom_scripts` cookie turns on the Custom script placements, and wordpress.org calls are blocked. |
+| `mu-plugins/ct-e2e/doctor-checks.php` | Sample Tracking Doctor checks, loaded by the helpers when the `ct_e2e_doctor` cookie is set. |
 | `mu-plugins/ct-e2e-page-cache.php` | With the `ct_e2e_page_cache` cookie, caches logged-out GET pages per URL and serves them to every browser (`X-CT-Cache: HIT`); `/?ct_e2e_page_cache_flush=1` empties it. |
 | `config/test-ids.json` | Test IDs. A tag listed here is enabled in the store and must send a Purchase hit. |
 | `utils/fixtures.ts` | `test` and `expect` with the `tracker` and `jsErrors` fixtures. Import these in every spec. |

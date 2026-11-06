@@ -20,10 +20,17 @@ const TONES = {
 /**
  * The four 24-hour stat cards, empty until the metrics route fills them.
  *
- * @param {Object}  props            Component props.
- * @param {boolean} props.refreshing Show skeletons.
+ * @param {Object}  props               Component props.
+ * @param {boolean} props.refreshing    Show skeletons.
+ * @param {string}  props.lastDoctorRun When the Doctor last ran, for example "2 days ago"; empty before the first run.
  */
-export const StatCards = ( { refreshing }: { refreshing: boolean } ) => {
+export const StatCards = ( {
+    refreshing,
+    lastDoctorRun,
+}: {
+    refreshing: boolean;
+    lastDoctorRun: string;
+} ) => {
     const empty = '–';
     const cards = [
         {
@@ -51,7 +58,9 @@ export const StatCards = ( { refreshing }: { refreshing: boolean } ) => {
             id: 'doctor',
             icon: Stethoscope,
             tone: TONES.off,
-            value: __( 'Not yet', 'woocommerce-conversion-tracking' ),
+            value:
+                lastDoctorRun ||
+                __( 'Not yet', 'woocommerce-conversion-tracking' ),
             label: __( 'Last Doctor run', 'woocommerce-conversion-tracking' ),
         },
     ];

@@ -16,15 +16,16 @@ abstract class WCCT_Test_Rest_Case extends TestCase {
     /**
      * Run steps (see jobs/rest-requests.php) and return one result per step.
      *
-     * @param array $steps Steps.
+     * @param array  $steps Steps.
+     * @param string $job   Job file under jobs/ that ends in rest-requests.php.
      *
      * @return array
      */
-    protected function rest( array $steps ) {
+    protected function rest( array $steps, $job = 'rest-requests' ) {
         $result = WCCT_Test_WP::run(
             array(
                 'type'     => 'file',
-                'file'     => dirname( __DIR__ ) . '/jobs/rest-requests.php',
+                'file'     => dirname( __DIR__ ) . '/jobs/' . $job . '.php',
                 'steps'    => $steps,
                 'rollback' => true,
             )
