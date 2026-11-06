@@ -201,7 +201,8 @@ class PageOutputTest extends WCCT_Test_Page_Case {
     public function test_google_configs_clean_the_page_location() {
         $head = $this->output_of( $this->request( 'all', 'home' ) );
 
-        $this->assertStringContainsString( "gtag('config', 'AW-123456789', (function (cleanUrl) {", $head );
-        $this->assertStringContainsString( "wcctGtag('config', \"G-CTTEST1234\", (function (cleanUrl) {", $head );
+        $this->assertStringContainsString( "wcctGtag('config', \"G-CTTEST1234\", pageConfig());", $head );
+        $this->assertStringContainsString( "wcctGtag('config', \"AW-123456789\", pageConfig());", $head );
+        $this->assertStringContainsString( '})(function () { return (function (cleanUrl) {', $head );
     }
 }

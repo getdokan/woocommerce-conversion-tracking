@@ -55,7 +55,7 @@ class EventFactory {
      * Search event.
      *
      * @param string $search_string What the visitor searched for.
-     * @param string $post_type     Post type searched, empty for all.
+     * @param string|array $post_type Post type searched, empty for all; a list when the query var is an array.
      *
      * @return Event
      */
@@ -66,6 +66,15 @@ class EventFactory {
                 'data' => array(
                     'search_string' => (string) $search_string,
                     'post_type'     => is_string( $post_type ) ? $post_type : '',
+                    // Every post type searched, also when the query var is an array.
+                    'post_types'    => array_values(
+                        array_filter(
+                            (array) $post_type,
+                            function ( $type ) {
+                                return is_string( $type ) && '' !== $type;
+                            }
+                        )
+                    ),
                 ),
             )
         );

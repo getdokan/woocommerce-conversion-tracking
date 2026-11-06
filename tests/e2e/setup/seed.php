@@ -123,6 +123,8 @@ $ct_e2e_settings = array(
                 'add_to_cart'    => 'on',
                 'begin_checkout' => 'on',
                 'purchase'       => 'on',
+                'search'         => 'on',
+                'sign_up'        => 'on',
             ),
         ),
     ),
@@ -160,6 +162,11 @@ if ( is_plugin_active( 'wc-conversion-tracking-pro/woocommerce-conversion-tracki
         'checkout_event_id' => $ct_e2e_checkout_ids['xCheckoutEventId'],
         'Registration'      => 'on',
         'signup_event_id'   => 'tw-cte2x-ctreg',
+    );
+    // Google Registration is an Ads conversion with its own label (#87).
+    $ct_e2e_settings['adwords'][0]['events'] += array(
+        'Registration'       => 'on',
+        'registration-label' => $ct_e2e_ids['ads']['registrationLabel'],
     );
     $ct_e2e_settings['bing_ads'] = array(
         'enabled' => true,

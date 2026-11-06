@@ -9,7 +9,7 @@
 class WCCT_GA4_Data {
 
     /**
-     * Clean a measurement ID and return it only if it is a valid GA4 ID
+     * Clean a measurement ID and return it only if it is a valid GA4 ID (G-) or Google tag ID (GT-)
      *
      * @param  mixed $measurement_id
      *
@@ -22,7 +22,7 @@ class WCCT_GA4_Data {
 
         $measurement_id = strtoupper( trim( $measurement_id ) );
 
-        if ( ! preg_match( '/^G-[A-Z0-9]{4,20}$/', $measurement_id ) ) {
+        if ( ! preg_match( '/^GT?-[A-Z0-9]{4,20}$/', $measurement_id ) ) {
             return '';
         }
 
@@ -180,6 +180,23 @@ class WCCT_GA4_Data {
         $transaction_id = is_scalar( $order_number ) ? trim( (string) $order_number ) : '';
 
         return '' !== $transaction_id ? $transaction_id : (string) abs( (int) $order_id );
+    }
+
+    /**
+     * Parameters for the search event; the term is capped at GA4's 100 characters
+     *
+     * @param  string $send_to
+     * @param  string $search_term
+     *
+     * @return array
+     */
+    public static function search_params( $send_to, $search_term ) {
+        $search_term = trim( (string) $search_term );
+
+        return array(
+            'send_to'     => (string) $send_to,
+            'search_term' => function_exists( 'mb_substr' ) ? mb_substr( $search_term, 0, 100 ) : substr( $search_term, 0, 100 ),
+        );
     }
 
     /**

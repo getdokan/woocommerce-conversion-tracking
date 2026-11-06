@@ -5,6 +5,7 @@ use StorePulse\ConversionTracking\Events\EventFactory;
 use StorePulse\ConversionTracking\Events\PurchaseConfirmation;
 use StorePulse\ConversionTracking\Events\PurchaseGate;
 use StorePulse\ConversionTracking\Events\ValueMode;
+use StorePulse\ConversionTracking\Platforms\GoogleTag;
 
 /**
  * Abstract Class
@@ -480,6 +481,30 @@ abstract class WCCT_Integration {
      */
     protected function get_content_ids_from_cart( $cart ) {
         return \StorePulse\ConversionTracking\Events\ProductId::for_cart( $cart, $this->id );
+    }
+
+    /**
+     * gtag config IDs this integration adds to the shared Google tag; empty for none
+     *
+     * @return string[]
+     */
+    public function get_gtag_ids() {
+        return array();
+    }
+
+    /**
+     * Print the shared Google tag once per page: one loader, then one config per ID of every active integration
+     *
+     * @return void
+     */
+    protected function print_google_tag() {
+        $integrations = function_exists( 'wcct_init' ) && isset( wcct_init()->manager ) ? wcct_init()->manager->get_active_integrations() : array();
+
+        if ( ! in_array( $this, $integrations, true ) ) {
+            $integrations[] = $this;
+        }
+
+        GoogleTag::print_once( $integrations );
     }
 
     /**

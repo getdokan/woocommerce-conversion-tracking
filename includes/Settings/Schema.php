@@ -402,8 +402,8 @@ class Schema {
                 'measurement_id',
                 __( 'Analytics Measurement ID', 'woocommerce-conversion-tracking' ),
                 __( 'Starts with G-', 'woocommerce-conversion-tracking' ),
-                __( 'Measurement IDs start with G- followed by letters and numbers. Find it under Admin, then Data streams.', 'woocommerce-conversion-tracking' ),
-                '^G-[A-Z0-9]+$',
+                __( 'Measurement IDs start with G- followed by letters and numbers. Find it under Admin, then Data streams. A GT- Google tag ID works too. Avoid double counting: if this GA4 property is already a destination of your Google Ads tag, remove that destination or turn on "Ignore duplicate instances of on-page configuration" in your Google tag settings.', 'woocommerce-conversion-tracking' ),
+                '^GT?-[A-Z0-9]+$',
                 20,
                 array(
                     'case'         => 'upper',
@@ -442,7 +442,7 @@ class Schema {
                     self::event( 'begin_checkout', __( 'Start checkout', 'woocommerce-conversion-tracking' ), __( 'Analytics begin_checkout, classic and block checkout.', 'woocommerce-conversion-tracking' ), array( 'recommended' => true ) ),
                     self::event( 'purchase', __( 'Purchase', 'woocommerce-conversion-tracking' ), __( 'Analytics purchase and the Ads conversion, once per order.', 'woocommerce-conversion-tracking' ), array( 'recommended' => true ) ),
                     self::event( 'search', __( 'Search', 'woocommerce-conversion-tracking' ), __( 'Analytics search on store search results.', 'woocommerce-conversion-tracking' ) ),
-                    self::event( 'sign_up', __( 'Registration', 'woocommerce-conversion-tracking' ), __( 'Counted as an Ads conversion when a shopper creates an account.', 'woocommerce-conversion-tracking' ), array( 'pro' => true ) ),
+                    self::event( 'sign_up', __( 'Registration', 'woocommerce-conversion-tracking' ), __( 'Analytics sign_up when a shopper creates an account; with a Registration conversion label (Pro), also an Ads conversion.', 'woocommerce-conversion-tracking' ) ),
                 )
             ),
             self::section( 'google', 'google_advanced', __( 'Advanced settings', 'woocommerce-conversion-tracking' ), array( 'collapsible' => true, 'collapsed' => true ) ),
@@ -451,7 +451,7 @@ class Schema {
                 'tag_id',
                 __( 'Google tag ID (optional)', 'woocommerce-conversion-tracking' ),
                 __( 'Starts with GT-', 'woocommerce-conversion-tracking' ),
-                __( 'Only if your Analytics stream uses a combined Google tag. Leave empty to use the G- ID above.', 'woocommerce-conversion-tracking' ),
+                __( 'Only if your Analytics stream uses a combined Google tag. Leave empty to use the G- ID above. The Google tag must include this GA4 stream as a destination; events are still sent to the G- ID. Avoid double counting: don\'t also add this GA4 property as a destination of your Google Ads tag.', 'woocommerce-conversion-tracking' ),
                 '^GT-[A-Z0-9]+$',
                 10,
                 array( 'case' => 'upper' )

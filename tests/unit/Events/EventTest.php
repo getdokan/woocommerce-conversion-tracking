@@ -2,6 +2,7 @@
 
 use PHPUnit\Framework\TestCase;
 use StorePulse\ConversionTracking\Events\Event;
+use StorePulse\ConversionTracking\Events\EventFactory;
 
 /**
  * Tests for the Event value object
@@ -117,6 +118,13 @@ class EventTest extends TestCase {
         $this->assertSame( 'shoes', $event->get( 'search_string' ) );
         $this->assertSame( 'none', $event->get( 'missing', 'none' ) );
         $this->assertSame( array(), $event->get_user_data() );
+    }
+
+    public function test_search_keeps_every_post_type_searched() {
+        $this->assertSame( array( 'product' ), EventFactory::search( 'hat', 'product' )->get( 'post_types' ) );
+        $this->assertSame( array( 'product', 'post' ), EventFactory::search( 'hat', array( 'product', 'post' ) )->get( 'post_types' ) );
+        $this->assertSame( '', EventFactory::search( 'hat', array( 'product' ) )->get( 'post_type' ) );
+        $this->assertSame( array(), EventFactory::search( 'hat' )->get( 'post_types' ) );
     }
 
     public function test_bad_args_do_not_break_the_event() {

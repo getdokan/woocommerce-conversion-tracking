@@ -7,7 +7,7 @@ use StorePulse\ConversionTracking\Events\EventFactory;
 use StorePulse\ConversionTracking\Events\PurchaseConfirmation;
 use StorePulse\ConversionTracking\Events\PurchaseGate;
 use StorePulse\ConversionTracking\Events\SentFlags;
-use StorePulse\ConversionTracking\Privacy\OrderUrl;
+use StorePulse\ConversionTracking\Platforms\GoogleTag;
 
 /**
  * Google Analytics 4 integration
@@ -38,6 +38,15 @@ class WCCT_Integration_GA4 extends WCCT_Integration {
      * @var string
      */
     const PURCHASE_SENT_ACTION = 'wcct_ga4_purchase_sent';
+
+    /**
+     * GA4 event names => the google platform's event switches, when they differ
+     *
+     * @var array
+     */
+    const EVENT_SWITCHES = array(
+        'view_item' => 'view_product',
+    );
 
     /**
      * Saved measurement ID for this request, see get_measurement_id()
@@ -72,14 +81,14 @@ class WCCT_Integration_GA4 extends WCCT_Integration {
         $help = sprintf(
             /* translators: 1: example measurement ID, 2: Google help link */
             __( 'Your GA4 Measurement ID, for example %1$s. Find it in Google Analytics under Admin &rarr; Data streams &rarr; your web stream. <a href="%2$s" target="_blank">Learn more</a>.', 'woocommerce-conversion-tracking' ),
-            '<code>G-XXXXXXXXXX</code>',
+            '<code>G-XXXXXXXXXX</code> or <code>GT-XXXXXXX</code>',
             'https://support.google.com/analytics/answer/12270356'
         );
 
         $help .= '<br><br>' . __( '<strong>Avoid double counting:</strong> if this GA4 property is already a destination of the Google tag you use for Google Ads (Google tag settings &rarr; Destinations), page views can be counted twice. Remove that destination, or turn on "Ignore duplicate instances of on-page configuration" in your Google tag settings.', 'woocommerce-conversion-tracking' );
 
         if ( $this->is_enabled() && '' === $this->get_measurement_id() ) {
-            $help .= '<br><br><strong>' . __( 'The saved Measurement ID is missing or invalid, so nothing is sent to Google Analytics. Only IDs that start with G- are accepted.', 'woocommerce-conversion-tracking' ) . '</strong>';
+            $help .= '<br><br><strong>' . __( 'The saved Measurement ID is missing or invalid, so nothing is sent to Google Analytics. Only IDs that start with G- or GT- are accepted.', 'woocommerce-conversion-tracking' ) . '</strong>';
         }
 
         $settings = array(
@@ -101,6 +110,8 @@ class WCCT_Integration_GA4 extends WCCT_Integration {
                     'add_to_cart'    => __( 'Add to Cart', 'woocommerce-conversion-tracking' ),
                     'begin_checkout' => __( 'Begin Checkout', 'woocommerce-conversion-tracking' ),
                     'purchase'       => __( 'Purchase', 'woocommerce-conversion-tracking' ),
+                    'search'         => __( 'Search', 'woocommerce-conversion-tracking' ),
+                    'sign_up'        => __( 'Sign up', 'woocommerce-conversion-tracking' ),
                 ),
             ),
         );
@@ -137,7 +148,7 @@ class WCCT_Integration_GA4 extends WCCT_Integration {
                     array(
                         'message' => sprintf(
                             /* translators: %s: the rejected measurement ID */
-                            __( 'Google Analytics 4: "%s" is not a valid Measurement ID. Use the ID that starts with G-, for example G-XXXXXXXXXX. Settings were not saved.', 'woocommerce-conversion-tracking' ),
+                            __( 'Google Analytics 4: "%s" is not a valid Measurement ID. Use the ID that starts with G- or GT-, for example G-XXXXXXXXXX. Settings were not saved.', 'woocommerce-conversion-tracking' ),
                             sanitize_text_field( wp_unslash( $raw_id ) )
                         ),
                     )
@@ -151,32 +162,51 @@ class WCCT_Integration_GA4 extends WCCT_Integration {
     }
 
     /**
-     * Enqueue script
+     * Whether GA4 is on in the google platform settings (mode Analytics or Both with a measurement ID) and not paused
      *
-     * The gtag.js loader is shared with the other gtag integrations, see
-     * WCCT_Integration::print_gtag_loader().
+     * @return boolean
+     */
+    public function is_active() {
+        return ! empty( GoogleTag::settings( $this->id )['enabled'] ) && ! $this->is_paused();
+    }
+
+    /**
+     * Whether a GA4 event is switched on in the google platform settings
      *
-     * Order parameters are removed from the page location and referrer, see OrderUrl.
+     * @param  string $event GA4 event name, or the platform event name.
+     *
+     * @return boolean
+     */
+    public function event_enabled( $event ) {
+        $event = isset( self::EVENT_SWITCHES[ $event ] ) ? self::EVENT_SWITCHES[ $event ] : $event;
+
+        return in_array( $event, GoogleTag::settings( $this->id )['events'], true );
+    }
+
+    /**
+     * Config ID for the shared Google tag: the Google tag ID when set, else the measurement ID
+     *
+     * @return string[]
+     */
+    public function get_gtag_ids() {
+        if ( ! $this->is_tracking_page() ) {
+            return array();
+        }
+
+        $tag_id = GoogleTag::tag_id( GoogleTag::settings( $this->id )['tag_id'] ?? '' );
+
+        return array( '' !== $tag_id ? $tag_id : $this->get_measurement_id() );
+    }
+
+    /**
+     * Print the shared Google tag, see GoogleTag; order parameters are removed from the page location and referrer, see OrderUrl
      *
      * @return void
      */
     public function enqueue_script() {
-        if ( ! $this->is_tracking_page() ) {
-            return;
+        if ( $this->is_tracking_page() ) {
+            $this->print_google_tag();
         }
-
-        $measurement_id = $this->get_measurement_id();
-        $loader_printed = $this->print_gtag_loader( $measurement_id );
-        ?>
-        <script>
-            window.dataLayer = window.dataLayer || [];
-            window.wcctGtag = window.wcctGtag || function () { window.dataLayer.push(arguments); };
-            <?php if ( $loader_printed ) { ?>
-            wcctGtag('js', new Date());
-            <?php } ?>
-            wcctGtag('config', <?php echo $this->encode( $measurement_id ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>, <?php echo OrderUrl::page_config_js(); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>);
-        </script>
-        <?php
     }
 
     /**
@@ -252,6 +282,24 @@ class WCCT_Integration_GA4 extends WCCT_Integration {
                 $events[] = array( 'view_item', $this->get_event_params( array( $this->get_product_item( $page_event->get_product(), 1 ) ) ) );
             }
 
+            if ( Event::SEARCH === $page_event->get_name() && $this->event_allowed( 'search' ) ) {
+                $params = $this->get_search_params( $page_event );
+
+                if ( $params ) {
+                    $events[] = array( 'search', $params );
+                }
+            }
+
+            if ( Event::SIGN_UP === $page_event->get_name() && $this->event_allowed( 'sign_up' ) ) {
+                $events[] = array(
+                    'sign_up',
+                    array(
+                        'send_to' => $this->get_measurement_id(),
+                        'method'  => 'WooCommerce',
+                    ),
+                );
+            }
+
             if ( Event::BEGIN_CHECKOUT === $page_event->get_name() && $this->event_allowed( 'begin_checkout' ) ) {
                 $params = $this->get_begin_checkout_params();
 
@@ -318,6 +366,23 @@ class WCCT_Integration_GA4 extends WCCT_Integration {
             })();
         <?php
         return trim( ob_get_clean() );
+    }
+
+    /**
+     * Search parameters for a store (product) search with a search term
+     *
+     * @param Event $event Search event.
+     *
+     * @return array|false
+     */
+    private function get_search_params( $event ) {
+        $term = $event->get( 'search_string', '' );
+
+        if ( ! in_array( 'product', (array) $event->get( 'post_types', array() ), true ) || ! is_string( $term ) || '' === trim( $term ) ) {
+            return false;
+        }
+
+        return WCCT_GA4_Data::search_params( $this->get_measurement_id(), $term );
     }
 
     /**
@@ -543,9 +608,9 @@ class WCCT_Integration_GA4 extends WCCT_Integration {
      */
     private function get_measurement_id() {
         if ( null === $this->measurement_id ) {
-            $settings = $this->get_integration_settings();
+            $settings = GoogleTag::settings( $this->id );
 
-            $this->measurement_id = WCCT_GA4_Data::sanitize_measurement_id( isset( $settings[0]['measurement_id'] ) ? $settings[0]['measurement_id'] : '' );
+            $this->measurement_id = WCCT_GA4_Data::sanitize_measurement_id( isset( $settings['measurement_id'] ) ? $settings['measurement_id'] : '' );
         }
 
         return $this->measurement_id;

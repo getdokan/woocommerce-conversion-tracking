@@ -563,13 +563,16 @@ window.wcctConsentConfig = {"api":false,"bridge":false,"cookiePrefix":"wp_consen
             })(window, document);
         </script>
         <script data-no-optimize="1">if (window.wcctConsent) { window.wcctConsent.wrap("wcfbq", "marketing"); }</script>
-        <script async src="https://www.googletagmanager.com/gtag/js?id=AW-123456789"></script>
-                <script>
-            window.dataLayer = window.dataLayer || [];
-            function gtag(){dataLayer.push(arguments)};
-                        gtag('js', new Date());
-            
-            gtag('config', 'AW-123456789', (function (cleanUrl) {
+<script async data-no-optimize="1" data-cfasync="false" src="https://www.googletagmanager.com/gtag/js?id=G-CTTEST1234"></script>
+<script data-no-optimize="1" data-cfasync="false">
+window.dataLayer = window.dataLayer || [];
+window.wcctGtag = window.wcctGtag || function () { window.dataLayer.push(arguments); };
+window.gtag = window.gtag || window.wcctGtag;
+wcctGtag('js', new Date());
+(function (pageConfig) {
+    wcctGtag('config', "G-CTTEST1234", pageConfig());
+    wcctGtag('config', "AW-123456789", pageConfig());
+})(function () { return (function (cleanUrl) {
                 var config = {};
                 var pageLocation = cleanUrl(window.location.href);
                 if (pageLocation != window.location.href) config.page_location = pageLocation;
@@ -600,48 +603,12 @@ window.wcctConsentConfig = {"api":false,"bridge":false,"cookiePrefix":"wp_consen
                     } catch (e) {
                         return String(url).split('?')[0];
                     }
-                }));
-        </script>
-        <script data-no-optimize="1">!function(e){if(!e.twq){var s=e.twq=function(){s.exe?s.exe.apply(s,arguments):s.queue.push(arguments);};s.version='1.1';s.queue=[];}}(window);if (window.wcctConsent) { window.wcctConsent.script("marketing", "https://static.ads-twitter.com/uwt.js"); }</script>
+                }); });
+</script>
+<script data-no-optimize="1">!function(e){if(!e.twq){var s=e.twq=function(){s.exe?s.exe.apply(s,arguments):s.queue.push(arguments);};s.version='1.1';s.queue=[];}}(window);if (window.wcctConsent) { window.wcctConsent.script("marketing", "https://static.ads-twitter.com/uwt.js"); }</script>
         <script type="text/javascript">
             !function(e,t,n,s,u,a){e.twq||(s=e.twq=function(){s.exe?s.exe.apply(s,arguments):s.queue.push(arguments);},s.version='1.1',s.queue=[],u=t.createElement(n),u.async=!0,u.src='https://static.ads-twitter.com/uwt.js',a=t.getElementsByTagName(n)[0],a.parentNode.insertBefore(u,a))}(window,document,'script');
             twq('config', "ct0x1");
-        </script>
-                <script>
-            window.dataLayer = window.dataLayer || [];
-            window.wcctGtag = window.wcctGtag || function () { window.dataLayer.push(arguments); };
-                        wcctGtag('config', "G-CTTEST1234", (function (cleanUrl) {
-                var config = {};
-                var pageLocation = cleanUrl(window.location.href);
-                if (pageLocation != window.location.href) config.page_location = pageLocation;
-                if (document.referrer) {
-                    var referrer = cleanUrl(document.referrer);
-                    if (referrer != document.referrer) config.page_referrer = referrer;
-                }
-                return config;
-            })(function (url) {
-                    var names = ["key","order","order_id","order-pay","order_key"], numeric = ["order"];
-                    try {
-                        url = String(url);
-                        var hashPos = url.indexOf('#');
-                        var hash = hashPos > -1 ? url.substring(hashPos) : '';
-                        var base = hashPos > -1 ? url.substring(0, hashPos) : url;
-                        var queryPos = base.indexOf('?');
-                        if (queryPos == -1) return url;
-                        var pairs = base.substring(queryPos + 1).split('&'), kept = [];
-                        for (var i = 0; i < pairs.length; i++) {
-                            var pair = pairs[i];
-                            try { pair = decodeURIComponent(pair.replace(/\+/g, ' ')); } catch (e) {}
-                            pair = pair.toLowerCase();
-                            var name = pair.split('=')[0], value = pair.substring(name.length + 1);
-                            var drop = names.indexOf(name) > -1 && (numeric.indexOf(name) == -1 || /^\d+$/.test(value));
-                            if (!drop && pair.indexOf('wc_order_') == -1) kept.push(pairs[i]);
-                        }
-                        return base.substring(0, queryPos) + (kept.length ? '?' + kept.join('&') : '') + hash;
-                    } catch (e) {
-                        return String(url).split('?')[0];
-                    }
-                }));
         </script>
         <!-- End: Conversion Tracking for WooCommerce Codes -->
 
@@ -721,7 +688,7 @@ window.wcctPurchaseSent("{home}/wp-admin/admin-ajax.php", "custom", 3001, "wc_or
     "extra": {
         "after": [
             false,
-            "window.wcctPurchaseSent = window.wcctPurchaseSent || function (url, platform, orderId, key) {\n    var sent = window.wcctPurchaseSent, all = sent.all = sent.all || {}, id = platform + \":\" + orderId;\n    if (all[id]) return all[id];\n    var done = false;\n    var confirm = all[id] = function () {\n        if (done) return;\n        done = true;\n        var body = new FormData();\n        body.append(\"action\", \"wcct_purchase_sent\");\n        body.append(\"platform\", platform);\n        body.append(\"order_id\", orderId);\n        body.append(\"key\", key);\n        if (navigator.sendBeacon && navigator.sendBeacon(url, body)) return;\n        var xhr = new XMLHttpRequest();\n        xhr.open(\"POST\", url);\n        xhr.send(body);\n    };\n    confirm.when = function (check, category) {\n        var consent = window.wcctConsent, tries = Math.ceil(30000 / 250);\n        var allowed = function () { return !category || !consent || !consent.allows || consent.allows(category); };\n        (function poll() {\n            if (done) return;\n            var ready = false;\n            try { ready = allowed() && !!check(); } catch (e) {}\n            if (ready) return confirm();\n            if (!allowed() && consent.when) return consent.when(category, function () { tries = Math.ceil(30000 / 250); poll(); });\n            if (--tries > 0) setTimeout(poll, 250);\n        })();\n    };\n    return confirm;\n};\ngtag('event', 'conversion', {\n    \"send_to\": \"AW-123456789/CtPurchaseLabel\",\n    \"transaction_id\": 3001,\n    \"value\": \"78.00\",\n    \"currency\": \"USD\",\n    \"event_callback\": window.wcctPurchaseSent(\"{home}/wp-admin/admin-ajax.php\", \"adwords\", 3001, \"wc_order_ctguest0001\"),\n    \"event_timeout\": 60000\n});\n"
+            "window.wcctPurchaseSent = window.wcctPurchaseSent || function (url, platform, orderId, key) {\n    var sent = window.wcctPurchaseSent, all = sent.all = sent.all || {}, id = platform + \":\" + orderId;\n    if (all[id]) return all[id];\n    var done = false;\n    var confirm = all[id] = function () {\n        if (done) return;\n        done = true;\n        var body = new FormData();\n        body.append(\"action\", \"wcct_purchase_sent\");\n        body.append(\"platform\", platform);\n        body.append(\"order_id\", orderId);\n        body.append(\"key\", key);\n        if (navigator.sendBeacon && navigator.sendBeacon(url, body)) return;\n        var xhr = new XMLHttpRequest();\n        xhr.open(\"POST\", url);\n        xhr.send(body);\n    };\n    confirm.when = function (check, category) {\n        var consent = window.wcctConsent, tries = Math.ceil(30000 / 250);\n        var allowed = function () { return !category || !consent || !consent.allows || consent.allows(category); };\n        (function poll() {\n            if (done) return;\n            var ready = false;\n            try { ready = allowed() && !!check(); } catch (e) {}\n            if (ready) return confirm();\n            if (!allowed() && consent.when) return consent.when(category, function () { tries = Math.ceil(30000 / 250); poll(); });\n            if (--tries > 0) setTimeout(poll, 250);\n        })();\n    };\n    return confirm;\n};\n(window.wcctGtag || function () { (window.dataLayer = window.dataLayer || []).push(arguments); })('event', 'conversion', {\n    \"send_to\": \"AW-123456789/CtPurchaseLabel\",\n    \"transaction_id\": 3001,\n    \"value\": \"78.00\",\n    \"currency\": \"USD\",\n    \"event_callback\": window.wcctPurchaseSent(\"{home}/wp-admin/admin-ajax.php\", \"adwords\", 3001, \"wc_order_ctguest0001\"),\n    \"event_timeout\": 60000\n});\n"
         ]
     }
 }

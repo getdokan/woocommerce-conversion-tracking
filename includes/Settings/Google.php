@@ -22,13 +22,15 @@ class Google {
     const ADS_EVENTS = array( 'purchase', 'sign_up' );
 
     /**
-     * 2.x ga4 event keys => platform events.
+     * 2.x ga4 event keys => platform events; search and sign_up are only saved by 3.0's 2.x-style settings page.
      */
     const V1_ANALYTICS_EVENTS = array(
         'view_item'      => 'view_product',
         'add_to_cart'    => 'add_to_cart',
         'begin_checkout' => 'begin_checkout',
         'purchase'       => 'purchase',
+        'search'         => 'search',
+        'sign_up'        => 'sign_up',
     );
 
     /**

@@ -15,7 +15,7 @@ class PurchaseOnceTest extends TestCase {
      */
     const MARKERS = array(
         'facebook' => "fbq('track', 'Purchase'",
-        'adwords'  => "gtag('event', 'conversion'",
+        'adwords'  => "})('event', 'conversion'",
         'ga4'      => '"purchase",{"send_to":"G-CTTEST1234"',
         'twitter'  => "twq('event', \"tw-ct0x1-ctpur\"",
         'custom'   => "ctCustom('purchase'",

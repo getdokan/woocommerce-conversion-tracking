@@ -1,26 +1,54 @@
 import { test, expect } from '../utils/fixtures';
 import { BASE_URL } from '../utils/site';
 import { GUEST, addProductToCart } from '../utils/checkout';
+import { loginAsAdmin } from '../utils/admin';
+import { NetworkTracker } from '../utils/network';
+import { TEST_IDS } from '../utils/platforms';
 
-const signUpHits = async (tracker: import('../utils/network').NetworkTracker) => (await tracker.eventHits('meta', 'CompleteRegistration')).length;
+const PRO_PLUGIN = 'wc-conversion-tracking-pro/woocommerce-conversion-tracking-pro.php';
+
+const signUpHits = async (tracker: NetworkTracker) => (await tracker.eventHits('meta', 'CompleteRegistration')).length;
+
+// GA4 sign_up, and with Pro the Ads conversion under the Registration label (#87).
+const ga4SignUps = async (tracker: NetworkTracker) => (await tracker.eventHits('ga4', 'sign_up')).length;
+const adsSignUps = async (tracker: NetworkTracker) => (await tracker.eventHits('ads', TEST_IDS.ads?.registrationLabel ?? '')).length;
+
+let proActive = false;
+
+test.beforeAll(async ({ browser }) => {
+    const page = await browser.newPage({ baseURL: BASE_URL });
+
+    await loginAsAdmin(page);
+    await page.goto('/wp-admin/plugins.php');
+    proActive = (await page.locator(`tr.active[data-plugin="${PRO_PLUGIN}"]`).count()) > 0;
+    await page.close();
+});
+
+// One Google sign-up per new account: GA4 sign_up, plus the Ads registration conversion with Pro.
+const expectGoogleSignUps = async (tracker: NetworkTracker) => {
+    await expect.poll(() => ga4SignUps(tracker), { message: 'GA4 sign_up hits' }).toBe(1);
+    await expect.poll(() => adsSignUps(tracker), { message: 'Ads registration conversions' }).toBe(proActive ? 1 : 0);
+};
 
 const uniqueEmail = (label: string) => `ct-${label}-${Date.now()}@example.com`;
 
-test('signing up on My account sends one CompleteRegistration', async ({ page, tracker }) => {
+test('signing up on My account sends one CompleteRegistration and one Google sign-up', async ({ page, tracker }) => {
     await page.goto('/my-account/');
     await page.locator('#reg_email').fill(uniqueEmail('account'));
     await page.locator('button[name="register"]').click();
     await expect(page.locator('.woocommerce-MyAccount-navigation')).toBeVisible();
 
     await expect.poll(() => signUpHits(tracker), { message: 'Meta CompleteRegistration hits' }).toBe(1);
+    await expectGoogleSignUps(tracker);
 
     // The flag is cleared: the next page view sends nothing.
     await page.goto('/shop/');
     await page.waitForLoadState('networkidle');
     expect(await signUpHits(tracker)).toBe(1);
+    await expectGoogleSignUps(tracker);
 });
 
-test('creating an account at checkout sends one CompleteRegistration', async ({ page, tracker }) => {
+test('creating an account at checkout sends one CompleteRegistration and one Google sign-up', async ({ page, tracker }) => {
     await page.context().addCookies([{ name: 'ct_e2e_checkout', value: 'classic', url: BASE_URL }]);
     await addProductToCart(page);
     await page.goto('/classic-checkout/');
@@ -39,8 +67,10 @@ test('creating an account at checkout sends one CompleteRegistration', async ({ 
     await page.waitForURL(/\/order-received\/\d+\//, { timeout: 30_000 });
 
     await expect.poll(() => signUpHits(tracker), { message: 'Meta CompleteRegistration hits' }).toBe(1);
+    await expectGoogleSignUps(tracker);
 
     await page.goto('/shop/');
     await page.waitForLoadState('networkidle');
     expect(await signUpHits(tracker)).toBe(1);
+    await expectGoogleSignUps(tracker);
 });

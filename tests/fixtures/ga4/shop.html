@@ -2,12 +2,15 @@
 <!-- page: is_shop -->
 <!-- head -->
 <!-- Starting: Conversion Tracking for WooCommerce (https://wordpress.org/plugins/woocommerce-conversion-tracking/) -->
-        <script async src="https://www.googletagmanager.com/gtag/js?id=G-CTTEST1234"></script>
-                <script>
-            window.dataLayer = window.dataLayer || [];
-            window.wcctGtag = window.wcctGtag || function () { window.dataLayer.push(arguments); };
-                        wcctGtag('js', new Date());
-                        wcctGtag('config', "G-CTTEST1234", (function (cleanUrl) {
+<script async data-no-optimize="1" data-cfasync="false" src="https://www.googletagmanager.com/gtag/js?id=G-CTTEST1234"></script>
+<script data-no-optimize="1" data-cfasync="false">
+window.dataLayer = window.dataLayer || [];
+window.wcctGtag = window.wcctGtag || function () { window.dataLayer.push(arguments); };
+window.gtag = window.gtag || window.wcctGtag;
+wcctGtag('js', new Date());
+(function (pageConfig) {
+    wcctGtag('config', "G-CTTEST1234", pageConfig());
+})(function () { return (function (cleanUrl) {
                 var config = {};
                 var pageLocation = cleanUrl(window.location.href);
                 if (pageLocation != window.location.href) config.page_location = pageLocation;
@@ -38,9 +41,9 @@
                     } catch (e) {
                         return String(url).split('?')[0];
                     }
-                }));
-        </script>
-        <!-- End: Conversion Tracking for WooCommerce Codes -->
+                }); });
+</script>
+<!-- End: Conversion Tracking for WooCommerce Codes -->
 
 <!-- body -->
 

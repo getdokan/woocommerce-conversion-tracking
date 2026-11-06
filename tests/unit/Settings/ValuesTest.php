@@ -205,7 +205,7 @@ class ValuesTest extends TestCase {
             case 'text':
                 $samples = array(
                     '^[0-9]{15,16}$'           => '123456789012345',
-                    '^G-[A-Z0-9]+$'            => 'G-ABC123',
+                    '^GT?-[A-Z0-9]+$'          => 'G-ABC123',
                     '^AW-[0-9]+$'              => 'AW-123456789',
                     '^[A-Za-z0-9_-]+$'         => 'AbC_label-1',
                     '^GT-[A-Z0-9]+$'           => 'GT-ABC123',

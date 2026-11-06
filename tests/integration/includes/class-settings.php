@@ -61,6 +61,9 @@ class WCCT_Test_Settings {
                         'add_to_cart'    => 'on',
                         'begin_checkout' => 'on',
                         'purchase'       => 'on',
+                        // Saved by 3.0's settings page (#92, #87).
+                        'search'         => 'on',
+                        'sign_up'        => 'on',
                     ),
                 ),
             ),

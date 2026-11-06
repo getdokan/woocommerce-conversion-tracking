@@ -7,7 +7,8 @@
     },
     "ads": {
         "conversionId": "AW-123456789",
-        "purchaseLabel": "CtE2ePurchase"
+        "purchaseLabel": "CtE2ePurchase",
+        "registrationLabel": "CtE2eRegistration"
     },
     "x": {
         "pixelId": "cte2x",

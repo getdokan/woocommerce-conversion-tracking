@@ -79,8 +79,10 @@ class ConsentPageOutputTest extends WCCT_Test_Page_Case {
         $this->assertStringContainsString( "g('set', 'ads_data_redaction', true);", $head[1] );
 
         $html = $result['html'];
-        $this->assertLessThan( strpos( $html, "gtag('config'" ), strpos( $html, "'consent', 'default'" ) );
-        $this->assertLessThan( strpos( $html, "wcctGtag('config'" ), strpos( $html, "'consent', 'default'" ) );
+        // One Google block (#92): both configs come after the default.
+        $this->assertLessThan( strpos( $html, "wcctGtag('config', \"G-CTTEST1234\"" ), strpos( $html, "'consent', 'default'" ) );
+        $this->assertLessThan( strpos( $html, "wcctGtag('config', \"AW-123456789\"" ), strpos( $html, "'consent', 'default'" ) );
+        $this->assertLessThan( strpos( $html, 'googletagmanager.com/gtag/js' ), strpos( $html, "'consent', 'default'" ) );
     }
 
     public function test_meta_is_revoked_before_init_and_x_does_not_load_uwt_js_itself() {

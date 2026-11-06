@@ -15,6 +15,17 @@ class ProductIdTest extends TestCase {
             $settings['platforms'][ $platform ] = array( 'product_id_mode' => 'sku' );
         }
 
+        // Google reads its IDs from wcct_settings_v3 once it exists (#92): the lite_all() values.
+        if ( isset( $settings['platforms']['google'] ) ) {
+            $settings['platforms']['google'] += array(
+                'mode'           => 'both',
+                'measurement_id' => 'G-CTTEST1234',
+                'ads_id'         => 'AW-123456789',
+                'purchase_label' => 'CtPurchaseLabel',
+                'events'         => array( 'view_product', 'add_to_cart', 'begin_checkout', 'purchase' ),
+            );
+        }
+
         return $settings;
     }
 

@@ -132,3 +132,9 @@ if ( ! function_exists( 'has_filter' ) ) {
         return isset( $GLOBALS['wcct_test_filters'][ $hook ] );
     }
 }
+
+if ( ! function_exists( 'esc_attr' ) ) {
+    function esc_attr( $text ) {
+        return htmlspecialchars( (string) $text, ENT_QUOTES );
+    }
+}
