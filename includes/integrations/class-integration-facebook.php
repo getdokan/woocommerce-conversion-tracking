@@ -87,6 +87,9 @@ class WCCT_Integration_Facebook extends WCCT_Integration {
             document,'script','https://connect.facebook.net/en_US/fbevents.js');
 
             <?php
+            // With consent mode on: revoke before init until marketing consent, grant on consent.
+            echo $this->consent_sync_js( "fbq('consent', granted ? 'grant' : 'revoke');" ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+
             if ( is_user_logged_in() ) {
                 $user_email = wp_get_current_user()->user_email;
 
@@ -101,6 +104,7 @@ class WCCT_Integration_Facebook extends WCCT_Integration {
         <?php
 
         $this->print_event_script();
+        $this->print_consent_script( $this->consent_wrap_js( 'wcfbq' ) );
     }
 
     /**

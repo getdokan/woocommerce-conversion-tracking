@@ -55,6 +55,9 @@ class WCCT_Integration_GA4 extends WCCT_Integration {
         $this->enabled  = true;
         $this->supports = array( 'add_to_cart' );
 
+        // Google consent mode covers GA4; this is the category for wcct_consent_allows().
+        $this->consent_category = 'statistics';
+
         add_filter( 'wcct_save_integrations_settings', array( $this, 'sanitize_settings' ) );
         add_action( 'wp_ajax_' . self::PURCHASE_SENT_ACTION, array( $this, 'mark_purchase_sent' ) );
         add_action( 'wp_ajax_nopriv_' . self::PURCHASE_SENT_ACTION, array( $this, 'mark_purchase_sent' ) );

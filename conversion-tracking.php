@@ -147,6 +147,7 @@ class WeDevs_WC_Conversion_Tracking {
         require_once WCCT_INCLUDES . '/class-ajax.php';
         require_once WCCT_INCLUDES . '/class-admin.php';
         require_once WCCT_INCLUDES . '/class-welcome-20.php';
+        require_once WCCT_INCLUDES . '/consent-functions.php';
     }
 
     /**
@@ -215,6 +216,8 @@ class WeDevs_WC_Conversion_Tracking {
         $this->container['event_dispatcher']    = new WCCT_Event_Dispatcher();
         $this->container['admin']               = new WCCT_Admin();
         $this->container['admin_assets']        = new \StorePulse\ConversionTracking\Admin\Assets();
+        $this->container['consent']             = new \StorePulse\ConversionTracking\Consent\ConsentMode();
+        $this->container['consent']->register();
 
         new WCCT_Welcome_20();
 

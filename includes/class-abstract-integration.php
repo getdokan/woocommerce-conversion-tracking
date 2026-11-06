@@ -84,6 +84,13 @@ abstract class WCCT_Integration {
     private $purchases_rendered = array();
 
     /**
+     * WP Consent API category this integration's tags need
+     *
+     * @var string
+     */
+    protected $consent_category = 'marketing';
+
+    /**
      * Get settings for all integration
      *
      * @return array
@@ -321,6 +328,91 @@ abstract class WCCT_Integration {
         $method = is_string( $name ) && isset( static::$event_methods[ $name ] ) ? static::$event_methods[ $name ] : '';
 
         return $method && $this->supports( $method ) && method_exists( $this, $method );
+    }
+
+    /**
+     * WP Consent API category this integration's tags need
+     *
+     * @return string
+     */
+    public function get_consent_category() {
+        return $this->consent_category;
+    }
+
+    /**
+     * Whether consent allows this integration to track, for server-side sends only; see wcct_consent_allows()
+     *
+     * @return boolean
+     */
+    public function consent_allows() {
+        return wcct_consent_allows( $this->get_consent_category() );
+    }
+
+    /**
+     * JavaScript calling a callback with (granted, first) now and on every consent change; empty with consent mode off
+     *
+     * @param string $body Callback body.
+     *
+     * @return string
+     */
+    protected function consent_sync_js( $body ) {
+        return \StorePulse\ConversionTracking\Consent\ConsentMode::sync_js( $this->get_consent_category(), $body );
+    }
+
+    /**
+     * JavaScript running code once consent allows this integration; empty with consent mode off
+     *
+     * @param string $body Code.
+     *
+     * @return string
+     */
+    protected function consent_when_js( $body ) {
+        return \StorePulse\ConversionTracking\Consent\ConsentMode::when_js( $this->get_consent_category(), $body );
+    }
+
+    /**
+     * JavaScript loading a script once consent allows this integration, then running code; empty with consent mode off
+     *
+     * @param string $src  Script URL.
+     * @param string $body Code to run after it loaded.
+     *
+     * @return string
+     */
+    protected function consent_script_js( $src, $body = '' ) {
+        return \StorePulse\ConversionTracking\Consent\ConsentMode::script_js( $this->get_consent_category(), $src, $body );
+    }
+
+    /**
+     * JavaScript holding a global function's calls until consent allows this integration; empty with consent mode off
+     *
+     * @param string $name Global function name.
+     *
+     * @return string
+     */
+    protected function consent_wrap_js( $name ) {
+        return \StorePulse\ConversionTracking\Consent\ConsentMode::wrap_js( $this->get_consent_category(), $name );
+    }
+
+    /**
+     * Whether consent mode is on, so tags wait for consent
+     *
+     * @return boolean
+     */
+    protected function consent_mode_on() {
+        return \StorePulse\ConversionTracking\Consent\ConsentMode::is_enabled();
+    }
+
+    /**
+     * Print JavaScript in its own script tag; prints nothing for empty code
+     *
+     * @param string $js JavaScript.
+     *
+     * @return void
+     */
+    protected function print_consent_script( $js ) {
+        if ( '' !== $js ) {
+            echo '<script data-no-optimize="1">' . $js . "</script>\n"; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- built from JSON-encoded values.
+        }
     }
 
     /**

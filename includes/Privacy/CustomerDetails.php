@@ -131,8 +131,7 @@ class CustomerDetails {
      * @return bool
      */
     public static function consent_mode_on(): bool {
-        // Swap for ConsentMode::is_enabled() once #81 lands; same option and filter.
-        return (bool) apply_filters( 'wcct_consent_mode_enabled', 'on' === get_option( self::CONSENT_OPTION, 'off' ) );
+        return \StorePulse\ConversionTracking\Consent\ConsentMode::is_enabled();
     }
 
     /**

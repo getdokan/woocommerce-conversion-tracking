@@ -90,7 +90,8 @@ class WCCT_Integration_Custom extends WCCT_Integration {
             $html .= $this->get_event_script( $event );
         }
 
-        return $html;
+        // With consent mode on, the scripts wait for marketing consent.
+        return \StorePulse\ConversionTracking\Consent\ConsentMode::hold_markup( $html, $this->get_consent_category() );
     }
 
     /**

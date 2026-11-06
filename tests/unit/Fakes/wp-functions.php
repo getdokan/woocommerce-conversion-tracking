@@ -110,3 +110,25 @@ if ( ! function_exists( 'absint' ) ) {
         return abs( (int) $maybeint );
     }
 }
+
+if ( ! function_exists( '__' ) ) {
+    function __( $text, $domain = 'default' ) {
+        return $text;
+    }
+}
+
+if ( ! function_exists( 'update_option' ) ) {
+    function update_option( $name, $value ) {
+        $changed = ! isset( $GLOBALS['wcct_test_options'] ) || ! array_key_exists( $name, $GLOBALS['wcct_test_options'] ) || $GLOBALS['wcct_test_options'][ $name ] !== $value;
+
+        $GLOBALS['wcct_test_options'][ $name ] = $value;
+
+        return $changed;
+    }
+}
+
+if ( ! function_exists( 'has_filter' ) ) {
+    function has_filter( $hook, $callback = false ) {
+        return isset( $GLOBALS['wcct_test_filters'][ $hook ] );
+    }
+}

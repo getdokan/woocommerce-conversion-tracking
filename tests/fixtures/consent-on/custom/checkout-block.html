@@ -1,0 +1,429 @@
+<!-- wcct-fixture: consent-on/custom/checkout-block -->
+<!-- page: is_checkout -->
+<!-- head -->
+<script data-no-optimize="1" id="wcct-consent-mode">
+window.dataLayer = window.dataLayer || [];
+(function () {
+    var dl = window.dataLayer;
+    for (var i = 0; i < dl.length; i++) {
+        if (dl[i] && dl[i][0] === 'consent' && dl[i][1] === 'default') return;
+    }
+    var g = function () { dl.push(arguments); };
+    g('consent', 'default', {"ad_storage":"denied","analytics_storage":"denied","ad_user_data":"denied","ad_personalization":"denied","region":["AT","BE","BG","HR","CY","CZ","DK","EE","FI","FR","DE","GR","HU","IE","IT","LV","LT","LU","MT","NL","PL","PT","RO","SK","SI","ES","SE","IS","LI","NO","GB","CH"],"wait_for_update":500});
+    g('set', 'ads_data_redaction', true);
+})();
+window.wcctConsentConfig = {"api":false,"bridge":false,"cookiePrefix":"wp_consent","type":"","typeExpected":false};
+/* Conversion Tracking consent runtime: holds tags until the WP Consent API allows them and bridges it to Google consent mode (ES5, inlined; tests in tests/js). */
+(function (root, factory) {
+    var lib = factory();
+
+    if (typeof module === 'object' && module.exports) {
+        module.exports = lib;
+    } else if (root && !root.wcctConsent) {
+        root.wcctConsent = lib.create(root, root.wcctConsentConfig || {});
+    }
+}(typeof window !== 'undefined' ? window : this, function () {
+    var CATEGORIES = ['functional', 'preferences', 'statistics', 'statistics-anonymous', 'marketing'];
+    var GOOGLE_TYPES = {
+        statistics: ['analytics_storage'],
+        marketing: ['ad_storage', 'ad_user_data', 'ad_personalization']
+    };
+
+    // Value of one cookie in a document.cookie string, '' when unset.
+    function readCookie(cookies, name) {
+        var parts = String(cookies || '').split(';');
+
+        for (var i = 0; i < parts.length; i++) {
+            var pair = parts[i].replace(/^\s+/, '');
+
+            if (pair.indexOf(name + '=') === 0) {
+                try {
+                    return decodeURIComponent(pair.substring(name.length + 1));
+                } catch (e) {
+                    return pair.substring(name.length + 1);
+                }
+            }
+        }
+
+        return '';
+    }
+
+    // Set the Google consent types of one category; returns how many were set.
+    function setGoogle(update, category, value) {
+        var types = GOOGLE_TYPES[category] || [];
+
+        for (var i = 0; i < types.length; i++) {
+            update[types[i]] = value;
+        }
+
+        return types.length;
+    }
+
+    // Google consent update for a wp_listen_for_consent_change detail ({ marketing: 'allow' }), null when nothing maps.
+    function googleUpdateForChange(detail) {
+        var update = {}, count = 0;
+
+        if (!detail || typeof detail !== 'object') {
+            return null;
+        }
+
+        for (var category in detail) {
+            if (Object.prototype.hasOwnProperty.call(detail, category)) {
+                count += setGoogle(update, category, detail[category] === 'allow' ? 'granted' : 'denied');
+            }
+        }
+
+        return count ? update : null;
+    }
+
+    // Google consent update once the consent type is known: none without a type, every type for opt-in, only denials for opt-out.
+    function googleUpdateForType(type, hasConsent, cookieValue) {
+        var update = {}, count = 0;
+
+        if (!type) {
+            return null;
+        }
+
+        for (var category in GOOGLE_TYPES) {
+            if (type === 'optout') {
+                if (cookieValue(category) === 'deny') {
+                    count += setGoogle(update, category, 'denied');
+                }
+            } else {
+                count += setGoogle(update, category, hasConsent(category) ? 'granted' : 'denied');
+            }
+        }
+
+        return count ? update : null;
+    }
+
+    // Whether a category is allowed before the API's footer script ran: true, false, or null when not known yet.
+    function earlyAllows(type, cookieValue, category) {
+        var cookie = cookieValue(category);
+
+        if (type === 'optout') {
+            return cookie !== 'deny';
+        }
+
+        if (type) {
+            return cookie === 'allow';
+        }
+
+        return cookie === 'allow' ? true : (cookie === 'deny' ? false : null);
+    }
+
+    // Whether a category is allowed once the consent type is known: always without a type.
+    function resolvedAllows(type, hasConsent, category) {
+        return !type ? true : !!hasConsent(category);
+    }
+
+    // The runtime for one page.
+    function create(win, config) {
+        var doc = win.document;
+        var prefix = config.cookiePrefix || 'wp_consent';
+        var state = {}, waiting = [], listeners = [], scripts = {};
+        var resolved = false, lastUpdate = '';
+        var api = {};
+
+        function cookieValue(category) {
+            return readCookie(doc && doc.cookie, prefix + '_' + category);
+        }
+
+        // Same rule as the API's wp_has_consent(): wp_consent_type when a banner set it, else the fallback.
+        function consentType() {
+            return (win.wp_consent_type !== undefined ? win.wp_consent_type : (win.wp_fallback_consent_type || config.type)) || '';
+        }
+
+        function hasConsent(category) {
+            return typeof win.wp_has_consent === 'function' ? !!win.wp_has_consent(category) : earlyAllows(consentType(), cookieValue, category) === true;
+        }
+
+        function get(category) {
+            if (!config.api) {
+                return true;
+            }
+
+            if (!Object.prototype.hasOwnProperty.call(state, category)) {
+                state[category] = resolved ? resolvedAllows(consentType(), hasConsent, category) : earlyAllows(win.wp_consent_type || config.type || '', cookieValue, category);
+            }
+
+            return state[category];
+        }
+
+        function set(category, value) {
+            var before = get(category) === true;
+            var after = value === true;
+            var i, held;
+
+            state[category] = value;
+
+            if (before === after) {
+                return;
+            }
+
+            for (i = 0; i < listeners.length; i++) {
+                listeners[i](category, after);
+            }
+
+            if (after) {
+                activateHeld();
+                held = waiting;
+                waiting = [];
+
+                for (i = 0; i < held.length; i++) {
+                    if (held[i][0] === category) {
+                        held[i][1]();
+                    } else {
+                        waiting.push(held[i]);
+                    }
+                }
+            }
+        }
+
+        function gtag() {
+            win.dataLayer = win.dataLayer || [];
+            win.dataLayer.push(arguments);
+        }
+
+        function sendGoogle(update) {
+            var key = update ? JSON.stringify(update) : '';
+
+            if (config.bridge && key && key !== lastUpdate) {
+                lastUpdate = key;
+                gtag('consent', 'update', update);
+            }
+        }
+
+        // Decide every category once the type is known; while the server expects a type, "no type" is never final.
+        function resolve() {
+            var type = consentType();
+            var categories = CATEGORIES.slice(0), category;
+
+            if (!type && config.typeExpected) {
+                return;
+            }
+
+            resolved = true;
+
+            for (category in state) {
+                if (Object.prototype.hasOwnProperty.call(state, category) && categories.indexOf(category) < 0) {
+                    categories.push(category);
+                }
+            }
+
+            for (var i = 0; i < categories.length; i++) {
+                set(categories[i], resolvedAllows(type, hasConsent, categories[i]));
+            }
+
+            sendGoogle(googleUpdateForType(type, hasConsent, cookieValue));
+        }
+
+        // Run the markup scripts held as type="text/plain" data-wcct-consent="<category>" whose category is allowed, in order.
+        function activateHeld() {
+            var nodes = doc && doc.querySelectorAll ? doc.querySelectorAll('script[data-wcct-consent]') : [];
+            var queue = [];
+
+            for (var i = 0; i < nodes.length; i++) {
+                if (api.allows(nodes[i].getAttribute('data-wcct-consent'))) {
+                    nodes[i].removeAttribute('data-wcct-consent');
+                    queue.push(nodes[i]);
+                }
+            }
+
+            runHeld(queue);
+        }
+
+        function runHeld(queue) {
+            var held = queue.shift();
+
+            if (!held) {
+                return;
+            }
+
+            var tag = doc.createElement('script');
+            var type = held.getAttribute('data-wcct-type');
+            var external = !!held.getAttribute('src');
+
+            for (var i = 0; i < held.attributes.length; i++) {
+                var name = held.attributes[i].name;
+
+                if (name !== 'type' && name !== 'data-wcct-type') {
+                    tag.setAttribute(name, held.attributes[i].value);
+                }
+            }
+
+            if (type) {
+                tag.setAttribute('type', type);
+            }
+
+            if (external) {
+                // The next script may need this one, so wait for it.
+                tag.async = false;
+                tag.onload = tag.onerror = function () {
+                    runHeld(queue);
+                };
+            } else {
+                tag.text = held.text;
+            }
+
+            held.parentNode.replaceChild(tag, held);
+
+            if (!external) {
+                runHeld(queue);
+            }
+        }
+
+        function change(event) {
+            var detail = event && event.detail;
+
+            if (!detail || typeof detail !== 'object') {
+                return;
+            }
+
+            for (var category in detail) {
+                if (Object.prototype.hasOwnProperty.call(detail, category)) {
+                    set(category, detail[category] === 'allow');
+                }
+            }
+
+            sendGoogle(googleUpdateForChange(detail));
+        }
+
+        // Whether a category is allowed now.
+        api.allows = function (category) {
+            return get(category) === true;
+        };
+
+        // Run fn now when the category is allowed, else once it is.
+        api.when = function (category, fn) {
+            if (api.allows(category)) {
+                fn();
+            } else {
+                waiting.push([category, fn]);
+            }
+        };
+
+        // Call fn(granted, first) now and on every change of the category.
+        api.sync = function (category, fn) {
+            fn(api.allows(category), true);
+            listeners.push(function (changed, granted) {
+                if (changed === category) {
+                    fn(granted, false);
+                }
+            });
+        };
+
+        // Replace window[name] with a version that holds its calls until the category is allowed.
+        api.wrap = function (name, category) {
+            var original = win[name];
+
+            if (typeof original !== 'function' || original.wcctConsent) {
+                return;
+            }
+
+            var gated = function () {
+                var self = this, args = arguments;
+
+                api.when(category, function () {
+                    original.apply(self, args);
+                });
+            };
+
+            gated.wcctConsent = true;
+            win[name] = gated;
+        };
+
+        // Run inline code in its own script once the category is allowed (the pending events runner).
+        api.inline = function (category, code) {
+            api.when(category, function () {
+                var tag = doc.createElement('script');
+
+                tag.setAttribute('data-no-optimize', '1');
+                tag.text = code;
+                (doc.body || doc.documentElement).appendChild(tag);
+            });
+        };
+
+        // Load a script once the category is allowed; onload runs after it loaded.
+        api.script = function (category, src, onload) {
+            api.when(category, function () {
+                var entry = scripts[src];
+
+                if (!entry) {
+                    entry = scripts[src] = { done: false, callbacks: [] };
+
+                    var tag = doc.createElement('script');
+                    var first = doc.getElementsByTagName('script')[0];
+
+                    tag.async = true;
+                    tag.src = src;
+                    tag.onload = function () {
+                        entry.done = true;
+
+                        for (var i = 0; i < entry.callbacks.length; i++) {
+                            entry.callbacks[i]();
+                        }
+
+                        entry.callbacks = [];
+                    };
+
+                    if (first && first.parentNode) {
+                        first.parentNode.insertBefore(tag, first);
+                    } else {
+                        (doc.head || doc.body || doc.documentElement).appendChild(tag);
+                    }
+                }
+
+                if (typeof onload === 'function') {
+                    if (entry.done) {
+                        onload();
+                    } else {
+                        entry.callbacks.push(onload);
+                    }
+                }
+            });
+        };
+
+        var ready = function () {
+            if (config.api && !(win.consent_api && win.consent_api.waitfor_consent_hook)) {
+                resolve();
+            }
+
+            activateHeld();
+        };
+
+        if (config.api && doc && doc.addEventListener) {
+            doc.addEventListener('wp_consent_type_defined', resolve);
+            doc.addEventListener('wp_listen_for_consent_change', change);
+        }
+
+        if (doc && doc.readyState === 'loading' && doc.addEventListener) {
+            doc.addEventListener('DOMContentLoaded', ready);
+        } else if (doc) {
+            ready();
+        }
+
+        return api;
+    }
+
+    return {
+        readCookie: readCookie,
+        googleUpdateForChange: googleUpdateForChange,
+        googleUpdateForType: googleUpdateForType,
+        earlyAllows: earlyAllows,
+        resolvedAllows: resolvedAllows,
+        create: create
+    };
+}));
+</script>
+
+<!-- Starting: Conversion Tracking for WooCommerce (https://wordpress.org/plugins/woocommerce-conversion-tracking/) -->
+<!-- End: Conversion Tracking for WooCommerce Codes -->
+
+<!-- body -->
+
+<!-- footer -->
+
+<!-- footer: wc_enqueue_js -->
+
+<!-- scripts -->

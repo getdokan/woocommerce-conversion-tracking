@@ -13,3 +13,5 @@ require_once dirname( __DIR__ ) . '/includes/class-abstract-integration.php';
 require_once __DIR__ . '/unit/Fakes/FakeIntegration.php';
 require_once __DIR__ . '/unit/Fakes/FakeOrder.php';
 require_once __DIR__ . '/unit/Fakes/FakeSession.php';
+require_once __DIR__ . '/unit/Fakes/FakeConsentApi.php';
+require_once dirname( __DIR__ ) . '/includes/consent-functions.php';

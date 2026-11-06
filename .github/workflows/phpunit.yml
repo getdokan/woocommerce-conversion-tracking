@@ -45,6 +45,10 @@ jobs:
                   cache: npm
                   cache-dependency-path: tests/integration/package-lock.json
 
+            # Node's own test runner; no packages needed.
+            - name: Run JS unit tests
+              run: node --test "tests/js/**/*.test.js"
+
             - name: Install wp-env
               working-directory: tests/integration
               run: npm ci --no-audit --no-fund

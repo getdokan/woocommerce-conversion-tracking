@@ -342,7 +342,8 @@ class Pipeline {
         $scripts = array();
 
         if ( $this->sends( Event::ADD_TO_CART ) ) {
-            $scripts[ self::RUNNER_HANDLE ] = $this->runner_script();
+            // With consent mode on, each platform's queued code waits for its consent category.
+            $scripts[ self::RUNNER_HANDLE ] = \StorePulse\ConversionTracking\Consent\ConsentMode::gate_runner( $this->runner_script(), $this->consent_categories() );
         }
 
         foreach ( $this->build_footer_scripts( $events ) as $id => $code ) {
@@ -356,6 +357,21 @@ class Pipeline {
 
             $this->handles[] = $handle;
         }
+    }
+
+    /**
+     * Consent category per active platform ID.
+     *
+     * @return string[]
+     */
+    public function consent_categories() {
+        $categories = array();
+
+        foreach ( $this->get_platforms() as $id => $platform ) {
+            $categories[ $id ] = method_exists( $platform, 'get_consent_category' ) ? (string) $platform->get_consent_category() : 'marketing';
+        }
+
+        return $categories;
     }
 
     /**

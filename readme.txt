@@ -121,7 +121,7 @@ Yes. Events work the same on the classic and the block checkout.
 
 = Does it work with cookie consent plugins? =
 
-Yes. Turn on "Respect cookie choices" and tags wait for the visitor's consent. Google gets Consent Mode v2 signals; the other platforms read consent through the WP Consent API, which most consent plugins support.
+Yes. Turn on "Respect cookie choices" and tags wait for the visitor's consent. Google gets Consent Mode v2 signals; the other platforms read consent through the WP Consent API, which most consent plugins support. If your consent plugin already sends Google's consent signals (for example Complianz with consent mode, CookieYes connected to its web app, Cookiebot or Site Kit), the plugin leaves Google's consent to it and sets no defaults of its own.
 
 = Can I add a platform that isn't listed? =
 

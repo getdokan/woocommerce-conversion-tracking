@@ -12,6 +12,7 @@
         "start": "wp-scripts start --progress",
         "start:less": "node --watch-path=assets/less node_modules/less/bin/lessc assets/less/style.less assets/css/style.css",
         "typecheck": "tsc --noEmit",
+        "test:js": "node --test \"tests/js/**/*.test.js\"",
         "lint": "npm run lint:js",
         "lint:js": "wp-scripts lint-js src webpack.config.js webpack-dependency-mapping.js",
         "format": "wp-scripts format src",
