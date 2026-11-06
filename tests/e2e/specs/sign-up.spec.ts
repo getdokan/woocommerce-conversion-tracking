@@ -1,11 +1,9 @@
 import { test, expect } from '../utils/fixtures';
 import { BASE_URL } from '../utils/site';
 import { GUEST, addProductToCart } from '../utils/checkout';
-import { loginAsAdmin } from '../utils/admin';
+import { isProActive, loginAsAdmin, openApp } from '../utils/admin';
 import { NetworkTracker } from '../utils/network';
 import { TEST_IDS } from '../utils/platforms';
-
-const PRO_PLUGIN = 'wc-conversion-tracking-pro/woocommerce-conversion-tracking-pro.php';
 
 const signUpHits = async (tracker: NetworkTracker) => (await tracker.eventHits('meta', 'CompleteRegistration')).length;
 
@@ -19,8 +17,8 @@ test.beforeAll(async ({ browser }) => {
     const page = await browser.newPage({ baseURL: BASE_URL });
 
     await loginAsAdmin(page);
-    await page.goto('/wp-admin/plugins.php');
-    proActive = (await page.locator(`tr.active[data-plugin="${PRO_PLUGIN}"]`).count()) > 0;
+    await openApp(page);
+    proActive = await isProActive(page);
     await page.close();
 });
 

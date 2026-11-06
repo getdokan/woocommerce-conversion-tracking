@@ -3,7 +3,7 @@ import { join } from 'path';
 import { test, expect } from '../utils/fixtures';
 import { CapturedRequest, NetworkTracker } from '../utils/network';
 import { addProductToCart, placeGuestOrder } from '../utils/checkout';
-import { loginAsAdmin } from '../utils/admin';
+import { isProActive, loginAsAdmin, openApp } from '../utils/admin';
 import { BASE_URL } from '../utils/site';
 import { TEST_IDS } from '../utils/platforms';
 
@@ -11,8 +11,6 @@ import { TEST_IDS } from '../utils/platforms';
 const CHECKOUT_IDS: { xCheckoutEventId: string; microsoftTagId: string } = JSON.parse(
     readFileSync(join(__dirname, '..', 'config', 'checkout-ids.json'), 'utf8')
 );
-
-const PRO_PLUGIN = 'wc-conversion-tracking-pro/woocommerce-conversion-tracking-pro.php';
 
 const isMetaStart = (r: CapturedRequest) =>
     r.platform === 'meta' && r.params.some(p => p.get('ev') === 'InitiateCheckout' && p.get('id') === TEST_IDS.meta?.pixelId);
@@ -40,8 +38,8 @@ test.beforeAll(async ({ browser }) => {
     const page = await browser.newPage({ baseURL: BASE_URL });
 
     await loginAsAdmin(page);
-    await page.goto('/wp-admin/plugins.php');
-    proActive = (await page.locator(`tr.active[data-plugin="${PRO_PLUGIN}"]`).count()) > 0;
+    await openApp(page);
+    proActive = await isProActive(page);
     await page.close();
 });
 

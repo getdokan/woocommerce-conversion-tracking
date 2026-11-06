@@ -9,9 +9,20 @@ const SUBSCRIPTIONS_URL =
     'https://woocommerce.com/my-account/my-subscriptions/';
 
 /**
- * Whether Pro is active.
+ * Whether a Pro built for this Free (3.0 or later) is running; an older Pro is paused and doesn't count.
  */
-export const isPro = (): boolean => !! window.wcctAdmin?.proVersion;
+export const isPro = (): boolean => !! window.wcctAdmin?.proActive;
+
+/**
+ * Whether a Pro older than 3.0 is installed and paused until it's updated.
+ */
+export const isProOutdated = (): boolean =>
+    !! window.wcctAdmin?.proVersion && ! window.wcctAdmin?.proActive;
+
+/**
+ * Where an outdated Pro is updated: the plugins list filtered to updates.
+ */
+export const proUpdateUrl = (): string => window.wcctAdmin?.proUpdate || '';
 
 /**
  * Every Upgrade, See pricing and Compare plans link: the Pro page on WooCommerce.com.

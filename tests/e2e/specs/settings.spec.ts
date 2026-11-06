@@ -1,6 +1,6 @@
 import { Page } from '@playwright/test';
 import { test, expect } from '../utils/fixtures';
-import { APP_PATH, SHOP_MANAGER, login, loginAsAdmin, openApp } from '../utils/admin';
+import { APP_PATH, SHOP_MANAGER, isProActive, login, loginAsAdmin, openApp, wcctAdminData } from '../utils/admin';
 
 // Admin\Upgrade: Pro is sold only on WooCommerce.com.
 const PRODUCT_URL = 'https://woocommerce.com/products/woocommerce-conversion-tracking-pro/';
@@ -10,8 +10,7 @@ const ACCESS_ROUTE = /wcct(\/|%2F)v1(\/|%2F)access/;
 const SETTINGS_ROUTE = /wcct(\/|%2F)v1(\/|%2F)settings(\?|&|$)/;
 const SECTIONS = 'nav[aria-label="Settings sections"]';
 
-const proVersion = (page: Page): Promise<string> =>
-    page.evaluate(() => (window as unknown as { wcctAdmin?: { proVersion: string } }).wcctAdmin?.proVersion ?? '');
+const proVersion = async (page: Page): Promise<string> => (await wcctAdminData(page)).proVersion;
 
 // Saves the granted roles through the access route, as the logged-in user.
 const postAccess = (page: Page, roles: string[]): Promise<{ ok: boolean; status?: number; code?: string }> =>
@@ -61,7 +60,7 @@ test.describe('Settings', () => {
     test.describe('on Free', () => {
         test.beforeEach(async ({ page }) => {
             await openApp(page, '#/settings');
-            test.skip(!!(await proVersion(page)), 'Pro is active in this store');
+            test.skip(!!(await proVersion(page)), 'Pro is installed in this store');
         });
 
         test('Integration access is a locked preview with the way to Pro', async ({ page }) => {
@@ -157,7 +156,7 @@ test.describe('Settings', () => {
     test.describe('on Pro', () => {
         test.beforeEach(async ({ page }) => {
             await openApp(page, '#/settings');
-            test.skip(!(await proVersion(page)), 'Pro is not mapped into this store');
+            test.skip(!(await isProActive(page)), 'No Pro 3.0 is mapped into this store');
             expect(await postAccess(page, [])).toEqual({ ok: true });
         });
 

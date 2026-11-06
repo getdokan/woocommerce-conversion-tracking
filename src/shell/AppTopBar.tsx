@@ -12,6 +12,7 @@ import { __, sprintf } from '@wordpress/i18n';
 /**
  * Internal dependencies
  */
+import { isProOutdated } from '../data/plan';
 import { DEFAULT_PLATFORM, type Route } from '../router';
 import { HelpMenu } from './HelpMenu';
 
@@ -95,11 +96,17 @@ export const AppTopBar = ( { route }: { route: Route } ) => {
 
     if ( proVersion ) {
         versions.push( {
-            version: sprintf(
-                /* translators: %s: plugin version */
-                __( 'Pro %s', 'woocommerce-conversion-tracking' ),
-                proVersion
-            ),
+            version: isProOutdated()
+                ? sprintf(
+                      /* translators: %s: plugin version */
+                      __( 'Pro %s, paused', 'woocommerce-conversion-tracking' ),
+                      proVersion
+                  )
+                : sprintf(
+                      /* translators: %s: plugin version */
+                      __( 'Pro %s', 'woocommerce-conversion-tracking' ),
+                      proVersion
+                  ),
             isPro: true,
             // TopBar's own classes drop the outline colour, so set it again.
             className: 'border-border! max-[1180px]:hidden',

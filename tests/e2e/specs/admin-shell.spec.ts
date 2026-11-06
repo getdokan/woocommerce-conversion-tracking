@@ -1,5 +1,5 @@
 import { test, expect } from '../utils/fixtures';
-import { APP_PATH, loginAsAdmin, openApp } from '../utils/admin';
+import { APP_PATH, loginAsAdmin, openApp, wcctAdminData } from '../utils/admin';
 
 // Every 3.0 route, its page heading and the nav tab it lights up.
 const ROUTES = [
@@ -220,9 +220,10 @@ test.describe('admin app shell', () => {
     test('Pro adds its version pill, unlocks Microsoft and sends Support to WooCommerce.com', async ({ page }) => {
         await openApp(page, '#/dashboard');
 
-        const proVersion = await page.evaluate(() => (window as unknown as { wcctAdmin?: { proVersion: string } }).wcctAdmin?.proVersion ?? '');
+        const { proVersion, proActive } = await wcctAdminData(page);
 
-        test.skip(!proVersion, 'Pro is not mapped into this store');
+        // A Pro older than 3.0 is paused: specs/version-guard.spec.ts.
+        test.skip(!proActive, 'No Pro 3.0 is mapped into this store');
 
         await expect(page.locator('#wcct-topbar-root')).toContainText(`Pro ${proVersion}`);
 

@@ -10,12 +10,18 @@ import { Crown } from 'lucide-react';
  * WordPress dependencies
  */
 import { createInterpolateElement } from '@wordpress/element';
-import { __ } from '@wordpress/i18n';
+import { __, sprintf } from '@wordpress/i18n';
 
 /**
  * Internal dependencies
  */
-import { isPro, manageUrl, upgradeUrl } from '../../data/plan';
+import {
+    isPro,
+    isProOutdated,
+    manageUrl,
+    proUpdateUrl,
+    upgradeUrl,
+} from '../../data/plan';
 import { NewTabNote } from '../../shell/NewTabNote';
 import { FeatureList, LINK_CLASS, SectionCard } from './SectionCard';
 
@@ -79,27 +85,65 @@ const UpgradeLink = ( { children }: { children?: ReactNode } ) => (
 );
 
 /**
+ * The Plan section's description: on Pro, on Free, or on Free with an older Pro paused.
+ *
+ * @param {boolean} pro      A Pro built for this Free is running.
+ * @param {boolean} outdated An older Pro is installed and paused.
+ */
+const planDescription = ( pro: boolean, outdated: boolean ): string => {
+    if ( pro ) {
+        return __(
+            "You're on Pro. Thanks for supporting the plugin.",
+            'woocommerce-conversion-tracking'
+        );
+    }
+
+    if ( outdated ) {
+        return sprintf(
+            /* translators: %s: installed Pro version */
+            __(
+                'Pro %s is installed but paused until you update it to 3.0. Free keeps tracking meanwhile.',
+                'woocommerce-conversion-tracking'
+            ),
+            window.wcctAdmin?.proVersion ?? ''
+        );
+    }
+
+    return __(
+        "You're on Free. Here's what Pro adds.",
+        'woocommerce-conversion-tracking'
+    );
+};
+
+/**
+ * Update Pro: an older Pro is installed and paused.
+ */
+const UpdateProButton = () => (
+    <Button
+        nativeButton={ false }
+        className="border-transparent bg-pro text-pro-foreground hover:bg-pro/85"
+        render={
+            // eslint-disable-next-line jsx-a11y/anchor-has-content, jsx-a11y/no-redundant-roles -- the button renders the label; Base UI would make it role=button.
+            <a href={ proUpdateUrl() } role="link" />
+        }
+    >
+        { __( 'Update Pro', 'woocommerce-conversion-tracking' ) }
+    </Button>
+);
+
+/**
  * Settings > Plan: Free vs Pro, with the way to buy or manage Pro on WooCommerce.com.
  */
 export const PlanSection = () => {
     const pro = isPro();
+    const outdated = isProOutdated();
 
     return (
         <SectionCard
             id="plan"
             icon={ <Crown /> }
             title={ __( 'Plan', 'woocommerce-conversion-tracking' ) }
-            description={
-                pro
-                    ? __(
-                          "You're on Pro. Thanks for supporting the plugin.",
-                          'woocommerce-conversion-tracking'
-                      )
-                    : __(
-                          "You're on Free. Here's what Pro adds.",
-                          'woocommerce-conversion-tracking'
-                      )
-            }
+            description={ planDescription( pro, outdated ) }
         >
             <div className="grid grid-cols-2 max-[900px]:grid-cols-1">
                 <div
@@ -144,7 +188,7 @@ export const PlanSection = () => {
                         </p>
                     </div>
                     <FeatureList items={ proFeatures() } />
-                    { pro ? (
+                    { pro && (
                         <a
                             href={ manageUrl() }
                             target="_blank"
@@ -157,7 +201,9 @@ export const PlanSection = () => {
                             ) }
                             <NewTabNote />
                         </a>
-                    ) : (
+                    ) }
+                    { outdated && <UpdateProButton /> }
+                    { ! pro && ! outdated && (
                         <div className="flex flex-col items-start gap-2">
                             <Button
                                 nativeButton={ false }

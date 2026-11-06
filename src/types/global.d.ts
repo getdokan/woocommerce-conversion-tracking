@@ -11,7 +11,11 @@ type WcctDocsTile = {
 
 type WcctAdminData = {
     version: string;
+    // Installed Pro version, also when it's paused.
     proVersion: string;
+    // wp_localize_script sends booleans as '1' or ''.
+    proActive: boolean | string;
+    proUpdate: string;
     docs: {
         home: string;
         tiles: WcctDocsTile[];

@@ -1,6 +1,6 @@
 import type { Page, Route } from '@playwright/test';
 import { test, expect } from '../utils/fixtures';
-import { APP_PATH, loginAsAdmin, openApp } from '../utils/admin';
+import { APP_PATH, isProActive, loginAsAdmin, openApp, wcctAdminData } from '../utils/admin';
 
 // The catalog route, not catalog/anything.
 const CATALOG_ROUTE = /wcct(\/|%2F)v1(\/|%2F)catalog(\?|&|$)/;
@@ -29,8 +29,8 @@ async function api(page: Page, path: string, method = 'GET', data?: unknown): Pr
     );
 }
 
-const isPro = (page: Page) =>
-    page.evaluate(() => !!(window as unknown as { wcctAdmin?: { proVersion: string } }).wcctAdmin?.proVersion);
+// Any Pro installed, also one older than 3.0 that Free pauses.
+const isPro = async (page: Page) => !!(await wcctAdminData(page)).proVersion;
 
 // Serves the real GET response with some fields replaced, once.
 async function patchCatalogOnce(page: Page, patch: (data: Catalog) => Catalog): Promise<void> {
@@ -99,7 +99,7 @@ test.describe('Catalog page', () => {
         // The app page the REST helper runs on; Pro shows in its wcctAdmin.
         test.beforeEach(async ({ page }) => {
             await openApp(page, '#/dashboard');
-            test.skip(!(await isPro(page)), 'Pro is not mapped into this store');
+            test.skip(!(await isProActive(page)), 'No Pro 3.0 is mapped into this store');
         });
 
         test('the status card shows the feed age and product count', async ({ page }) => {

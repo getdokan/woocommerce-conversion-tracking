@@ -3,7 +3,7 @@
 Plugin Name: Conversion Tracking for WooCommerce
 Plugin URI: https://wordpress.org/plugins/woocommerce-conversion-tracking/
 Description: Sends WooCommerce purchases and shopper events to Meta, Google Analytics 4, Google Ads and X, each purchase counted once, plus your own scripts.
-Version: 2.1.6
+Version: 3.0.0
 Author: weDevs
 Author URI: https://wedevs.com/?utm_source=ORG_Author_URI_WCCT
 License: GPL2
@@ -59,7 +59,7 @@ class WeDevs_WC_Conversion_Tracking {
      *
      * @var string
      */
-    public $version = '2.1.6';
+    public $version = '3.0.0';
 
     /**
      * Holds various class instances
@@ -189,6 +189,9 @@ class WeDevs_WC_Conversion_Tracking {
      * @return void
      */
     public function init_hooks() {
+        // Before wcct_loaded, so a Pro older than 3.0 never loads its classes.
+        \StorePulse\ConversionTracking\Compat\ProGuard::register();
+
         $this->container['capability'] = new \StorePulse\ConversionTracking\Access\Capability();
         $this->container['capability']->register();
 
@@ -226,7 +229,7 @@ class WeDevs_WC_Conversion_Tracking {
 
         new WCCT_Welcome_20();
 
-        if ( ! class_exists( 'WeDevs_WC_Conversion_Tracking_Pro') ) {
+        if ( ! $this->is_pro() ) {
             $this->container['pro_feature'] = new WCCT_Pro_Features();
         }
     }
@@ -290,15 +293,12 @@ class WeDevs_WC_Conversion_Tracking {
 	}
 
     /**
-     * Check the pro version
+     * Whether Pro 3.0 or later is running; an older Pro is paused and counts as Free
      *
      * @return boolean
      */
     public function is_pro() {
-        if ( class_exists( 'WeDevs_WC_Conversion_Tracking_Pro' ) ) {
-            return true;
-        }
-        return false;
+        return \StorePulse\ConversionTracking\Compat\ProVersion::is_active();
     }
 
     /**

@@ -68,6 +68,10 @@ Pro's suite (Pro's `tests/`) runs Pro on top of Lite with this harness. Map Pro 
 
 `npm run test:uninstall` runs `uninstall/run.sh` in the same container (#121). It installs throwaway sites next to the test store (own table prefix, plugins folder and uploads folder, so the store is untouched), single site and a two-site network, activates WooCommerce, Free and Pro, seeds every option, transient, table, Action Scheduler group, cron hook, order/product/user meta and the feed folder (`uninstall/seed.php`), then deletes the plugins with `wp plugin uninstall`, one order and the other. `uninstall/check.php` checks that deleting Free while Pro is installed leaves Pro's data (and the reverse), and that after both nothing is left but the order sent flags (`_wcct_sent_*`, `_wcct_ga4_tracked`), in `wc_orders_meta` and `postmeta`. Without Pro mapped it deletes Free alone and expects nothing left.
 
+### Old Pro (#125)
+
+`Compat/OldProTest.php` loads `plugins/old-pro/`, a stand-in with Pro 1.1.4's bootstrap hooks whose admin and integrations throw if they load, before and after Lite. It checks that Lite's output on six pages still matches the `all/` fixtures, that the Update Pro notice shows, and that old Pro's catalog feed still answers. The real Pro 1.1.4 is checked by hand (see #125).
+
 ## The store
 
 Fixtures are only valid for this store. Change it and every fixture has to be recorded again.

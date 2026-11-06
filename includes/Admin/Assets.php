@@ -2,6 +2,9 @@
 
 namespace StorePulse\ConversionTracking\Admin;
 
+use StorePulse\ConversionTracking\Compat\ProGuard;
+use StorePulse\ConversionTracking\Compat\ProVersion;
+
 // don't call the file directly
 if ( ! defined( 'ABSPATH' ) ) {
     exit;
@@ -104,7 +107,10 @@ class Assets {
             'wcctAdmin',
             array(
                 'version'    => WCCT_VERSION,
-                'proVersion' => defined( 'WCCT_PRO_VERSION' ) ? WCCT_PRO_VERSION : '',
+                'proVersion' => ProVersion::installed(),
+                // A Pro older than 3.0 is installed but paused (Compat\ProGuard).
+                'proActive'  => ProVersion::is_active(),
+                'proUpdate'  => ProVersion::is_outdated() ? ProGuard::update_url() : '',
                 'docs'       => array(
                     'home'  => Docs::home_url(),
                     'tiles' => Docs::tiles(),

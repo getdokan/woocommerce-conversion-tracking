@@ -20,6 +20,8 @@ The store runs in Docker with [wp-env](https://www.npmjs.com/package/@wordpress/
 
 `specs/settings.spec.ts` covers Settings > Integration access and Settings > Plan. On Free (no Pro mapped) it checks the locked access preview, the plan comparison with no price, and that every Upgrade, See pricing, Compare plans and plugins-list Get PRO link opens the WooCommerce.com product page. With Pro it checks Manage subscription, the confirmation before a role is granted (Cancel and Escape leave it off), the save, the Dokan vendor warning, and that a granted shop manager (`ct_e2e_shop_manager` / `password`, seeded by setup) sees the list read-only and gets 403 from the access route. Run it once without and once with Pro to cover both.
 
+`specs/version-guard.spec.ts` reads the Pro state the app gets: with a Pro older than 3.0 mapped in (Pro 1.1.4), it checks the Update Pro notice, that Settings > Plan and the top bar show Pro as paused, and that the old catalog feed still returns the CSV; otherwise that no notice shows. Setup and the specs count Pro only when it is 3.0 or later, so the whole suite also runs with Pro 1.1.4 mapped in: old Pro stays paused and Free's own tags must pass unchanged.
+
 ## Run it locally
 
 You need Docker and Node 22.13 or newer. The plugin also needs its Composer packages and its built admin bundles, so run `composer install` and `npm ci && npm run build` in the plugin root once.

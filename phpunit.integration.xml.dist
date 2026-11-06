@@ -13,5 +13,8 @@
         <testsuite name="rest">
             <directory suffix="Test.php">tests/integration/REST</directory>
         </testsuite>
+        <testsuite name="compat">
+            <directory suffix="Test.php">tests/integration/Compat</directory>
+        </testsuite>
     </testsuites>
 </phpunit>
