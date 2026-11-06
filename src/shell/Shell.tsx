@@ -19,6 +19,7 @@ import { replaceHash, routePath, useRoute, type Route } from '../router';
 import Catalog from '../pages/catalog/Catalog';
 import Dashboard from '../pages/dashboard/Dashboard';
 import Doctor from '../pages/doctor/Doctor';
+import Onboarding from '../pages/onboarding/Onboarding';
 import Placeholder from '../pages/Placeholder';
 import Platforms from '../pages/platforms/Platforms';
 import Settings from '../pages/settings/Settings';
@@ -54,6 +55,10 @@ const RoutePage = ( { route }: { route: Route } ) => {
 
     if ( route.name === 'doctor' ) {
         return <Doctor />;
+    }
+
+    if ( route.name === 'onboarding' ) {
+        return <Onboarding query={ route.query } />;
     }
 
     return <Placeholder { ...pageInfo( route ) } />;

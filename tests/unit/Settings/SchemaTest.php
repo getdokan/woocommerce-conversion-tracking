@@ -160,6 +160,40 @@ class SchemaTest extends TestCase {
         $this->fail( "No field {$platform}.{$id}" );
     }
 
+    public function test_the_setup_wizard_asks_for_the_connection_ids_only() {
+        $wizard = array();
+
+        foreach ( Schema::get()['platforms'] as $id => $platform ) {
+            foreach ( Schema::fields( $platform['schema'] ) as $field ) {
+                if ( isset( $field['onboarding'] ) ) {
+                    $this->assertSame( 'id', $field['format'], "{$id}.{$field['id']}" );
+                    $this->assertIsBool( $field['onboarding']['required'], "{$id}.{$field['id']}" );
+                    $wizard[ $id ][ $field['id'] ] = $field['onboarding']['required'];
+                }
+            }
+        }
+
+        // The Ads label goes with the Ads ID.
+        $this->assertSame( 'ads_id', Schema::fields( Schema::get()['platforms']['google']['schema'] )['purchase_label']['onboarding']['with'] );
+
+        // X takes the Purchase event ID; the rest wait for the Platforms page.
+        $this->assertSame(
+            array(
+                'facebook' => array( 'pixel_id' => true ),
+                'google'   => array(
+                    'measurement_id' => true,
+                    'ads_id'         => false,
+                    'purchase_label' => false,
+                ),
+                'twitter'  => array(
+                    'pixel_id'          => true,
+                    'purchase_event_id' => true,
+                ),
+            ),
+            $wizard
+        );
+    }
+
     public function test_value_mode_on_meta_ads_and_x_defaults_by_install_type() {
         $platforms = Schema::get()['platforms'];
 

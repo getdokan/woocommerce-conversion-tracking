@@ -13,8 +13,10 @@ import { __, sprintf } from '@wordpress/i18n';
  * Internal dependencies
  */
 import { isProOutdated } from '../data/plan';
+import { queryStep } from '../data/onboarding';
 import { DEFAULT_PLATFORM, type Route } from '../router';
 import { HelpMenu } from './HelpMenu';
+import { WizardSteps } from './WizardSteps';
 
 type NavItem = {
     value: string;
@@ -135,44 +137,52 @@ export const AppTopBar = ( { route }: { route: Route } ) => {
             }
             versions={ versions }
             rightSideComponents={
-                <>
-                    <nav
-                        className="h-full min-w-0 self-stretch overflow-x-auto [scrollbar-width:none]"
-                        aria-label={ __(
-                            'Conversion Tracking pages',
-                            'woocommerce-conversion-tracking'
-                        ) }
-                    >
-                        { /* Links styled like plugin-ui's line Tabs; Tabs' roving focus would hide them from Tab. */ }
-                        <ul className="m-0 flex h-full list-none items-stretch gap-1 p-0">
-                            { navItems().map( ( item ) => {
-                                const current =
-                                    item.value === activeTab( route );
+                // The setup wizard shows its steps instead of the nav, as in the prototype.
+                route.name === 'onboarding' ? (
+                    <WizardSteps current={ queryStep( route.query ) || 1 } />
+                ) : (
+                    <>
+                        <nav
+                            className="h-full min-w-0 self-stretch overflow-x-auto [scrollbar-width:none]"
+                            aria-label={ __(
+                                'Conversion Tracking pages',
+                                'woocommerce-conversion-tracking'
+                            ) }
+                        >
+                            { /* Links styled like plugin-ui's line Tabs; Tabs' roving focus would hide them from Tab. */ }
+                            <ul className="m-0 flex h-full list-none items-stretch gap-1 p-0">
+                                { navItems().map( ( item ) => {
+                                    const current =
+                                        item.value === activeTab( route );
 
-                                return (
-                                    <li key={ item.value } className="m-0 flex">
-                                        <a
-                                            href={ item.hash }
-                                            aria-current={
-                                                current ? 'page' : undefined
-                                            }
-                                            className={ cn(
-                                                'inline-flex items-center border-b-2 border-transparent px-2 text-sm font-medium whitespace-nowrap text-foreground/60 no-underline transition-all hover:text-foreground focus:shadow-none',
-                                                current &&
-                                                    'border-b-primary text-primary hover:text-primary'
-                                            ) }
+                                    return (
+                                        <li
+                                            key={ item.value }
+                                            className="m-0 flex"
                                         >
-                                            { item.label }
-                                        </a>
-                                    </li>
-                                );
-                            } ) }
-                        </ul>
-                    </nav>
-                    <div className="ml-auto flex items-center">
-                        <HelpMenu />
-                    </div>
-                </>
+                                            <a
+                                                href={ item.hash }
+                                                aria-current={
+                                                    current ? 'page' : undefined
+                                                }
+                                                className={ cn(
+                                                    'inline-flex items-center border-b-2 border-transparent px-2 text-sm font-medium whitespace-nowrap text-foreground/60 no-underline transition-all hover:text-foreground focus:shadow-none',
+                                                    current &&
+                                                        'border-b-primary text-primary hover:text-primary'
+                                                ) }
+                                            >
+                                                { item.label }
+                                            </a>
+                                        </li>
+                                    );
+                                } ) }
+                            </ul>
+                        </nav>
+                        <div className="ml-auto flex items-center">
+                            <HelpMenu />
+                        </div>
+                    </>
+                )
             }
         />
     );

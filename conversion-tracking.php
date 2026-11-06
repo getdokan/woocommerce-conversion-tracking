@@ -147,7 +147,6 @@ class WeDevs_WC_Conversion_Tracking {
         require_once WCCT_INCLUDES . '/class-integration-pro-features.php';
         require_once WCCT_INCLUDES . '/class-ajax.php';
         require_once WCCT_INCLUDES . '/class-admin.php';
-        require_once WCCT_INCLUDES . '/class-welcome-20.php';
         require_once WCCT_INCLUDES . '/consent-functions.php';
     }
 
@@ -172,9 +171,11 @@ class WeDevs_WC_Conversion_Tracking {
      *
      * @since 1.2.5
      *
+     * @param bool $network_wide Network activation.
+     *
      * @return void
      */
-    public function activate() {
+    public function activate( $network_wide = false ) {
         $installed = get_option( 'wcct_installed' );
 
         if ( ! $installed ) {
@@ -185,6 +186,7 @@ class WeDevs_WC_Conversion_Tracking {
 
         \StorePulse\ConversionTracking\Log\OrderLog::install();
         \StorePulse\ConversionTracking\Log\Prune::schedule();
+        \StorePulse\ConversionTracking\Onboarding\Redirect::on_activation( $network_wide );
     }
 
     /**
@@ -215,6 +217,9 @@ class WeDevs_WC_Conversion_Tracking {
         // Every settings save and pause purges the known page caches.
         \StorePulse\ConversionTracking\Cache\PageCache::register();
 
+        $this->container['onboarding_redirect'] = new \StorePulse\ConversionTracking\Onboarding\Redirect();
+        $this->container['onboarding_redirect']->register();
+
         add_action( 'plugins_loaded', array( $this, 'plugin_upgrades' ) );
         add_action( 'init', array( $this, 'localization_setup' ) );
         add_action( 'init', array( $this, 'init_classes' ) );
@@ -238,8 +243,6 @@ class WeDevs_WC_Conversion_Tracking {
         $this->container['admin_assets']        = new \StorePulse\ConversionTracking\Admin\Assets();
         $this->container['consent']             = new \StorePulse\ConversionTracking\Consent\ConsentMode();
         $this->container['consent']->register();
-
-        new WCCT_Welcome_20();
 
         if ( ! $this->is_pro() ) {
             $this->container['pro_feature'] = new WCCT_Pro_Features();

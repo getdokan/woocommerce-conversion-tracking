@@ -2,6 +2,8 @@
 
 namespace StorePulse\ConversionTracking\Consent;
 
+use StorePulse\ConversionTracking\Settings\Store;
+
 /**
  * The "Respect cookie choices" switch: Google consent defaults, consent tool detection, the WP Consent API bridge and tag gating.
  */
@@ -33,6 +35,7 @@ class ConsentMode {
      */
     public function register() {
         add_action( 'wp_head', array( $this, 'print_head' ), 5 );
+        add_action( 'wcct_settings_saved', array( self::class, 'sync_from_settings' ), 10, 2 );
 
         if ( self::is_enabled() ) {
             add_filter( 'wp_consent_api_registered_' . plugin_basename( WCCT_FILE ), '__return_true' );
@@ -56,13 +59,52 @@ class ConsentMode {
     }
 
     /**
-     * Turn consent mode on or off.
+     * Turn consent mode on or off: the 3.0 settings' consent_mode, which is the source, and its mirror.
      *
      * @param bool $enabled On or off.
      *
-     * @return bool Whether the option changed.
+     * @return bool Whether the mirror changed.
      */
     public static function set_enabled( $enabled ) {
+        // While the 2.x settings wait for the migration, it owns the first 3.0 write.
+        if ( ! Store::migration_pending() ) {
+            $doc                 = Store::load();
+            $doc['consent_mode'] = (bool) $enabled;
+
+            Store::save( $doc );
+        }
+
+        return self::mirror( (bool) $enabled );
+    }
+
+    /**
+     * Mirror a settings save that changed consent_mode; other saves leave the switch alone.
+     *
+     * @param mixed $new Saved 3.0 settings.
+     * @param mixed $old Settings before the save.
+     *
+     * @return void
+     */
+    public static function sync_from_settings( $new, $old = array() ) {
+        if ( ! is_array( $new ) || ! array_key_exists( 'consent_mode', $new ) ) {
+            return;
+        }
+
+        $was = is_array( $old ) && ! empty( $old['consent_mode'] );
+
+        if ( (bool) $new['consent_mode'] !== $was ) {
+            self::mirror( (bool) $new['consent_mode'] );
+        }
+    }
+
+    /**
+     * Write the option the storefront reads.
+     *
+     * @param bool $enabled On or off.
+     *
+     * @return bool Whether it changed.
+     */
+    private static function mirror( bool $enabled ): bool {
         return update_option( self::OPTION, $enabled ? 'on' : 'off' );
     }
 

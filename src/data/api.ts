@@ -10,6 +10,7 @@ import { __ } from '@wordpress/i18n';
 import type {
     AppData,
     PlatformValues,
+    OnboardingState,
     SettingsSchema,
     SettingsValues,
 } from './types';
@@ -46,15 +47,26 @@ export const errorMessage = ( error: unknown ): string => {
     return message;
 };
 
+export const NEW_ONBOARDING: OnboardingState = {
+    status: 'new',
+    step: 0,
+    platforms: [],
+    eu: '',
+};
+
 /**
- * Settings and schema, fetched together.
+ * Settings, schema and the setup wizard's progress, fetched together.
  */
 export const fetchAppData = async (): Promise< AppData > => {
-    const [ settings, schema ] = await Promise.all( [
+    const [ settings, schema, onboarding ] = await Promise.all( [
         apiFetch< SettingsValues >( { path: `${ NAMESPACE }/settings` } ),
         apiFetch< SettingsSchema >( {
             path: `${ NAMESPACE }/settings/schema`,
         } ),
+        // Progress only drives the setup checklist; the app works without it.
+        apiFetch< OnboardingState >( {
+            path: `${ NAMESPACE }/onboarding`,
+        } ).catch( () => NEW_ONBOARDING ),
     ] );
 
     return {
@@ -66,6 +78,7 @@ export const fetchAppData = async (): Promise< AppData > => {
             global: schema?.global ?? [],
             platforms: schema?.platforms ?? [],
         },
+        onboarding: { ...NEW_ONBOARDING, ...onboarding },
     };
 };
 

@@ -1,15 +1,12 @@
 import { BrowserContext, Page } from '@playwright/test';
 import { test, expect } from '../utils/fixtures';
-import { APP_PATH, loginAsAdmin, openApp } from '../utils/admin';
+import { APP_PATH, isProActive, loginAsAdmin, openApp } from '../utils/admin';
 import { BASE_URL } from '../utils/site';
 
 // The sample checks in mu-plugins/ct-e2e/doctor-checks.php read these cookies.
 const setCookies = async (context: BrowserContext, cookies: Record<string, string>): Promise<void> => {
     await context.addCookies(Object.entries(cookies).map(([name, value]) => ({ name, value, url: BASE_URL })));
 };
-
-const proVersion = (page: Page): Promise<string> =>
-    page.evaluate(() => (window as unknown as { wcctAdmin?: { proVersion: string } }).wcctAdmin?.proVersion ?? '');
 
 // Forgets every Doctor run, dismissal and badge (ct-e2e-helpers.php).
 const resetDoctor = async (page: Page): Promise<void> => {
@@ -29,7 +26,8 @@ test.describe('Tracking Doctor', () => {
         await openApp(page, '#/doctor');
 
         const summary = page.getByTestId('wcct-doctor-summary');
-        const checks = (await proVersion(page)) ? 2 : 1;
+        // Only a running Pro 3.0 adds its check; a paused Pro 1.x adds none.
+        const checks = (await isProActive(page)) ? 2 : 1;
 
         await expect(summary).toContainText('Everything looks good');
         await expect(summary).toContainText(`We checked ${checks} thing${checks > 1 ? 's' : ''}.`);
@@ -62,7 +60,7 @@ test.describe('Tracking Doctor', () => {
         await setCookies(context, { ct_e2e_doctor: 'Pixel Plugin A', ct_e2e_consent: 'off' });
         await openApp(page, '#/doctor');
 
-        const checks = (await proVersion(page)) ? 4 : 3;
+        const checks = (await isProActive(page)) ? 4 : 3;
         const summary = page.getByTestId('wcct-doctor-summary');
 
         await expect(summary).toContainText(`We checked ${checks} things.`);

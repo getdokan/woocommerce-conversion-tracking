@@ -337,7 +337,15 @@ class Schema {
                 __( '15 or 16 digits, numbers only', 'woocommerce-conversion-tracking' ),
                 __( 'Numbers only, 15 or 16 digits. If it starts with "EAA", that\'s an access token, not a Pixel ID.', 'woocommerce-conversion-tracking' ),
                 '^[0-9]{15,16}$',
-                10
+                10,
+                array(
+                    'onboarding' => array(
+                        'required' => true,
+                        'hint'     => __( 'In Meta Events Manager, open your data source, then Settings. The Pixel ID is the number at the top.', 'woocommerce-conversion-tracking' ),
+                        'valid'    => __( 'Looks like a Pixel ID.', 'woocommerce-conversion-tracking' ),
+                        'invalid'  => __( 'Pixel IDs are 15 or 16 digits, numbers only.', 'woocommerce-conversion-tracking' ),
+                    ),
+                )
             ),
             self::section( 'facebook', 'facebook_events', __( 'Events', 'woocommerce-conversion-tracking' ) ),
             self::events_field(
@@ -408,6 +416,7 @@ class Schema {
                 array(
                     'case'         => 'upper',
                     'dependencies' => $analytics,
+                    'onboarding'   => array( 'required' => true ),
                 )
             ),
             self::id_field(
@@ -421,6 +430,10 @@ class Schema {
                 array(
                     'case'         => 'upper',
                     'dependencies' => $ads,
+                    'onboarding'   => array(
+                        'required' => false,
+                        'invalid'  => __( 'Starts with AW- followed by numbers.', 'woocommerce-conversion-tracking' ),
+                    ),
                 )
             ),
             self::id_field(
@@ -431,7 +444,16 @@ class Schema {
                 '',
                 '^[A-Za-z0-9_-]+$',
                 40,
-                array( 'dependencies' => $ads )
+                array(
+                    'dependencies' => $ads,
+                    'onboarding'   => array(
+                        'required' => false,
+                        // Ads conversions need the label with the Ads ID.
+                        'with'     => 'ads_id',
+                        'invalid'  => __( 'Labels are letters, numbers, dashes and underscores: the part after the slash.', 'woocommerce-conversion-tracking' ),
+                        'missing'  => __( 'Add the conversion label to count Ads conversions.', 'woocommerce-conversion-tracking' ),
+                    ),
+                )
             ),
             self::section( 'google', 'google_events', __( 'Events', 'woocommerce-conversion-tracking' ) ),
             self::events_field(
@@ -472,12 +494,23 @@ class Schema {
         $lower    = array( 'case' => 'lower' );
         // Free sends X Purchase only; Pro unlocks the other event IDs.
         $pro      = array_merge( $lower, array( 'pro' => true, 'disabled' => true ) );
+        // The setup wizard asks for the Pixel ID and the Purchase event ID only.
+        $wizard = array(
+            'pixel_id'          => array(
+                'required' => true,
+                'invalid'  => __( 'X Pixel IDs are 5 letters and numbers.', 'woocommerce-conversion-tracking' ),
+            ),
+            'purchase_event_id' => array(
+                'required' => true,
+                'invalid'  => __( 'Starts with tw-, then your Pixel ID and the event code, like tw-o8x2k-o8x3a.', 'woocommerce-conversion-tracking' ),
+            ),
+        );
 
         return array(
             self::page( 'twitter', __( 'X', 'woocommerce-conversion-tracking' ) ),
             self::section( 'twitter', 'twitter_connection', __( 'Connection', 'woocommerce-conversion-tracking' ) ),
-            self::id_field( 'twitter_connection', 'pixel_id', __( 'Pixel ID', 'woocommerce-conversion-tracking' ), __( '5 letters and numbers, like o8x2k', 'woocommerce-conversion-tracking' ), __( 'The base tag on every page.', 'woocommerce-conversion-tracking' ), '^[a-z0-9]{5}$', 10, $lower ),
-            self::id_field( 'twitter_connection', 'purchase_event_id', __( 'Purchase event ID', 'woocommerce-conversion-tracking' ), $event_id, '', $pattern, 20, $lower ),
+            self::id_field( 'twitter_connection', 'pixel_id', __( 'Pixel ID', 'woocommerce-conversion-tracking' ), __( '5 letters and numbers, like o8x2k', 'woocommerce-conversion-tracking' ), __( 'The base tag on every page.', 'woocommerce-conversion-tracking' ), '^[a-z0-9]{5}$', 10, array_merge( $lower, array( 'onboarding' => $wizard['pixel_id'] ) ) ),
+            self::id_field( 'twitter_connection', 'purchase_event_id', __( 'Purchase event ID', 'woocommerce-conversion-tracking' ), $event_id, '', $pattern, 20, array_merge( $lower, array( 'onboarding' => $wizard['purchase_event_id'] ) ) ),
             self::id_field( 'twitter_connection', 'cart_event_id', __( 'Add to cart event ID (optional)', 'woocommerce-conversion-tracking' ), $event_id, '', $pattern, 30, $pro ),
             self::id_field( 'twitter_connection', 'checkout_event_id', __( 'Start checkout event ID (optional)', 'woocommerce-conversion-tracking' ), $event_id, '', $pattern, 40, $pro ),
             self::id_field( 'twitter_connection', 'signup_event_id', __( 'Registration event ID (optional)', 'woocommerce-conversion-tracking' ), $event_id, '', $pattern, 50, $pro ),
@@ -582,7 +615,7 @@ class Schema {
      * @param string $description Help text.
      * @param string $pattern     Format the value must match once cleaned (empty clears the field); extra 'case' (upper, lower) is applied first.
      * @param int    $priority    Order in the section.
-     * @param array  $extra       More element keys.
+     * @param array  $extra       More element keys; 'onboarding' { required, with, hint, valid, invalid, missing } puts the field in the setup wizard.
      *
      * @return array
      */

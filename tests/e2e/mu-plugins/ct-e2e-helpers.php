@@ -171,6 +171,74 @@ add_action(
     }
 );
 
+// ct-e2e/v1/state: lets the onboarding spec read, set and restore the setup state, and switch plugins without a page view.
+add_action(
+    'rest_api_init',
+    static function () {
+        $options = array( 'wcct_onboarding', 'wcct_onboarding_redirect', 'wcct_install_type', 'wcct_settings', 'wcct_settings_v3', 'wcct_consent_mode' );
+
+        register_rest_route(
+            'ct-e2e/v1',
+            '/state',
+            array(
+                array(
+                    'methods'             => 'GET',
+                    'permission_callback' => static function () {
+                        return current_user_can( 'manage_options' );
+                    },
+                    'callback'            => static function () use ( $options ) {
+                        $state = array();
+
+                        foreach ( $options as $name ) {
+                            $state[ $name ] = get_option( $name, null );
+                        }
+
+                        return array(
+                            'options' => $state,
+                            'active'  => array_values( (array) get_option( 'active_plugins', array() ) ),
+                        );
+                    },
+                ),
+                array(
+                    'methods'             => 'POST',
+                    'permission_callback' => static function () {
+                        return current_user_can( 'manage_options' );
+                    },
+                    'callback'            => static function ( WP_REST_Request $request ) use ( $options ) {
+                        require_once ABSPATH . 'wp-admin/includes/plugin.php';
+
+                        foreach ( (array) $request->get_param( 'options' ) as $name => $value ) {
+                            if ( ! in_array( $name, $options, true ) ) {
+                                continue;
+                            }
+
+                            if ( null === $value ) {
+                                delete_option( $name );
+                            } else {
+                                update_option( $name, $value );
+                            }
+                        }
+
+                        // Pro needs Lite, so Pro goes first on the way down and last on the way up.
+                        $deactivate = (array) $request->get_param( 'deactivate' );
+                        $activate   = (array) $request->get_param( 'activate' );
+
+                        if ( $deactivate ) {
+                            deactivate_plugins( $deactivate, true );
+                        }
+
+                        foreach ( $activate as $plugin ) {
+                            activate_plugin( $plugin, '', false, true );
+                        }
+
+                        return array( 'active' => array_values( (array) get_option( 'active_plugins', array() ) ) );
+                    },
+                ),
+            )
+        );
+    }
+);
+
 // The ct_e2e_block_rest cookie answers 403 on wcct/v1/events, like a security plugin that blocks REST for guests.
 add_filter(
     'rest_pre_dispatch',

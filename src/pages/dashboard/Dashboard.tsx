@@ -76,6 +76,10 @@ const Dashboard = () => {
 
     const cards = platformCards( data );
     const connected = cards.filter( ( card ) => card.connected );
+    // A setup that was started and not finished keeps its checklist, even once a platform is connected.
+    const setupOpen = [ 'in_progress', 'skipped' ].includes(
+        data.onboarding.status
+    );
 
     if ( ! connected.length ) {
         return (
@@ -86,7 +90,7 @@ const Dashboard = () => {
                     'woocommerce-conversion-tracking'
                 ) }
             >
-                <WelcomeCard />
+                <WelcomeCard onboarding={ data.onboarding } />
                 <section
                     className="flex flex-col gap-3"
                     aria-labelledby="wcct-new-platforms"
@@ -142,6 +146,7 @@ const Dashboard = () => {
             }
         >
             <div className="flex flex-col gap-5" data-testid="wcct-dashboard">
+                { setupOpen && <WelcomeCard onboarding={ data.onboarding } /> }
                 <StatCards
                     refreshing={ refreshing }
                     lastDoctorRun={ doctor?.ran_ago ?? '' }

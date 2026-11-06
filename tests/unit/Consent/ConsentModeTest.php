@@ -1,7 +1,12 @@
 <?php
 
+require_once dirname( __DIR__ ) . '/Fakes/settings-functions.php';
+
 use PHPUnit\Framework\TestCase;
 use StorePulse\ConversionTracking\Consent\ConsentMode;
+use StorePulse\ConversionTracking\Settings\Schema;
+use StorePulse\ConversionTracking\Settings\Store;
+use StorePulse\ConversionTracking\Settings\Values;
 
 /**
  * Tests for the consent switch, wcct_consent_allows(), the status data and the head script
@@ -32,12 +37,58 @@ class ConsentModeTest extends TestCase {
         $this->assertFalse( ConsentMode::is_enabled() );
     }
 
-    public function test_set_enabled_stores_on_or_off() {
+    public function test_set_enabled_writes_the_settings_and_the_mirror() {
         ConsentMode::set_enabled( true );
         $this->assertSame( 'on', get_option( ConsentMode::OPTION ) );
+        $this->assertTrue( get_option( Store::OPTION )['consent_mode'] );
 
         ConsentMode::set_enabled( false );
         $this->assertSame( 'off', get_option( ConsentMode::OPTION ) );
+        $this->assertFalse( get_option( Store::OPTION )['consent_mode'] );
+    }
+
+    public function test_set_enabled_leaves_the_settings_to_a_pending_migration() {
+        $GLOBALS['wcct_test_options']['wcct_settings'] = array( 'facebook' => array( 'enabled' => true ) );
+
+        ConsentMode::set_enabled( true );
+
+        $this->assertSame( 'on', get_option( ConsentMode::OPTION ) );
+        $this->assertFalse( get_option( Store::OPTION ) );
+    }
+
+    public function test_a_settings_save_mirrors_only_a_changed_switch() {
+        ConsentMode::sync_from_settings( array( 'consent_mode' => true ), array() );
+        $this->assertTrue( ConsentMode::is_enabled() );
+
+        // Settings without consent_mode, or with it unchanged, leave the mirror alone.
+        $GLOBALS['wcct_test_options'][ ConsentMode::OPTION ] = 'off';
+        ConsentMode::sync_from_settings( array( 'platforms' => array() ), array() );
+        ConsentMode::sync_from_settings( array( 'consent_mode' => true ), array( 'consent_mode' => true ) );
+        $this->assertFalse( ConsentMode::is_enabled() );
+
+        ConsentMode::sync_from_settings( array( 'consent_mode' => false ), array( 'consent_mode' => true ) );
+        $this->assertSame( 'off', get_option( ConsentMode::OPTION ) );
+    }
+
+    public function test_an_unrelated_save_keeps_the_switch_on() {
+        ConsentMode::set_enabled( true );
+
+        $old    = Store::load();
+        $result = Values::apply(
+            Schema::get(),
+            $old,
+            array( 'platforms' => array( 'facebook' => array( 'pixel_id' => '1234567890123456' ) ) ),
+            function () {
+                return true;
+            }
+        );
+
+        $this->assertSame( array(), $result['errors'] );
+        Store::save( $result['doc'] );
+        ConsentMode::sync_from_settings( $result['doc'], $old );
+
+        $this->assertTrue( ConsentMode::is_enabled() );
+        $this->assertTrue( Store::load()['consent_mode'] );
     }
 
     public function test_allows_everything_with_the_switch_off() {

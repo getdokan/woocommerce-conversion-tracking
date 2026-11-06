@@ -41,7 +41,21 @@ export type SettingsValues = {
     [ key: string ]: unknown;
 };
 
+export type OnboardingStatus = 'new' | 'in_progress' | 'skipped' | 'done';
+
+export type EuAnswer = '' | 'yes' | 'no';
+
+// The wcct/v1/onboarding state: wizard progress, never settings.
+export type OnboardingState = {
+    status: OnboardingStatus;
+    // Furthest step reached, 1 to 6; 0 before the wizard opens.
+    step: number;
+    platforms: string[];
+    eu: EuAnswer;
+};
+
 export type AppData = {
     settings: SettingsValues;
     schema: SettingsSchema;
+    onboarding: OnboardingState;
 };

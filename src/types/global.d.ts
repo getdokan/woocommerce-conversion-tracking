@@ -32,6 +32,8 @@ type WcctAdminData = {
     };
     logosUrl: string;
     classicUrl: string;
+    // The storefront, opened from the wizard's Verify step.
+    homeUrl: string;
 };
 
 interface Window {
