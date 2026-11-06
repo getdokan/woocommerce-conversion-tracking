@@ -1,11 +1,18 @@
 <?php
 
 use StorePulse\ConversionTracking\Events\PurchaseConfirmation;
+use StorePulse\ConversionTracking\Events\OrderReceived;
+use StorePulse\ConversionTracking\Privacy\CustomerDetails;
 
 /**
  * WCCT gate way custom
  */
 class WCCT_Integration_Custom extends WCCT_Integration {
+
+    /**
+     * Order placeholders of the thank-you script.
+     */
+    const ORDER_PLACEHOLDERS = array( '{used_coupons}', '{payment_method}', '{currency}', '{order_total}', '{order_number}', '{order_subtotal}', '{order_discount}', '{order_shipping}' );
 
     /**
      * Constructor for WC_Conversion_Tracking_Gateway_Custom class
@@ -134,7 +141,7 @@ class WCCT_Integration_Custom extends WCCT_Integration {
             $code = $this->get_integration_settings();
 
             if ( isset( $code['registration'] ) && ! empty( $code['registration'] ) ) {
-                return $code['registration'];
+                return str_replace( CustomerDetails::PLACEHOLDERS, '', $code['registration'] );
             }
         }
     }
@@ -154,7 +161,7 @@ class WCCT_Integration_Custom extends WCCT_Integration {
 
         // bail out if not a valid instance
         if ( ! is_a( $order, 'WC_Order' ) ) {
-            return $code;
+            return str_replace( array_merge( CustomerDetails::PLACEHOLDERS, self::ORDER_PLACEHOLDERS ), '', $code );
         }
 
         if ( version_compare( WC()->version, '3.0', '<=' ) ) {
@@ -175,7 +182,6 @@ class WCCT_Integration_Custom extends WCCT_Integration {
             $used_coupons = $order->get_coupon_codes();
         }
 
-        $customer       = $order->get_user();
         $used_coupons   = implode( ',', $used_coupons );
         $order_total    = $order->get_total();
         $order_number   = $order->get_order_number();
@@ -183,13 +189,10 @@ class WCCT_Integration_Custom extends WCCT_Integration {
 	    $order_discount = $order->get_total_discount();
 
 
-        // customer details
-        if ( $customer ) {
-            $code = str_replace( '{customer_id}', $customer->ID, $code );
-            $code = str_replace( '{customer_email}', $customer->user_email, $code );
-            $code = str_replace( '{customer_first_name}', $customer->first_name, $code );
-            $code = str_replace( '{customer_last_name}', $customer->last_name, $code );
-        }
+        // Customer details stay empty unless "Include customer details in scripts" allows them.
+        $verified = CustomerDetails::is_enabled() ? OrderReceived::get_order() : false;
+        $customer = CustomerDetails::values( $order, $verified );
+        $code     = str_replace( array_keys( $customer ), array_values( $customer ), $code );
 
         // order details
         $code = str_replace( '{used_coupons}', $used_coupons, $code );

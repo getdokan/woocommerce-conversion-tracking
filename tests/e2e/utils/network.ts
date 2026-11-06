@@ -21,7 +21,7 @@ export interface CapturedRequest {
 const STUBS: { match: RegExp; file: string }[] = [
     { match: /^https:\/\/connect\.facebook\.net\/[^/]+\/fbevents\.js/, file: 'fbevents.js' },
     { match: /^https:\/\/www\.googletagmanager\.com\/gtag\/js/, file: 'gtag.js' },
-    { match: /^https:\/\/static\.ads-twitter\.com\/uwt\.js/, file: 'uwt.js' },
+    { match: /^https?:\/\/static\.ads-twitter\.com\/uwt\.js/, file: 'uwt.js' },
     { match: /^https?:\/\/bat\.bing\.com\/bat\.js/, file: 'bat.js' },
 ];
 

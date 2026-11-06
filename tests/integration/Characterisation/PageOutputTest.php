@@ -72,6 +72,16 @@ class PageOutputTest extends WCCT_Test_Page_Case {
         return $cases;
     }
 
+    protected function captured_page_differences() {
+        $customer_details = '#78 renders the Custom script\'s customer placeholders empty while "Include customer details in scripts" is off';
+
+        return array(
+            'order-received-classic'  => $customer_details,
+            'order-received-block'    => $customer_details,
+            'order-received-customer' => $customer_details,
+        );
+    }
+
     public function pages_and_integrations() {
         $cases = array();
 

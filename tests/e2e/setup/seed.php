@@ -148,20 +148,23 @@ $ct_e2e_settings = array(
     ),
 );
 
-// With Pro: X's optional events and Microsoft, so their requests are checked too.
-if ( is_plugin_active( 'wc-conversion-tracking-pro/woocommerce-conversion-tracking-pro.php' ) ) {
+// With Pro: X's optional events and Microsoft, so their requests are checked too. Start checkout IDs are shared with specs/begin-checkout.spec.ts.
+$ct_e2e_checkout_ids = json_decode( file_get_contents( __DIR__ . '/../config/checkout-ids.json' ), true );
+
+// A Pro left in active_plugins after its mapping was removed doesn't count.
+if ( is_plugin_active( 'wc-conversion-tracking-pro/woocommerce-conversion-tracking-pro.php' ) && file_exists( WP_PLUGIN_DIR . '/wc-conversion-tracking-pro/woocommerce-conversion-tracking-pro.php' ) ) {
     $ct_e2e_settings['twitter'][0]['events'] += array(
         'AddToCart'         => 'on',
         'cart_event_id'     => 'tw-cte2x-ctadd',
         'InitiateCheckout'  => 'on',
-        'checkout_event_id' => 'tw-cte2x-ctchk',
+        'checkout_event_id' => $ct_e2e_checkout_ids['xCheckoutEventId'],
         'Registration'      => 'on',
         'signup_event_id'   => 'tw-cte2x-ctreg',
     );
     $ct_e2e_settings['bing_ads'] = array(
         'enabled' => true,
         array(
-            'tag_id' => '12345678',
+            'tag_id' => $ct_e2e_checkout_ids['microsoftTagId'],
             'events' => array(
                 'AddToCart'     => 'on',
                 'BeginCheckout' => 'on',
