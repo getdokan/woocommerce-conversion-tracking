@@ -111,6 +111,9 @@ class WCCT_Admin {
 
             if ( ! empty( $tab['id'] ) ) {
                 printf( '<a href="%s" class="nav-tab %s">%s</a>', esc_url( 'admin.php?page=conversion-tracking&tab=' . rawurlencode( $tab['id'] ) ), esc_attr( $active_class ), esc_html( $tab['title'] ) );
+            } elseif ( ! empty( $tab['url'] ) ) {
+                // Pro tabs open the upgrade page.
+                printf( '<a href="%s" class="nav-tab disabled" target="_blank" rel="noopener noreferrer">%s<span class="screen-reader-text"> %s</span></a>', esc_url( $tab['url'] ), esc_html( $tab['title'] ), esc_html__( '(opens in a new tab)', 'woocommerce-conversion-tracking' ) );
             } else {
                 printf( '<a href="#" class="nav-tab disabled">%s</a>', esc_html( $tab['title'] ) );
             }

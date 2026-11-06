@@ -79,7 +79,7 @@
                                                             $checked = isset( $settings[0][ $field_name ][ $key ] ) ? 'on' : '';
                                                             $disabled = isset( $option['profeature'] ) ? 'disabled' : '';
                                                             $class  = isset( $option['profeature'] ) ? 'disabled-class' : '';
-                                                            $feature = isset( $option['profeature'] ) ? ' (Pro-feature)' : '';
+                                                            $feature = isset( $option['profeature'] ) ? ' <a href="' . esc_url( \StorePulse\ConversionTracking\Admin\Upgrade::url() ) . '" target="_blank" rel="noopener">' . esc_html__( '(Pro feature)', 'woocommerce-conversion-tracking' ) . '<span class="screen-reader-text"> ' . esc_html__( '(opens in a new tab)', 'woocommerce-conversion-tracking' ) . '</span></a>' : '';
                                                             ?>
                                                                 <label for="<?php echo esc_attr( $id . '-' . $key ); ?>" class="<?php echo esc_attr( $class )?>">
                                                                     <input type="checkbox" name="settings[<?php echo esc_attr( $id ); ?>][0][<?php echo esc_attr( $field_name ); ?>][<?php echo esc_attr( $key ); ?>]" <?php checked( 'on', $checked ); ?> id="<?php echo esc_attr( $id . '-' . $key ); ?>" class="event <?php echo esc_attr( $class );?>" <?php echo esc_attr( $disabled ) ?>>

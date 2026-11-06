@@ -12,28 +12,8 @@ class WCCT_Pro_Features {
         add_filter( 'wcct_settings_fb', array( $this, 'facebook_pro_features' ), 10, 1 );
         add_filter( 'wcct_settings_twitter', array( $this, 'twitter_pro_features' ), 10, 1 );
         add_filter( 'wcct_settings_adwords', array( $this, 'adwords_pro_features' ), 10, 1 );
-        add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_script' ) );
 
         add_filter( 'wcct_nav_tab', array( $this, 'pro_tabs' ) );
-
-        add_action( 'wcct_sidebar', array( $this, 'profeature_ad' ) );
-    }
-
-    /**
-     * Enqueue SweetAlert for the Pro feature prompts, on the Conversion Tracking page only
-     *
-     * @param string $hook_suffix Current admin page hook.
-     *
-     * @return void
-     */
-    public function enqueue_script( $hook_suffix ) {
-        $admin = wcct_init()->admin;
-
-        if ( empty( $admin->page_hook ) || $admin->page_hook !== $hook_suffix ) {
-            return;
-        }
-
-        wp_enqueue_script( 'sweetalert', plugins_url( 'assets/js/sweetalert.min.js', WCCT_FILE ), array(), WCCT_VERSION, false );
     }
 
     /**
@@ -48,11 +28,13 @@ class WCCT_Pro_Features {
         $sections[] = array(
             'id'    => '',
             'title' => __( 'Facebook Product Catalog (Pro)', 'woocommerce-conversion-tracking' ),
+            'url'   => \StorePulse\ConversionTracking\Admin\Upgrade::url(),
         );
 
         $sections[] = array(
             'id'    => '',
             'title' => __( 'Settings (Pro)', 'woocommerce-conversion-tracking' ),
+            'url'   => \StorePulse\ConversionTracking\Admin\Upgrade::url(),
         );
 
         return $sections;
@@ -129,29 +111,5 @@ class WCCT_Pro_Features {
         );
 
         return $settings;
-    }
-
-    /**
-     * Show profeature
-     *
-     * @return void
-     */
-    public function profeature_ad() {
-        ?>
-        <div class="premium-box box-blue">
-            <h3><?php esc_html_e( 'Premium Features', 'woocommerce-conversion-tracking' ) ?></h3>
-
-            <ul class="premium-feature-list">
-                <li>Advanced Facebook Events and Tracking</li>
-                <li>Facebook <strong>Product Catalog</strong></li>
-                <li><mark><strong>Multiple</strong> Facebook Pixels</mark></li>
-                <li>Advanced Google Adwords Events</li>
-                <li>Advanced X (formerly Twitter) Events</li>
-                <li>Bing Ads</li>
-            </ul>
-
-            <a href="https://woocommerce.com/products/woocommerce-conversion-tracking-pro/" target="_blank" class="button button-primary"><?php esc_html_e( 'Get Premium', 'woocommerce-conversion-tracking' ) ?></a>
-        </div>
-        <?php
     }
 }

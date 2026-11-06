@@ -33,3 +33,11 @@ body.wcct-app-page .wcct-wrap > div.updated,
 body.wcct-app-page .wcct-wrap > div.error {
     margin: 16px 32px 0;
 }
+
+/* Modal dialogs cover the admin bar (z-index 99999) and the admin menu too; plugin-ui's z-50 is !important. */
+.wcct-app [data-slot="alert-dialog-overlay"],
+.wcct-app [data-slot="alert-dialog-content"],
+.wcct-app [data-slot="dialog-overlay"],
+.wcct-app [data-slot="dialog-content"] {
+    z-index: 100000 !important;
+}

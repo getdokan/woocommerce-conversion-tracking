@@ -176,4 +176,18 @@ if ( is_plugin_active( 'wc-conversion-tracking-pro/woocommerce-conversion-tracki
 
 update_option( 'wcct_settings', $ct_e2e_settings );
 
+// A shop manager for the Integration access specs; only administrators have access until a spec grants it.
+if ( ! get_user_by( 'login', 'ct_e2e_shop_manager' ) ) {
+    wp_insert_user(
+        array(
+            'user_login' => 'ct_e2e_shop_manager',
+            'user_pass'  => 'password',
+            'user_email' => 'shop-manager@example.test',
+            'role'       => 'shop_manager',
+        )
+    );
+}
+
+delete_option( 'wcct_permissions' );
+
 WP_CLI::success( sprintf( 'Seeded the e2e store (product #%d).', $ct_e2e_product->get_id() ) );

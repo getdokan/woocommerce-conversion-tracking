@@ -12,7 +12,9 @@ import { __ } from '@wordpress/i18n';
 /**
  * Internal dependencies
  */
+import { upgradeUrl } from '../../data/plan';
 import type { PlatformCardInfo } from '../../data/platforms';
+import { NewTabNote } from '../../shell/NewTabNote';
 import { CardSkeleton } from '../../shell/PageSkeleton';
 
 const logoUrl = ( file: string ) =>
@@ -131,10 +133,13 @@ export const SetupPlatformCard = ( { platform }: Props ) => (
                     ) }
                 </span>
                 <a
-                    href="#/settings/plan"
+                    href={ upgradeUrl() }
+                    target="_blank"
+                    rel="noreferrer"
                     className="shrink-0 font-medium text-primary underline underline-offset-3"
                 >
                     { __( 'Compare plans', 'woocommerce-conversion-tracking' ) }
+                    <NewTabNote />
                 </a>
             </div>
         ) : (

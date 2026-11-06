@@ -6,12 +6,19 @@ const ADMIN_PASSWORD = process.env.WP_ADMIN_PASSWORD ?? 'password';
 
 export const APP_PATH = '/wp-admin/admin.php?page=conversion-tracking';
 
-export async function loginAsAdmin(page: Page): Promise<void> {
+// Seeded by setup/seed.php.
+export const SHOP_MANAGER = { user: 'ct_e2e_shop_manager', password: 'password' };
+
+export async function login(page: Page, user: string, password: string): Promise<void> {
     await page.goto('/wp-login.php');
-    await page.locator('#user_login').fill(ADMIN_USER);
-    await page.locator('#user_pass').fill(ADMIN_PASSWORD);
+    await page.locator('#user_login').fill(user);
+    await page.locator('#user_pass').fill(password);
     await page.locator('#wp-submit').click();
     await expect(page.locator('#wpadminbar')).toBeVisible();
+}
+
+export async function loginAsAdmin(page: Page): Promise<void> {
+    await login(page, ADMIN_USER, ADMIN_PASSWORD);
 }
 
 // Opens the admin app at a hash route and waits for the page heading.

@@ -15,6 +15,8 @@ The store runs in Docker with [wp-env](https://www.npmjs.com/package/@wordpress/
 
 `specs/begin-checkout.spec.ts` loads block and classic checkout and checks that Meta `InitiateCheckout` and GA4 `begin_checkout` are each sent once, and none on the thank-you page. With Pro active, setup also saves X's Start checkout event ID and a Microsoft UET tag (`config/checkout-ids.json`), and the spec checks their hits too; `utils/stubs` has stand-ins for X's `uwt.js` and Microsoft's `bat.js` too.
 
+`specs/settings.spec.ts` covers Settings > Integration access and Settings > Plan. On Free (no Pro mapped) it checks the locked access preview, the plan comparison with no price, and that every Upgrade, See pricing, Compare plans and plugins-list Get PRO link opens the WooCommerce.com product page. With Pro it checks Manage subscription, the confirmation before a role is granted (Cancel and Escape leave it off), the save, the Dokan vendor warning, and that a granted shop manager (`ct_e2e_shop_manager` / `password`, seeded by setup) sees the list read-only and gets 403 from the access route. Run it once without and once with Pro to cover both.
+
 ## Run it locally
 
 You need Docker and Node 22.13 or newer. The plugin also needs its Composer packages and its built admin bundles, so run `composer install` and `npm ci && npm run build` in the plugin root once.

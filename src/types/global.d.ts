@@ -21,6 +21,11 @@ type WcctAdminData = {
         support: string;
         feature_request: string;
     };
+    // Every Upgrade and Manage subscription link (WooCommerce.com), from Admin\Upgrade.
+    upgrade: {
+        upgrade: string;
+        manage: string;
+    };
     logosUrl: string;
     classicUrl: string;
 };

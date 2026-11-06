@@ -110,6 +110,7 @@ class Assets {
                     'tiles' => Docs::tiles(),
                 ),
                 'help'       => Docs::help_links(),
+                'upgrade'    => Upgrade::links(),
                 'logosUrl'   => WCCT_ASSETS . '/images/platforms/',
                 'classicUrl' => admin_url( 'admin.php?page=conversion-tracking&tab=integrations' ),
             )

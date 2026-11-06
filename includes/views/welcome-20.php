@@ -16,7 +16,7 @@
 
         <p class="cta-buttons">
             <a href="https://wedevs.com/in/woocommerce-conversion-tracking" target="_blank" class="btn-whats-new">Checkout What's New</a>
-            <a href="https://wedevs.com/woocommerce-conversion-tracking/upgrade-to-pro/?utm_source=wp-admin&utm_medium=pro-upgrade&utm_campaign=wcct_upgrade&utm_content=Get_Premium" target="_blank" class="btn-pro-upgrade">Upgrate to Pro</a>
+            <a href="<?php echo esc_url( \StorePulse\ConversionTracking\Admin\Upgrade::url() ); ?>" target="_blank" rel="noopener noreferrer" class="btn-pro-upgrade"><?php esc_html_e( 'Upgrade to Pro', 'woocommerce-conversion-tracking' ); ?></a>
         </p>
 
         <span class="bottom-logo">

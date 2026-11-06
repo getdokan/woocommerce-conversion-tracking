@@ -18,6 +18,7 @@ import { isKnownPlatform } from '../data/platforms';
 import { replaceHash, routePath, useRoute, type Route } from '../router';
 import Dashboard from '../pages/dashboard/Dashboard';
 import Placeholder from '../pages/Placeholder';
+import Settings from '../pages/settings/Settings';
 import { pageInfo } from '../pages/titles';
 import { AppTopBar } from './AppTopBar';
 import { PageSkeleton } from './PageSkeleton';
@@ -34,6 +35,10 @@ const BASE_TITLE = document.title;
 const RoutePage = ( { route }: { route: Route } ) => {
     if ( route.name === 'dashboard' ) {
         return <Dashboard />;
+    }
+
+    if ( route.name === 'settings' ) {
+        return <Settings section={ route.section } />;
     }
 
     return <Placeholder { ...pageInfo( route ) } />;
@@ -95,15 +100,31 @@ export const Shell = () => {
         document.title = `${ title } ‹ ${ BASE_TITLE }`;
     }, [ title ] );
 
-    // Entering a page from another one re-reads the settings and moves focus to its heading.
+    // Entering a page from another one re-reads the settings and moves focus to its heading;
+    // switching sections within a page (Settings) only focuses the section heading.
     useEffect( () => {
         if ( previousPath.current === path ) {
             return;
         }
 
+        const samePage =
+            previousPath.current.split( '/' )[ 1 ] === path.split( '/' )[ 1 ];
+        const section = samePage
+            ? document.querySelector< HTMLElement >(
+                  '#wcct-app-root [data-wcct-section-heading]'
+              )
+            : null;
+
         previousPath.current = path;
-        refresh();
-        document.querySelector< HTMLElement >( '#wcct-app-root h1' )?.focus();
+
+        if ( ! samePage ) {
+            refresh();
+        }
+
+        (
+            section ??
+            document.querySelector< HTMLElement >( '#wcct-app-root h1' )
+        )?.focus();
     }, [ path, refresh ] );
 
     let page = <RoutePage route={ route } />;

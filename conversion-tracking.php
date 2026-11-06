@@ -1,7 +1,7 @@
 <?php
 /*
 Plugin Name: Conversion Tracking for WooCommerce
-Plugin URI: https://wedevs.com/woocommerce-conversion-tracking/
+Plugin URI: https://wordpress.org/plugins/woocommerce-conversion-tracking/
 Description: Sends WooCommerce purchases and shopper events to Meta, Google Analytics 4, Google Ads and X, each purchase counted once, plus your own scripts.
 Version: 2.1.6
 Author: weDevs
@@ -302,7 +302,7 @@ class WeDevs_WC_Conversion_Tracking {
      */
     function plugin_action_links( $links ) {
         if ( ! $this->is_pro() ) {
-            $links[] = '<a href="https://wedevs.com/woocommerce-conversion-tracking/upgrade-to-pro/?utm_source=wp-admin&utm_medium=pro-upgrade&utm_campaign=wcct_upgrade&utm_content=Get_Premium" target="_blank" style="color: #389e38;font-weight: bold;">' . __( 'Get PRO', 'woocommerce-conversion-tracking' ) . '</a>';
+            $links[] = '<a href="' . esc_url( \StorePulse\ConversionTracking\Admin\Upgrade::url() ) . '" target="_blank" rel="noopener noreferrer" style="color: #389e38;font-weight: bold;">' . __( 'Get PRO', 'woocommerce-conversion-tracking' ) . '</a>';
         }
 
         $links[] = '<a href="https://wedevs.com/docs/woocommerce-conversion-tracking/?utm_source=wp-admin&utm_medium=action-link&utm_campaign=wcct_docs&utm_content=Docs" target="_blank">' . __( 'Docs', 'woocommerce-conversion-tracking' ) . '</a>';
