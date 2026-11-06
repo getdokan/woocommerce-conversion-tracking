@@ -14,7 +14,7 @@ class SettingsRouteTest extends TestCase {
     );
 
     public function test_only_users_who_can_manage_conversion_tracking_get_in() {
-        $paths    = array( array( 'GET', '/wcct/v1/settings' ), array( 'GET', '/wcct/v1/settings/schema' ), array( 'POST', '/wcct/v1/settings' ) );
+        $paths    = array( array( 'GET', '/wcct/v1/settings' ), array( 'GET', '/wcct/v1/settings/schema' ), array( 'POST', '/wcct/v1/settings' ), array( 'POST', '/wcct/v1/settings/pause' ) );
         $expected = array(
             'admin'        => 200,
             'shop_manager' => 403,
@@ -26,7 +26,7 @@ class SettingsRouteTest extends TestCase {
 
         foreach ( array_keys( $expected ) as $as ) {
             foreach ( $paths as $path ) {
-                $requests[] = array( 'as' => $as, 'method' => $path[0], 'path' => $path[1], 'body' => 'POST' === $path[0] ? array( 'consent_mode' => true ) : null );
+                $requests[] = array( 'as' => $as, 'method' => $path[0], 'path' => $path[1], 'body' => 'POST' === $path[0] ? array( 'consent_mode' => true, 'platform' => 'facebook', 'paused' => false ) : null );
             }
         }
 
@@ -176,6 +176,70 @@ class SettingsRouteTest extends TestCase {
         $this->assertSame( 200, $result['responses'][1]['status'] );
         $this->assertSame( 'G-ABC123', $result['responses'][1]['data']['platforms']['google']['measurement_id'] );
         $this->assertSame( 'tw-o8x2k-o8x3a', $result['responses'][1]['data']['platforms']['twitter']['purchase_event_id'] );
+    }
+
+    public function test_pause_and_resume_take_effect_at_once_and_purge_the_page_caches() {
+        $result = $this->run_job(
+            array(
+                array( 'as' => 'admin', 'method' => 'POST', 'path' => '/wcct/v1/settings/pause', 'body' => array( 'platform' => 'google', 'paused' => true ) ),
+                array( 'as' => 'admin', 'method' => 'POST', 'path' => '/wcct/v1/settings/pause', 'body' => array( 'platform' => 'facebook', 'paused' => true ) ),
+                array( 'as' => 'admin', 'method' => 'POST', 'path' => '/wcct/v1/settings/pause', 'body' => array( 'platform' => 'google', 'paused' => false ) ),
+                array( 'as' => 'admin', 'method' => 'GET', 'path' => '/wcct/v1/settings' ),
+            ),
+            array( 'wcct_settings' => self::V1, 'wcct_paused_platforms' => array( 'ga4' ) )
+        );
+
+        $this->assertSame( array( 200, 200, 200, 200 ), array_column( $result['responses'], 'status' ) );
+        $this->assertTrue( $result['responses'][0]['data']['platforms']['google']['paused'] );
+        $this->assertTrue( $result['responses'][1]['data']['platforms']['facebook']['paused'] );
+        $this->assertFalse( $result['responses'][2]['data']['platforms']['google']['paused'] );
+        $this->assertTrue( $result['responses'][3]['data']['platforms']['facebook']['paused'] );
+        $this->assertFalse( $result['responses'][3]['data']['platforms']['twitter']['paused'] );
+
+        // Resuming Google also cleared the old ga4-only pause.
+        $this->assertSame( array( 'facebook' ), $result['after']['paused'] );
+
+        // Each change purged; reading did not.
+        $this->assertContains( 'litespeed', $result['responses'][0]['purged'] );
+        $this->assertContains( 'object_cache', $result['responses'][0]['purged'] );
+        $this->assertNotNull( $result['responses'][2]['purged'] );
+        $this->assertNull( $result['responses'][3]['purged'] );
+
+        // The settings stay as they were.
+        $this->assertSame( $result['before']['v1'], $result['after']['v1'] );
+        $this->assertNull( $result['after']['v3'] );
+    }
+
+    public function test_pause_needs_a_known_platform_and_the_manage_capability() {
+        $result = $this->run_job(
+            array(
+                array( 'as' => 'admin', 'method' => 'POST', 'path' => '/wcct/v1/settings/pause', 'body' => array( 'platform' => 'pinterest', 'paused' => true ) ),
+                array( 'as' => 'admin', 'method' => 'POST', 'path' => '/wcct/v1/settings/pause', 'body' => array( 'platform' => 'facebook' ) ),
+                array( 'as' => 'shop_manager', 'method' => 'POST', 'path' => '/wcct/v1/settings/pause', 'body' => array( 'platform' => 'facebook', 'paused' => true ) ),
+                array( 'as' => 'guest', 'method' => 'POST', 'path' => '/wcct/v1/settings/pause', 'body' => array( 'platform' => 'facebook', 'paused' => true ) ),
+            )
+        );
+
+        $this->assertSame( array( 400, 400, 403, 401 ), array_column( $result['responses'], 'status' ) );
+        $this->assertSame( 'wcct_rest_unknown_platform', $result['responses'][0]['data']['code'] );
+        $this->assertNull( $result['after']['paused'] );
+        $this->assertSame( array( null, null, null, null ), array_column( $result['responses'], 'purged' ) );
+    }
+
+    public function test_every_settings_save_purges_the_page_caches() {
+        $result = $this->run_job(
+            array(
+                array( 'as' => 'admin', 'method' => 'POST', 'path' => '/wcct/v1/settings', 'body' => array( 'consent_mode' => true ) ),
+                // Nothing changed, still a save.
+                array( 'as' => 'admin', 'method' => 'POST', 'path' => '/wcct/v1/settings', 'body' => array( 'consent_mode' => true ) ),
+                array( 'as' => 'admin', 'method' => 'POST', 'path' => '/wcct/v1/settings', 'body' => array( 'platforms' => array( 'google' => array( 'ads_id' => 'AW-123/label' ) ) ) ),
+            )
+        );
+
+        $this->assertContains( 'litespeed', $result['responses'][0]['purged'] );
+        $this->assertContains( 'litespeed', $result['responses'][1]['purged'] );
+        $this->assertSame( 400, $result['responses'][2]['status'] );
+        $this->assertNull( $result['responses'][2]['purged'] );
     }
 
     private function run_job( array $requests, array $options = array(), string $grant = '' ): array {

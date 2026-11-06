@@ -2,7 +2,7 @@
  * External dependencies
  */
 import { Button, Card, cn } from '@wedevs/plugin-ui';
-import { Page, PlatformLogo, ProBadge } from '@wcct/components';
+import { Page, PlatformLogo, ProBadge, StatusPill } from '@wcct/components';
 
 /**
  * WordPress dependencies
@@ -20,6 +20,7 @@ import {
 } from '../../data/platforms';
 import { pageInfo } from '../titles';
 import CustomScript from './custom/CustomScript';
+import { PauseTracking } from './PauseTracking';
 
 /**
  * The status dot of a platform in the list.
@@ -103,50 +104,78 @@ const PlatformList = ( {
 );
 
 /**
- * A platform whose page a later task builds; its settings stay on the classic screen.
+ * A platform whose page a later task builds; its settings stay on the classic screen, Pause tracking is here once it is connected.
  *
  * @param {Object}           props          Component props.
  * @param {PlatformCardInfo} props.platform Platform.
  */
 const ComingDetail = ( { platform }: { platform: PlatformCardInfo } ) => {
     const classicUrl = window.wcctAdmin?.classicUrl ?? '';
+    const pausable = platform.connected && ! platform.locked;
 
     return (
-        <section
-            aria-labelledby="wcct-platform-title"
-            className="flex flex-col gap-4 p-6"
-            data-testid="wcct-placeholder"
+        <div
+            className="flex flex-col"
+            data-testid={ pausable ? 'wcct-platform-status' : undefined }
         >
-            <div className="flex items-center gap-3.5">
-                <PlatformLogo src={ platformLogoUrl( platform.logo ) } />
-                <h2
-                    id="wcct-platform-title"
-                    className="m-0 p-0 text-base font-semibold text-foreground"
-                >
-                    { platform.name }
-                </h2>
-            </div>
-            <p className="m-0 text-sm text-muted-foreground">
-                { __(
-                    'This page is coming with the new admin. Until then, change your settings on the classic screen.',
-                    'woocommerce-conversion-tracking'
-                ) }
-            </p>
-            { classicUrl && ! platform.locked && (
-                <Button
-                    variant="outline"
-                    className="self-start"
-                    nativeButton={ false }
-                    // eslint-disable-next-line jsx-a11y/anchor-has-content -- the button renders the label inside.
-                    render={ <a href={ classicUrl } /> }
-                >
+            <section
+                aria-labelledby="wcct-platform-title"
+                className="flex flex-col gap-4 p-6"
+                data-testid="wcct-placeholder"
+            >
+                <div className="flex items-center gap-3.5">
+                    <PlatformLogo src={ platformLogoUrl( platform.logo ) } />
+                    <h2
+                        id="wcct-platform-title"
+                        className="m-0 p-0 text-base font-semibold text-foreground"
+                    >
+                        { platform.name }
+                    </h2>
+                    { pausable && (
+                        <StatusPill tone="off" className="ml-auto">
+                            { platform.paused
+                                ? __(
+                                      'Paused',
+                                      'woocommerce-conversion-tracking'
+                                  )
+                                : __(
+                                      'Waiting for first event',
+                                      'woocommerce-conversion-tracking'
+                                  ) }
+                        </StatusPill>
+                    ) }
+                </div>
+                <p className="m-0 text-sm text-muted-foreground">
                     { __(
-                        'Open the classic settings',
+                        'This page is coming with the new admin. Until then, change your settings on the classic screen.',
                         'woocommerce-conversion-tracking'
                     ) }
-                </Button>
+                </p>
+                { classicUrl && ! platform.locked && (
+                    <Button
+                        variant="outline"
+                        className="self-start"
+                        nativeButton={ false }
+                        // eslint-disable-next-line jsx-a11y/anchor-has-content -- the button renders the label inside.
+                        render={ <a href={ classicUrl } /> }
+                    >
+                        { __(
+                            'Open the classic settings',
+                            'woocommerce-conversion-tracking'
+                        ) }
+                    </Button>
+                ) }
+            </section>
+            { pausable && (
+                <div className="flex flex-wrap items-center gap-3 border-t border-border px-6 py-4">
+                    <PauseTracking
+                        id={ platform.id }
+                        name={ platform.name }
+                        paused={ platform.paused }
+                    />
+                </div>
             ) }
-        </section>
+        </div>
     );
 };
 
@@ -176,7 +205,7 @@ const Platforms = ( { id }: { id: string } ) => {
                 <div className="min-w-0">
                     { current && id === 'custom' && <CustomScript /> }
                     { current && id !== 'custom' && (
-                        <ComingDetail platform={ current } />
+                        <ComingDetail key={ current.id } platform={ current } />
                     ) }
                 </div>
             </Card>

@@ -1,6 +1,6 @@
 <?php
 /**
- * Minimal WordPress and WooCommerce functions for unit tests. Tests set $GLOBALS['wcct_test_options'] and $GLOBALS['wcct_test_filters'].
+ * Minimal WordPress and WooCommerce functions for unit tests. Tests set $GLOBALS['wcct_test_options'], $GLOBALS['wcct_test_filters'] and $GLOBALS['wcct_test_hooks'] (hook => callables); do_action() logs to $GLOBALS['wcct_test_actions'].
  */
 
 if ( ! function_exists( 'apply_filters' ) ) {
@@ -23,7 +23,10 @@ if ( ! function_exists( 'wc_string_to_bool' ) ) {
 
 if ( ! function_exists( 'wp_load_alloptions' ) ) {
     function wp_load_alloptions() {
-        return isset( $GLOBALS['wcct_test_options'] ) ? $GLOBALS['wcct_test_options'] : array();
+        $options = isset( $GLOBALS['wcct_test_options'] ) ? $GLOBALS['wcct_test_options'] : array();
+
+        // Options a test saved with autoload off.
+        return array_diff_key( $options, array_flip( isset( $GLOBALS['wcct_test_not_autoloaded'] ) ? $GLOBALS['wcct_test_not_autoloaded'] : array() ) );
     }
 }
 
@@ -148,5 +151,21 @@ if ( ! function_exists( 'has_filter' ) ) {
 if ( ! function_exists( 'esc_attr' ) ) {
     function esc_attr( $text ) {
         return htmlspecialchars( (string) $text, ENT_QUOTES );
+    }
+}
+
+if ( ! function_exists( 'has_action' ) ) {
+    function has_action( $hook, $callback = false ) {
+        return ! empty( $GLOBALS['wcct_test_hooks'][ $hook ] );
+    }
+}
+
+if ( ! function_exists( 'do_action' ) ) {
+    function do_action( $hook, ...$args ) {
+        $GLOBALS['wcct_test_actions'][] = array( $hook, $args );
+
+        foreach ( isset( $GLOBALS['wcct_test_hooks'][ $hook ] ) ? (array) $GLOBALS['wcct_test_hooks'][ $hook ] : array() as $callback ) {
+            call_user_func_array( $callback, $args );
+        }
     }
 }

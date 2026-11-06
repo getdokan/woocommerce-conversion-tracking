@@ -71,6 +71,10 @@ class WCCT_Ajax {
         }
 
         update_option( 'wcct_settings', $integration_settings );
+
+        // The classic page has no wcct_settings_saved; its saves purge the page caches too.
+        \StorePulse\ConversionTracking\Cache\PageCache::purge();
+
         wp_send_json_success( array(
             'message' => __( 'Settings has been saved successfully!', 'woocommerce-conversion-tracking' )
         ) );

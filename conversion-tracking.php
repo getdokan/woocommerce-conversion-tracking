@@ -212,6 +212,9 @@ class WeDevs_WC_Conversion_Tracking {
 
         \StorePulse\ConversionTracking\Log\Prune::init_hooks();
 
+        // Every settings save and pause purges the known page caches.
+        \StorePulse\ConversionTracking\Cache\PageCache::register();
+
         add_action( 'plugins_loaded', array( $this, 'plugin_upgrades' ) );
         add_action( 'init', array( $this, 'localization_setup' ) );
         add_action( 'init', array( $this, 'init_classes' ) );

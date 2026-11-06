@@ -95,7 +95,7 @@ class LegacyView {
     /**
      * A 2.x integration switched off with its ID saved stays off in 3.0 as paused.
      *
-     * Read-only in the API for now; #103 and #122 persist it in wcct_paused_platforms.
+     * Read by Pause until the wcct_paused_platforms option is first written; #122 writes it there.
      *
      * @param array  $integration 2.x settings.
      * @param string $id          Its saved ID.

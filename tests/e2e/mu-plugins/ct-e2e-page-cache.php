@@ -49,3 +49,11 @@ add_action(
     },
     -1000
 );
+
+// Purged the way LiteSpeed Cache listens for it, so a settings save or a pause empties this cache (#103).
+add_action(
+    'litespeed_purge_all',
+    static function () {
+        delete_option( 'ct_e2e_page_cache' );
+    }
+);

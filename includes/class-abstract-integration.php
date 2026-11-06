@@ -6,6 +6,7 @@ use StorePulse\ConversionTracking\Events\PurchaseConfirmation;
 use StorePulse\ConversionTracking\Events\PurchaseGate;
 use StorePulse\ConversionTracking\Events\ValueMode;
 use StorePulse\ConversionTracking\Platforms\GoogleTag;
+use StorePulse\ConversionTracking\Platforms\Pause;
 
 /**
  * Abstract Class
@@ -148,24 +149,12 @@ abstract class WCCT_Integration {
     }
 
     /**
-     * Whether tracking is paused; reads the autoloaded wcct_paused_platforms option, so it costs no query
+     * Whether tracking is paused, for this integration or its settings platform (ga4 and adwords follow google)
      *
      * @return boolean
      */
     public function is_paused() {
-        $options = wp_load_alloptions();
-        $paused  = isset( $options['wcct_paused_platforms'] ) ? maybe_unserialize( $options['wcct_paused_platforms'] ) : array();
-        $paused  = is_array( $paused ) && in_array( $this->id, $paused, true );
-
-        /**
-         * Whether a platform is paused.
-         *
-         * @since 3.0.0
-         *
-         * @param bool   $paused Whether the ID is in the wcct_paused_platforms option.
-         * @param string $id     Integration ID.
-         */
-        return (bool) apply_filters( 'wcct_platform_paused', $paused, $this->id );
+        return Pause::is_paused( (string) $this->id );
     }
 
     /**

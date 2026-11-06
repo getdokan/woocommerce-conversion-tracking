@@ -4,6 +4,7 @@ require_once dirname( __DIR__ ) . '/Fakes/settings-functions.php';
 
 use PHPUnit\Framework\TestCase;
 use StorePulse\ConversionTracking\Platforms\GoogleTag;
+use StorePulse\ConversionTracking\Platforms\Pause;
 
 /**
  * Tests for the one Google tag shared by GA4 and Google Ads
@@ -24,10 +25,12 @@ class GoogleTagTest extends TestCase {
     protected function setUp(): void {
         $GLOBALS['wcct_test_options'] = array();
         GoogleTag::reset();
+        Pause::reset();
     }
 
     protected function tearDown(): void {
         unset( $GLOBALS['wcct_test_options'], $GLOBALS['wcct_test_filters'] );
+        Pause::reset();
     }
 
     public function test_2x_settings_are_read_as_one_platform() {

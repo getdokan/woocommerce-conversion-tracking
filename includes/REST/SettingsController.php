@@ -2,6 +2,7 @@
 
 namespace StorePulse\ConversionTracking\REST;
 
+use StorePulse\ConversionTracking\Platforms\Pause;
 use StorePulse\ConversionTracking\Settings\Schema;
 use StorePulse\ConversionTracking\Settings\Store;
 use StorePulse\ConversionTracking\Settings\Values;
@@ -11,7 +12,7 @@ use WP_REST_Response;
 use WP_REST_Server;
 
 /**
- * The settings and settings/schema routes.
+ * The settings, settings/pause and settings/schema routes.
  */
 class SettingsController extends Controller {
 
@@ -43,6 +44,30 @@ class SettingsController extends Controller {
                     'permission_callback' => array( $this, 'permissions_check' ),
                 ),
                 'schema' => array( $this, 'get_public_item_schema' ),
+            )
+        );
+
+        register_rest_route(
+            $this->namespace,
+            '/' . $this->rest_base . '/pause',
+            array(
+                array(
+                    'methods'             => WP_REST_Server::CREATABLE,
+                    'callback'            => array( $this, 'pause' ),
+                    'permission_callback' => array( $this, 'permissions_check' ),
+                    'args'                => array(
+                        'platform' => array(
+                            'description' => __( 'Platform ID.', 'woocommerce-conversion-tracking' ),
+                            'type'        => 'string',
+                            'required'    => true,
+                        ),
+                        'paused'   => array(
+                            'description' => __( 'Pause (true) or resume (false) tracking on the platform.', 'woocommerce-conversion-tracking' ),
+                            'type'        => 'boolean',
+                            'required'    => true,
+                        ),
+                    ),
+                ),
             )
         );
 
@@ -126,6 +151,30 @@ class SettingsController extends Controller {
         do_action( 'wcct_settings_saved', $result['doc'], $old );
 
         return rest_ensure_response( Values::get( $schema, $result['doc'] ) );
+    }
+
+    /**
+     * Pause or resume tracking on one platform; takes effect at once, without a settings save.
+     *
+     * @param WP_REST_Request $request Request.
+     *
+     * @return WP_REST_Response|WP_Error Every platform's values, as the settings route returns them.
+     */
+    public function pause( $request ) {
+        $schema   = Schema::get();
+        $platform = $request->get_param( 'platform' );
+
+        if ( ! is_string( $platform ) || ! isset( $schema['platforms'][ $platform ] ) ) {
+            return new WP_Error(
+                'wcct_rest_unknown_platform',
+                __( 'Unknown platform.', 'woocommerce-conversion-tracking' ),
+                array( 'status' => 400 )
+            );
+        }
+
+        Pause::set( $platform, (bool) $request->get_param( 'paused' ) );
+
+        return rest_ensure_response( Values::get( $schema, Store::load() ) );
     }
 
     /**

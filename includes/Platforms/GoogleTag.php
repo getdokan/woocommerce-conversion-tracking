@@ -43,7 +43,7 @@ class GoogleTag {
 
             // A save later in the same request is read again.
             if ( function_exists( 'add_action' ) ) {
-                foreach ( array( Store::OPTION, Store::V1_OPTION ) as $option ) {
+                foreach ( array( Store::OPTION, Store::V1_OPTION, Pause::OPTION ) as $option ) {
                     add_action( 'add_option_' . $option, array( self::class, 'reset' ) );
                     add_action( 'update_option_' . $option, array( self::class, 'reset' ) );
                     add_action( 'delete_option_' . $option, array( self::class, 'reset' ) );
@@ -65,7 +65,7 @@ class GoogleTag {
     }
 
     /**
-     * Settings of the ga4 or adwords integration (see Google::integrations()), switched off while the platform is paused.
+     * Settings of the ga4 or adwords integration (see Google::integrations()), switched off while it is paused (see Pause).
      *
      * @param string     $integration ga4 or adwords.
      * @param array|null $google      Google platform values; read from the settings when null.
@@ -75,16 +75,29 @@ class GoogleTag {
     public static function settings( string $integration, ?array $google = null ): array {
         if ( null === $google ) {
             if ( ! isset( self::$settings[ $integration ] ) ) {
-                self::$settings[ $integration ] = self::settings( $integration, self::platform() );
+                self::$settings[ $integration ] = self::build( $integration, self::platform(), Pause::is_paused( $integration ) );
             }
 
             return self::$settings[ $integration ];
         }
 
+        return self::build( $integration, $google, Pause::is_paused( $integration, array( 'platforms' => array( 'google' => $google ) ) ) );
+    }
+
+    /**
+     * Settings of one integration from the google platform values.
+     *
+     * @param string $integration ga4 or adwords.
+     * @param array  $google      Google platform values.
+     * @param bool   $paused      Whether the integration is paused.
+     *
+     * @return array
+     */
+    private static function build( string $integration, array $google, bool $paused ): array {
         $all      = Google::integrations( $google );
         $settings = isset( $all[ $integration ] ) ? $all[ $integration ] : array();
 
-        $settings['enabled'] = ! empty( $settings['enabled'] ) && empty( $google['paused'] );
+        $settings['enabled'] = ! empty( $settings['enabled'] ) && ! $paused;
         $settings['events']  = isset( $settings['events'] ) ? $settings['events'] : array();
 
         return $settings;

@@ -3,6 +3,7 @@
  * Sends wcct/v1 requests as different users in a test store process (see REST/SettingsRouteTest).
  *
  * Job args: requests (list of { as, method, path, body }), grant (role given manage_wcct the way Pro grants it).
+ * Each response has the cache IDs the purge reported (null when no purge ran); LiteSpeed Cache is stood in by a listener on its action.
  * Users: admin (1), guest (0), customer (501), and a shop_manager and a subscriber created here.
  */
 
@@ -45,8 +46,20 @@ $wcct_out = array(
     'responses' => array(),
 );
 
+$wcct_purged = null;
+
+add_action( 'litespeed_purge_all', '__return_null' );
+add_action(
+    'wcct_purge_page_caches',
+    function ( $purged ) use ( &$wcct_purged ) {
+        $wcct_purged = $purged;
+    }
+);
+
 foreach ( $wcct_args['requests'] as $wcct_request ) {
     wp_set_current_user( $wcct_users[ $wcct_request['as'] ] );
+
+    $wcct_purged = null;
 
     $request = new WP_REST_Request( $wcct_request['method'], $wcct_request['path'] );
 
@@ -60,9 +73,10 @@ foreach ( $wcct_args['requests'] as $wcct_request ) {
     $wcct_out['responses'][] = array(
         'status' => $response->get_status(),
         'data'   => rest_get_server()->response_to_data( $response, false ),
+        'purged' => $wcct_purged,
     );
 }
 
-$wcct_out['after'] = array( 'v1' => $wcct_raw( 'wcct_settings' ), 'v3' => $wcct_raw( 'wcct_settings_v3' ) );
+$wcct_out['after'] = array( 'v1' => $wcct_raw( 'wcct_settings' ), 'v3' => $wcct_raw( 'wcct_settings_v3' ), 'paused' => get_option( 'wcct_paused_platforms', null ) );
 
 return $wcct_out;

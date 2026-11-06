@@ -20,6 +20,8 @@ The store runs in Docker with [wp-env](https://www.npmjs.com/package/@wordpress/
 
 `specs/begin-checkout.spec.ts` loads block and classic checkout and checks that Meta `InitiateCheckout` and GA4 `begin_checkout` are each sent once, and none on the thank-you page. With Pro active, setup also saves X's Start checkout event ID and a Microsoft UET tag (`config/checkout-ids.json`), and the spec checks their hits too; `utils/stubs` has stand-ins for X's `uwt.js` and Microsoft's `bat.js` too.
 
+`specs/pause.spec.ts` pauses Meta and then Google on their platform pages (the confirmation, Keep tracking and Escape, the Paused state and Resume) and checks, with the page cache on, that a page cached before the pause is purged and comes back without that platform's tags, and that they come back after Resume.
+
 `specs/settings.spec.ts` covers Settings > Integration access and Settings > Plan. On Free (no Pro mapped) it checks the locked access preview, the plan comparison with no price, and that every Upgrade, See pricing, Compare plans and plugins-list Get PRO link opens the WooCommerce.com product page. With Pro it checks Manage subscription, the confirmation before a role is granted (Cancel and Escape leave it off), the save, the Dokan vendor warning, and that a granted shop manager (`ct_e2e_shop_manager` / `password`, seeded by setup) sees the list read-only and gets 403 from the access route. Run it once without and once with Pro to cover both.
 
 `specs/version-guard.spec.ts` reads the Pro state the app gets: with a Pro older than 3.0 mapped in (Pro 1.1.4), it checks the Update Pro notice, that Settings > Plan and the top bar show Pro as paused, and that the old catalog feed still returns the CSV; otherwise that no notice shows. Setup and the specs count Pro only when it is 3.0 or later, so the whole suite also runs with Pro 1.1.4 mapped in: old Pro stays paused and Free's own tags must pass unchanged.
@@ -68,7 +70,7 @@ The tracker serves small stand-ins for `fbevents.js`, `gtag.js`, X's `uwt.js` an
 | `setup/` | Seeding, run inside the wp-env cli container. |
 | `mu-plugins/ct-e2e-helpers.php` | Test-site helpers: the `ct_e2e_checkout=classic` cookie makes the shortcode page the checkout page, the `ct_e2e_custom_scripts` cookie turns on the Custom script placements, the `ct_e2e_no_unfiltered_html` cookie takes `unfiltered_html` away from the logged-in user, and wordpress.org calls are blocked. |
 | `mu-plugins/ct-e2e/doctor-checks.php` | Sample Tracking Doctor checks, loaded by the helpers when the `ct_e2e_doctor` cookie is set. |
-| `mu-plugins/ct-e2e-page-cache.php` | With the `ct_e2e_page_cache` cookie, caches logged-out GET pages per URL and serves them to every browser (`X-CT-Cache: HIT`); `/?ct_e2e_page_cache_flush=1` empties it. |
+| `mu-plugins/ct-e2e-page-cache.php` | With the `ct_e2e_page_cache` cookie, caches logged-out GET pages per URL and serves them to every browser (`X-CT-Cache: HIT`); `/?ct_e2e_page_cache_flush=1` empties it, and so does `litespeed_purge_all`, as LiteSpeed Cache's own purge does. |
 | `config/test-ids.json` | Test IDs. A tag listed here is enabled in the store and must send a Purchase hit. |
 | `utils/fixtures.ts` | `test` and `expect` with the `tracker` and `jsErrors` fixtures. Import these in every spec. |
 | `utils/network.ts` | The tracker: `platformRequests(platform?)`, `purchaseHits(tag)`, `expectPurchase(tag)`, `eventHits(tag, event)`. |

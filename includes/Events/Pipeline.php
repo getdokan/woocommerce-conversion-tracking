@@ -190,14 +190,22 @@ class Pipeline {
     }
 
     /**
-     * Pending events the browser has not run yet, after the ID in its seen cookie.
+     * Pending events the browser has not run yet, after the ID in its seen cookie; code of platforms paused since it was queued is left out.
      *
      * @return array List of {id, scripts}.
      */
     public function unseen_events() {
-        $seen = isset( $_COOKIE[ self::SEEN_COOKIE ] ) && is_string( $_COOKIE[ self::SEEN_COOKIE ] ) ? sanitize_text_field( wp_unslash( $_COOKIE[ self::SEEN_COOKIE ] ) ) : '';
+        $seen   = isset( $_COOKIE[ self::SEEN_COOKIE ] ) && is_string( $_COOKIE[ self::SEEN_COOKIE ] ) ? sanitize_text_field( wp_unslash( $_COOKIE[ self::SEEN_COOKIE ] ) ) : '';
+        $active = $this->get_platforms();
 
-        return $this->pending()->after( $seen );
+        return array_map(
+            function ( $entry ) use ( $active ) {
+                $entry['scripts'] = array_intersect_key( $entry['scripts'], $active );
+
+                return $entry;
+            },
+            $this->pending()->after( $seen )
+        );
     }
 
     /**

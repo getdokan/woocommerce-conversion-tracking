@@ -4,6 +4,7 @@ namespace StorePulse\ConversionTracking\Settings;
 
 use InvalidArgumentException;
 use StorePulse\ConversionTracking\Access\CustomScripts;
+use StorePulse\ConversionTracking\Platforms\Pause;
 use StorePulse\ConversionTracking\Platforms\XSettings;
 use StorePulse\ConversionTracking\Privacy\CustomerDetails;
 
@@ -35,8 +36,8 @@ class Values {
                 $values['platforms'][ $id ][ CustomerDetails::SETTING ] = CustomerDetails::v1_default();
             }
 
-            // Read-only until #103 adds Pause; a 2.x integration that was switched off reads as paused.
-            $values['platforms'][ $id ]['paused'] = ! empty( $stored['paused'] );
+            // Read-only here; Pause owns it (settings/pause). A 2.x integration that was switched off reads as paused.
+            $values['platforms'][ $id ]['paused'] = Pause::is_platform_paused( (string) $id, $doc );
 
             // Read-only: events 2.x sent that need a new event ID (X); input for What's new (#124) and the migration (#122).
             $values['platforms'][ $id ]['needs_resetup'] = self::needs_resetup( $id, $stored );

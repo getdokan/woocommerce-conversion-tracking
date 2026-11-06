@@ -48,6 +48,8 @@ export const AppDataProvider = ( { children }: { children: ReactNode } ) => {
     const [ busy, setBusy ] = useState( true );
     const inFlight = useRef( false );
     const mounted = useRef( true );
+    // Bumped by replaceSettings(), so a fetch that started earlier can't bring back older settings.
+    const generation = useRef( 0 );
 
     const load = useCallback( () => {
         if ( inFlight.current ) {
@@ -57,10 +59,16 @@ export const AppDataProvider = ( { children }: { children: ReactNode } ) => {
         inFlight.current = true;
         setBusy( true );
 
+        const started = generation.current;
+
         fetchAppData()
             .then( ( next ) => {
                 if ( mounted.current ) {
-                    setData( next );
+                    setData( ( current ) =>
+                        current && started !== generation.current
+                            ? { ...next, settings: current.settings }
+                            : next
+                    );
                     setError( '' );
                 }
             } )
@@ -79,16 +87,17 @@ export const AppDataProvider = ( { children }: { children: ReactNode } ) => {
     }, [] );
 
     const replaceSettings = useCallback( ( settings: SettingsValues ) => {
-        setData( ( prev ) =>
-            prev
+        generation.current++;
+        setData( ( current ) =>
+            current
                 ? {
-                      ...prev,
+                      ...current,
                       settings: {
                           ...settings,
                           platforms: settings?.platforms ?? {},
                       },
                   }
-                : prev
+                : current
         );
     }, [] );
 
