@@ -1,5 +1,8 @@
 <?php
 
+use StorePulse\ConversionTracking\Events\Event;
+use StorePulse\ConversionTracking\Platforms\XSettings;
+
 /**
  * WCCT gate way twitter
  */
@@ -15,6 +18,23 @@ class WCCT_Integration_Twitter extends WCCT_Integration {
         $this->supports = array(
             'checkout',
         );
+
+        add_filter( 'wcct_save_integrations_settings', array( $this, 'keep_legacy_settings' ) );
+    }
+
+    /**
+     * Keep the 2.x X keys through a settings save, so the re-setup flags survive
+     *
+     * @param array $settings Posted settings, slashed.
+     *
+     * @return array
+     */
+    public function keep_legacy_settings( $settings ) {
+        if ( is_array( $settings ) && isset( $settings[ $this->id ] ) ) {
+            $settings[ $this->id ] = XSettings::keep_legacy( $settings[ $this->id ], parent::get_integration_settings() );
+        }
+
+        return $settings;
     }
 
     /**
@@ -24,7 +44,14 @@ class WCCT_Integration_Twitter extends WCCT_Integration {
      */
     public function get_settings() {
         $settings = array(
-
+            'pixel_id'  => array(
+                'type'        => 'text',
+                'name'        => 'pixel_id',
+                'label'       => __( 'Pixel ID', 'woocommerce-conversion-tracking' ),
+                'value'       => '',
+                'placeholder' => __( '5 letters and numbers, like o8x2k', 'woocommerce-conversion-tracking' ),
+                'help'        => __( 'The base tag on every page; it also sends the page views.', 'woocommerce-conversion-tracking' ),
+            ),
             'events'    => array(
                 'type'  => 'multicheck',
                 'name'  => 'events',
@@ -34,9 +61,10 @@ class WCCT_Integration_Twitter extends WCCT_Integration {
                     'Purchase'  => array(
                         'event_label_box'  => true,
                         'label'            => __( 'Purchase', 'woocommerce-conversion-tracking' ),
-                        'label_name'       => 'universal_tag_id',
-                        'placeholder'      => 'Universal Tag ID',
-                        'help'             => sprintf( __( 'Find the Universal Tag ID from <a href="%s" target="_blank">here</a>, navigate to Tools &rarr; Conversion Tracking.', 'woocommerce-conversion-tracking' ), 'https://ads.x.com/' )
+                        'label_name'       => 'purchase_event_id',
+                        'placeholder'      => __( 'Purchase event ID, starts with tw-', 'woocommerce-conversion-tracking' ),
+                        /* translators: %s: X Ads Manager URL */
+                        'help'             => sprintf( __( 'Each event has its own ID in <a href="%s" target="_blank">X Ads Manager</a>, under Tools &rarr; Events Manager. The event stays off until it has an ID.', 'woocommerce-conversion-tracking' ), 'https://ads.x.com/' ),
                     ),
                 )
             ),
@@ -46,7 +74,33 @@ class WCCT_Integration_Twitter extends WCCT_Integration {
     }
 
     /**
+     * Integration settings, with the 2.x pixel ID shown in the Pixel ID field
+     *
+     * @return array|false
+     */
+    public function get_integration_settings() {
+        $settings = parent::get_integration_settings();
+
+        if ( is_array( $settings ) && isset( $settings[0] ) && is_array( $settings[0] ) && empty( $settings[0]['pixel_id'] ) ) {
+            $settings[0]['pixel_id'] = XSettings::from_v1( $settings )['pixel_id'];
+        }
+
+        return $settings;
+    }
+
+    /**
+     * Settings in the 3.0 shape, see XSettings
+     *
+     * @return array
+     */
+    public function get_x_settings() {
+        return XSettings::from_v1( parent::get_integration_settings() );
+    }
+
+    /**
      * Build the event object
+     *
+     * @deprecated 3.0.0 X events need an event ID, see event_script().
      *
      * @param  string $event_name
      * @param  array $params
@@ -54,12 +108,14 @@ class WCCT_Integration_Twitter extends WCCT_Integration {
      *
      * @return string
      */
-    public function build_event( $event_name, $params = array(), $method = 'track' ) {
+    public function build_event( $event_name, $params = array(), $method = 'event' ) {
+        _deprecated_function( __METHOD__, '3.0.0', 'WCCT_Integration_Twitter::event_script()' );
+
         return sprintf( "twq('%s', '%s', %s);", $method, $event_name, json_encode( $params, JSON_PRETTY_PRINT | JSON_FORCE_OBJECT ) );
     }
 
     /**
-     * Enqueue script
+     * Print the base code: the uwt.js loader and twq('config'), which also sends the page view
      *
      * @return void
      */
@@ -68,20 +124,16 @@ class WCCT_Integration_Twitter extends WCCT_Integration {
             return;
         }
 
-        $integration_settins = $this->get_integration_settings();
-        $universal_tag_id    = ! empty( $integration_settins[0]['events']['universal_tag_id'] ) ? $integration_settins[0]['events']['universal_tag_id'] : '';
-        $advance_event       = ( isset( $integration_settins[0]['events']['AddToCart'] ) ||isset( $integration_settins[0]['events']['Registration'] ) ) ? true : false;
+        $pixel_id = $this->get_x_settings()['pixel_id'];
+
+        if ( '' === $pixel_id ) {
+            return;
+        }
         ?>
         <script type="text/javascript">
-            !function(e,t,n,s,u,a){e.twq||(s=e.twq=function(){s.exe?s.exe.apply(s,arguments):s.queue.push(arguments);},s.version='1.1',s.queue=[],u=t.createElement(n),u.async=!0,u.src='//static.ads-twitter.com/uwt.js',a=t.getElementsByTagName(n)[0],a.parentNode.insertBefore(u,a))}(window,document,'script');
-
-            <?php echo $this->build_event( $universal_tag_id, array(), 'init' ); ?>
-            <?php echo $this->build_event( 'PageView' ); ?>
+            !function(e,t,n,s,u,a){e.twq||(s=e.twq=function(){s.exe?s.exe.apply(s,arguments):s.queue.push(arguments);},s.version='1.1',s.queue=[],u=t.createElement(n),u.async=!0,u.src='https://static.ads-twitter.com/uwt.js',a=t.getElementsByTagName(n)[0],a.parentNode.insertBefore(u,a))}(window,document,'script');
+            twq('config', <?php echo self::js( $pixel_id ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>);
         </script>
-
-        <?php if ( $advance_event ): ?>
-            <script src="//platform.twitter.com/oct.js" type="text/javascript"></script>
-        <?php endif;?>
         <?php
     }
 
@@ -111,39 +163,109 @@ class WCCT_Integration_Twitter extends WCCT_Integration {
      * @return string|void JavaScript for the pipeline
      */
     public function checkout( $order_id ) {
-        if ( ! $this->event_enabled( 'Purchase' ) ) {
+        $event = $this->current_event;
+        $order = $event && $event->get_order() ? $event->get_order() : wc_get_order( $order_id );
+
+        if ( ! $order instanceof WC_Order ) {
             return;
         }
 
-        $order        = wc_get_order( $order_id );
-        $content_type = 'product';
-        $product_ids  = array();
+        return $this->event_script(
+            Event::PURCHASE,
+            array(
+                // In this platform's value mode (#95).
+                'value'         => (float) $this->purchase_value( $order ),
+                'currency'      => Event::currency_code( $order->get_currency() ),
+                'conversion_id' => (string) $order->get_order_number(),
+                'contents'      => $this->order_contents( $order ),
+            )
+        );
+    }
 
-        if ( ! $order ) {
-            return;
+    /**
+     * twq('event') for a pipeline event, or an empty string when its row is off (no pixel or no event ID)
+     *
+     * @param string $event  Pipeline event name.
+     * @param array  $params Event parameters.
+     *
+     * @return string
+     */
+    protected function event_script( $event, array $params = array() ) {
+        $settings = $this->get_x_settings();
+        $event_id = XSettings::event_id( $settings, $event );
+
+        if ( '' === $settings['pixel_id'] || '' === $event_id ) {
+            return '';
         }
+
+        return sprintf( "window.twq && twq('event', %s, %s);", self::js( $event_id ), self::js( (object) $params ) );
+    }
+
+    /**
+     * Parameters for a cart event (add to cart, start checkout) from the event being rendered
+     *
+     * @return array
+     */
+    protected function cart_params() {
+        $event  = $this->current_event;
+        $params = array();
+
+        if ( ! $event ) {
+            return $params;
+        }
+
+        if ( $event->get_value() > 0 && '' !== $event->get_currency() ) {
+            $params['value']    = $event->get_value();
+            $params['currency'] = $event->get_currency();
+        }
+
+        $contents = array();
+
+        foreach ( $event->get_product_ids() as $product_id ) {
+            $contents[] = array( 'content_id' => (string) $product_id );
+        }
+
+        if ( $contents ) {
+            $params['contents'] = $contents;
+        }
+
+        return $params;
+    }
+
+    /**
+     * X contents for the order's products
+     *
+     * @param WC_Order $order Order.
+     *
+     * @return array
+     */
+    protected function order_contents( $order ) {
+        $contents = array();
 
         foreach ( $order->get_items() as $item ) {
-            $product = wc_get_product( $item['product_id'] );
-
-            if ( ! $product ) {
+            if ( ! $item instanceof WC_Order_Item_Product ) {
                 continue;
             }
 
-            $product_ids[] = $product->get_id();
-
-            if ( $product->get_type() === 'variable' ) {
-                $content_type = 'product_group';
-            }
+            $contents[] = array(
+                'content_id'    => (string) ( $item->get_variation_id() ? $item->get_variation_id() : $item->get_product_id() ),
+                'content_name'  => $item->get_name(),
+                'content_price' => Event::amount( $order->get_item_total( $item, false, false ), wc_get_price_decimals() ),
+                'num_items'     => (int) $item->get_quantity(),
+            );
         }
 
-        $code = $this->build_event( 'Purchase', array(
-            'content_ids'  => json_encode($product_ids),
-            'content_type' => $content_type,
-            'value'        => $this->purchase_value( $order ),
-            'currency'     => $order->get_currency()
-        ) );
+        return $contents;
+    }
 
-        return $code;
+    /**
+     * A value as JavaScript, safe inside a script tag
+     *
+     * @param mixed $value Value.
+     *
+     * @return string
+     */
+    protected static function js( $value ) {
+        return (string) wp_json_encode( $value, JSON_HEX_TAG | JSON_HEX_AMP | JSON_UNESCAPED_SLASHES );
     }
 }

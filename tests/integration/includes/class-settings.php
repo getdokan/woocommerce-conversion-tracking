@@ -45,9 +45,10 @@ class WCCT_Test_Settings {
             'twitter'  => array(
                 'enabled' => true,
                 array(
-                    'events' => array(
-                        'Purchase'         => 'on',
-                        'universal_tag_id' => 'ct0x1',
+                    'pixel_id' => 'ct0x1',
+                    'events'   => array(
+                        'Purchase'          => 'on',
+                        'purchase_event_id' => 'tw-ct0x1-ctpur',
                     ),
                 ),
             ),
@@ -67,6 +68,25 @@ class WCCT_Test_Settings {
                 'enabled'      => true,
                 'checkout'     => self::CUSTOM_CHECKOUT,
                 'registration' => "<script>ctCustom('registration');</script>",
+            ),
+        );
+    }
+
+    /**
+     * X as 2.x saved it: the universal tag ID and Purchase, no event ID
+     *
+     * @return array
+     */
+    public static function twitter_v2() {
+        return array(
+            'twitter' => array(
+                'enabled' => true,
+                array(
+                    'events' => array(
+                        'Purchase'         => 'on',
+                        'universal_tag_id' => 'ct0x1',
+                    ),
+                ),
             ),
         );
     }

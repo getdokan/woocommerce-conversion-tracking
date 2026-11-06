@@ -7,6 +7,8 @@ import { enabledTags } from '../utils/platforms';
 const CONFIRMATION: Record<string, string> = {
     meta: 'name="platform"\r\n\r\nfacebook',
     ga4: 'wcct_ga4_purchase_sent',
+    ads: 'name="platform"\r\n\r\nadwords',
+    x: 'name="platform"\r\n\r\ntwitter',
 };
 
 test('reloading the thank-you page sends no second Purchase', async ({ page, tracker }) => {
@@ -35,7 +37,8 @@ test('reloading the thank-you page sends no second Purchase', async ({ page, tra
 
     const before = Object.fromEntries(await Promise.all(enabledTags().map(async tag => [tag, (await tracker.purchaseHits(tag)).length])));
 
-    await page.reload();
+    // The address bar lost the key on load (#79), so open the thank-you URL with its key again, as a reload before #79 did.
+    await page.goto(order.url);
     await expect(page.locator('.woocommerce-order-overview__order')).toContainText(String(order.id));
     await page.waitForLoadState('networkidle');
 

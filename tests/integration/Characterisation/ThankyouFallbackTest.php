@@ -34,7 +34,7 @@ class ThankyouFallbackTest extends TestCase {
 
         $this->assertSame( 1, substr_count( $value['scripts']['facebook'], "fbq('track', 'Purchase'" ) );
         $this->assertSame( 1, substr_count( $value['scripts']['adwords'], "gtag('event', 'conversion'" ) );
-        $this->assertSame( 1, substr_count( $value['scripts']['twitter'], "twq('track', 'Purchase'" ) );
+        $this->assertSame( 1, substr_count( $value['scripts']['twitter'], "twq('event', \"tw-ct0x1-ctpur\"" ) );
         $this->assertSame( 1, substr_count( $value['scripts']['ga4'], '[["purchase",' ) );
         $this->assertSame( 1, substr_count( $value['markup']['custom'], "ctCustom('purchase'" ) );
     }

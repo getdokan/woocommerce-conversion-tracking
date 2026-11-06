@@ -3,7 +3,7 @@ name: E2E
 # Runs started by a wc-conversion-tracking-pro PR (pro_sha set) are named after both branches so they can be found.
 run-name: ${{ inputs.pro_sha && format('E2E (pro {0}, lite {1})', inputs.pro_ref, inputs.lite_ref || github.ref_name) || github.workflow }}
 
-# Places guest orders in a wp-env store (tests/e2e) and fails on a JS error or a missing Purchase hit.
+# Places guest orders in a wp-env store (tests/e2e) and fails on a JS error, a missing Purchase hit, or an order key leaked to a platform URL, referrer or payload.
 on:
     pull_request:
     push:

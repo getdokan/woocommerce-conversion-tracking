@@ -57,6 +57,11 @@ class PageOutputTest extends WCCT_Test_Page_Case {
         $this->assertInCapturedPage( $page, $this->request( 'all', $page ) );
     }
 
+    // #89 replaced the X base code and #79 added the order URL script and cleans Google and Meta URLs, all in the head.
+    protected function captured_page_skipped_regions() {
+        return array( 'head' );
+    }
+
     public function pages() {
         $cases = array();
 
@@ -146,5 +151,47 @@ class PageOutputTest extends WCCT_Test_Page_Case {
     public function test_meta_purchase_is_queued_on_the_thank_you_page() {
         $this->assertStringContainsString( "fbq('track', 'Purchase', {", $this->output_of( $this->request( 'facebook', 'order-received-classic' ) ) );
         $this->assertStringNotContainsString( "fbq('track', 'Purchase'", $this->output_of( $this->request( 'facebook', 'order-received-no-key' ) ) );
+    }
+
+    public function test_x_base_code_is_config_only() {
+        $head = $this->output_of( $this->request( 'twitter', 'home' ) );
+
+        $this->assertStringContainsString( "u.src='https://static.ads-twitter.com/uwt.js'", $head );
+        $this->assertStringContainsString( "twq('config', \"ct0x1\");", $head );
+        $this->assertStringNotContainsString( "twq('init'", $head );
+        $this->assertStringNotContainsString( "twq('track'", $head );
+        $this->assertStringNotContainsString( 'oct.js', $head );
+    }
+
+    public function test_x_purchase_uses_the_purchase_event_id() {
+        $js = $this->event_js( $this->request( 'twitter', 'order-received-classic' ) );
+
+        $this->assertSame( 1, substr_count( $js, "twq('event'" ) );
+        $this->assertStringContainsString( "window.twq && twq('event', \"tw-ct0x1-ctpur\", {\"value\":78,\"currency\":\"USD\",\"conversion_id\":\"3001\",\"contents\":[", $js );
+        $this->assertStringNotContainsString( "twq('event'", $this->event_js( $this->request( 'twitter', 'order-received-no-key' ) ) );
+    }
+
+    public function test_x_saved_by_2_x_sends_page_views_but_no_purchase() {
+        $result = $this->request_page( 'order-received-classic', WCCT_Test_Settings::twitter_v2() );
+
+        $this->assertStringContainsString( "twq('config', \"ct0x1\");", $this->output_of( $result ) );
+        $this->assertStringNotContainsString( "twq('event'", $this->event_js( $result ) . $this->output_of( $result ) );
+    }
+
+    public function test_the_order_url_script_runs_first_on_the_order_received_page_only() {
+        $result = $this->request( 'all', 'order-received-classic' );
+
+        $this->assertSame( 'head', $result['chunks'][0][0] );
+        $this->assertStringStartsWith( '<script data-cfasync="false" data-no-defer="1" data-no-optimize="1" id="wcct-order-url">', $result['chunks'][0][1] );
+        $this->assertStringContainsString( 'window.wcctOrder = { id: 3001,', $result['chunks'][0][1] );
+        $this->assertStringNotContainsString( 'wcct-order-url', $this->output_of( $this->request( 'all', 'checkout-classic' ) ) );
+        $this->assertStringNotContainsString( 'wcct-order-url', $this->output_of( $this->request( 'all', 'home' ) ) );
+    }
+
+    public function test_google_configs_clean_the_page_location() {
+        $head = $this->output_of( $this->request( 'all', 'home' ) );
+
+        $this->assertStringContainsString( "gtag('config', 'AW-123456789', (function (cleanUrl) {", $head );
+        $this->assertStringContainsString( "wcctGtag('config', \"G-CTTEST1234\", (function (cleanUrl) {", $head );
     }
 }

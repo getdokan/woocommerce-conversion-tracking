@@ -4,7 +4,7 @@ import { join } from 'path';
 export type Platform = 'meta' | 'google' | 'x' | 'microsoft';
 
 // Purchase checks the specs can run, one per tag that has a test ID in config/test-ids.json.
-export type Tag = 'meta' | 'ga4';
+export type Tag = 'meta' | 'ga4' | 'ads' | 'x';
 
 // Hosts each platform's tags and hits go to (the list from the order-key task, plus the script hosts).
 export const PLATFORM_HOSTS: Record<Platform, string[]> = {

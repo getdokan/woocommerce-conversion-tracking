@@ -17,7 +17,7 @@ class PurchaseOnceTest extends TestCase {
         'facebook' => "fbq('track', 'Purchase'",
         'adwords'  => "gtag('event', 'conversion'",
         'ga4'      => '"purchase",{"send_to":"G-CTTEST1234"',
-        'twitter'  => "twq('track', 'Purchase'",
+        'twitter'  => "twq('event', \"tw-ct0x1-ctpur\"",
         'custom'   => "ctCustom('purchase'",
     );
 

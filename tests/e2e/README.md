@@ -7,7 +7,9 @@ The store runs in Docker with [wp-env](https://www.npmjs.com/package/@wordpress/
 - **`tracker`** answers every request that leaves the test site, so no test reaches a real ad platform. It records each request to a platform host (Meta, Google, X, Microsoft) with its URL, body, referer and the page that sent it.
 - **`jsErrors`** fails the test on any uncaught exception or `console.error` on any page.
 
-`specs/purchase.spec.ts` places one order on classic checkout and one on block checkout, paid by cash on delivery, and fails unless every tag with a test ID in `config/test-ids.json` sent its Purchase hit.
+`specs/purchase.spec.ts` places one order on classic checkout and one on block checkout, paid by cash on delivery, and fails unless every tag with a test ID in `config/test-ids.json` (Meta, GA4, Google Ads, X) sent its Purchase hit.
+
+`specs/order-key.spec.ts` places the same guest orders and fails when any request to a platform host, from the thank-you page or the next page view, has `wc_order_` or `key=` in its URL, body or referer. It also checks that the thank-you page shows the order on first load, that Google gets a cleaned page location on a page with order parameters but no order key (an archive's `order=desc` survives), and that no platform gets the key on a funnel page whose URL carries one. With Pro mapped in, X's optional events (Add to cart, Start checkout, Registration) and Microsoft are seeded too, so their requests are checked as well.
 
 `specs/add-to-cart.spec.ts` adds to the cart from the product form, a shop-page AJAX button and a block Product Button (the `/block-shop/` page), and expects exactly one add to cart hit per tag, also after one more page view. Its last test turns on the `ct-e2e-page-cache.php` mu-plugin (a worst-case page cache that serves the same HTML to every browser) and checks a second browser never sends the first browser's add to cart. `specs/sign-up.spec.ts` signs up on My account and at classic checkout and expects one Meta `CompleteRegistration`, and none on the next page view.
 
@@ -44,7 +46,7 @@ The path above works when Pro sits next to this plugin in `wp-content/plugins`. 
 
 ### Real platform libraries
 
-The tracker serves small stand-ins for `fbevents.js` and `gtag.js` (`utils/stubs`). They turn `fbq()` and `gtag()` calls into the same hits the real libraries send (`facebook.com/tr?ev=…`, `google-analytics.com/g/collect?en=…`), reading the page URL and referrer from the browser the same way. To use the real libraries instead, run `CT_E2E_LIVE_TAGS=1 npm test`. Their hits are still answered locally.
+The tracker serves small stand-ins for `fbevents.js`, `gtag.js`, X's `uwt.js` and Microsoft's `bat.js` (`utils/stubs`). They turn `fbq()`, `gtag()`, `twq()` and `uetq` calls into hits like the real libraries send (`facebook.com/tr?ev=…`, `google-analytics.com/g/collect?en=…`, `googleadservices.com/pagead/conversion/…`, `analytics.twitter.com/1/i/adsct?txn_id=…`, `bat.bing.com/action/0?…`), reading the page URL and referrer from the browser the same way. To use the real libraries instead, run `CT_E2E_LIVE_TAGS=1 npm test`. Their hits are still answered locally.
 
 ## Layout
 

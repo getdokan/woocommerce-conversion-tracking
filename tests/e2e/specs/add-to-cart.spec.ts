@@ -4,16 +4,18 @@ import { addProductToCart } from '../utils/checkout';
 import { NetworkTracker } from '../utils/network';
 import { Platform, Tag, enabledTags } from '../utils/platforms';
 
-// Each platform's own name for the add to cart event.
-const ADD_TO_CART: Record<Tag, string> = { meta: 'AddToCart', ga4: 'add_to_cart' };
+// Each platform's own name for the add to cart event (X's is Pro, Google Ads has none).
+const ADD_TO_CART: Partial<Record<Tag, string>> = { meta: 'AddToCart', ga4: 'add_to_cart' };
 
 // The platform host each tag's requests go to.
-const PLATFORM: Record<Tag, Platform> = { meta: 'meta', ga4: 'google' };
+const PLATFORM: Partial<Record<Tag, Platform>> = { meta: 'meta', ga4: 'google' };
+
+const cartTags = (): Tag[] => enabledTags().filter(tag => tag in ADD_TO_CART);
 
 const expectOneAddToCart = async (tracker: NetworkTracker) => {
-    for (const tag of enabledTags()) {
+    for (const tag of cartTags()) {
         await expect
-            .poll(async () => (await tracker.eventHits(tag, ADD_TO_CART[tag])).length, { message: `${tag} AddToCart hits` })
+            .poll(async () => (await tracker.eventHits(tag, ADD_TO_CART[tag]!)).length, { message: `${tag} AddToCart hits` })
             .toBe(1);
     }
 };
@@ -85,9 +87,9 @@ test('behind a full-page cache, a second browser never sends the first browserâ€
     await pageB.waitForTimeout(1_000);
 
     // B's tags did load, and they sent no add to cart.
-    for (const tag of enabledTags()) {
+    for (const tag of cartTags()) {
         expect((await trackerB.platformRequests(PLATFORM[tag])).length, `${tag} requests from browser B`).toBeGreaterThan(0);
-        expect(await trackerB.eventHits(tag, ADD_TO_CART[tag]), `${tag} AddToCart hits from browser B`).toHaveLength(0);
+        expect(await trackerB.eventHits(tag, ADD_TO_CART[tag]!), `${tag} AddToCart hits from browser B`).toHaveLength(0);
     }
 
     await contextB.close();

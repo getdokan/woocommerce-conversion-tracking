@@ -6,7 +6,7 @@ export type CheckoutType = 'classic' | 'block';
 export interface PlacedOrder {
     id: number;
     key: string;
-    // Thank-you page URL, with the order key.
+    // Thank-you page URL as requested, with the order key.
     url: string;
 }
 
@@ -69,19 +69,26 @@ export const placeGuestOrder = async (page: Page, checkout: CheckoutType): Promi
 
     await addProductToCart(page);
 
+    // The plugin removes the key from the address bar on load, so read the URL from the request.
+    const thankYou = page.waitForRequest(
+        request => request.isNavigationRequest() && /\/order-received\/\d+\/\?.*key=wc_order_/.test(request.url()),
+        { timeout: 30_000 }
+    );
+
     if (checkout === 'classic') {
         await fillClassicCheckout(page);
     } else {
         await fillBlockCheckout(page);
     }
 
-    await page.waitForURL(/\/order-received\/\d+\/\?.*key=wc_order_/, { timeout: 30_000 });
+    const url = new URL((await thankYou).url());
 
-    const url = new URL(page.url());
+    await page.waitForURL(/\/order-received\/\d+\//, { timeout: 30_000 });
+    await page.waitForLoadState('load');
 
     return {
         id: Number(url.pathname.match(/\/order-received\/(\d+)/)![1]),
         key: url.searchParams.get('key')!,
-        url: page.url(),
+        url: url.toString(),
     };
 };

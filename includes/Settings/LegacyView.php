@@ -2,6 +2,8 @@
 
 namespace StorePulse\ConversionTracking\Settings;
 
+use StorePulse\ConversionTracking\Platforms\XSettings;
+
 /**
  * Reads the 2.x wcct_settings option as 3.0 settings, until the migration (#122) has written them.
  */
@@ -54,17 +56,9 @@ class LegacyView {
             $platforms['google'] = $google;
         }
 
-        $twitter = self::first( $v1, 'twitter' );
-
-        if ( null !== $twitter ) {
-            $saved = isset( $twitter['events'] ) && is_array( $twitter['events'] ) ? $twitter['events'] : array();
-
-            // 2.x kept the base tag ID among the events; 2.x labels are not 3.0 event IDs, so they are not carried.
-            $platforms['twitter'] = array(
-                'pixel_id' => self::text( $saved, 'universal_tag_id' ),
-                'events'   => array_merge( array( 'page_view' ), isset( $saved['Purchase'] ) && 'on' === $saved['Purchase'] ? array( 'purchase' ) : array() ),
-            );
-
+        if ( null !== self::first( $v1, 'twitter' ) ) {
+            // 2.x labels are not 3.0 event IDs; they read as needs_resetup instead.
+            $platforms['twitter']           = XSettings::from_v1( $v1['twitter'] );
             $platforms['twitter']['paused'] = self::paused( $v1['twitter'], $platforms['twitter']['pixel_id'] );
         }
 

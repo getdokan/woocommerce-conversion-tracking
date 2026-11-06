@@ -174,6 +174,15 @@ abstract class WCCT_Test_Page_Case extends TestCase {
     }
 
     /**
+     * Page regions (head, body, footer) whose output is not checked against the captured pages, because it changed on purpose everywhere
+     *
+     * @return string[]
+     */
+    protected function captured_page_skipped_regions() {
+        return array();
+    }
+
+    /**
      * Assert today's output is all in the page captured from the released versions (html/<page>.html in the fixtures)
      *
      * The captured pages are the full storefront HTML the fixtures were derived from. WCCT_CAPTURE_HTML=1
@@ -211,12 +220,17 @@ abstract class WCCT_Test_Page_Case extends TestCase {
             $captured = preg_replace( $pattern, '', $captured );
         }
 
-        $outputs  = array_map(
-            function ( $chunk ) {
-                return $chunk[1];
-            },
-            $result['chunks']
-        );
+        $skipped  = $this->captured_page_skipped_regions();
+        $outputs  = array();
+
+        // Pages with only skipped output still check the capture is there.
+        $this->assertNotSame( '', $captured, "Captured page html/$page.html is empty" );
+
+        foreach ( $result['chunks'] as $chunk ) {
+            if ( ! in_array( $chunk[0], $skipped, true ) ) {
+                $outputs[] = $chunk[1];
+            }
+        }
 
         if ( $result['queued_js'] ) {
             $outputs[] = implode( '', $result['queued_js'] );

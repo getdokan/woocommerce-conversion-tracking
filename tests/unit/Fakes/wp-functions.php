@@ -104,3 +104,9 @@ if ( ! function_exists( 'wc_get_price_decimals' ) ) {
         return isset( $GLOBALS['wcct_test_decimals'] ) ? $GLOBALS['wcct_test_decimals'] : 2;
     }
 }
+
+if ( ! function_exists( 'absint' ) ) {
+    function absint( $maybeint ) {
+        return abs( (int) $maybeint );
+    }
+}

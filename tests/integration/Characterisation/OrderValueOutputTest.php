@@ -18,7 +18,7 @@ class OrderValueOutputTest extends TestCase {
     const PATTERNS = array(
         'facebook' => '~fbq\(\'track\', \'Purchase\', \{[^}]*?"value": "(?<value>[0-9.]+)",\s*"currency": "(?<currency>[A-Z]+)"~',
         'adwords'  => '~gtag\(\'event\', \'conversion\', \{[^}]*?"value": "(?<value>[0-9.]+)",\s*"currency": "(?<currency>[A-Z]+)"~',
-        'twitter'  => '~twq\(\'track\', \'Purchase\', \{[^}]*?"value": "(?<value>[0-9.]+)",\s*"currency": "(?<currency>[A-Z]+)"~',
+        'twitter'  => '~twq\(\'event\', "tw-ct0x1-ctpur", \{"value":(?<value>[0-9.]+),"currency":"(?<currency>[A-Z]+)"~',
         'ga4'      => '~"purchase",\{"send_to":"G-CTTEST1234","currency":"(?<currency>[A-Z]+)","value":(?<value>[0-9.]+)~',
     );
 

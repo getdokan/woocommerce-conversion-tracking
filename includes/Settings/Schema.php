@@ -241,6 +241,24 @@ class Schema {
     }
 
     /**
+     * Unlock Pro fields: they become editable.
+     *
+     * @param array    $elements Elements.
+     * @param string[] $ids      Field IDs.
+     *
+     * @return array
+     */
+    public static function unlock_fields( array $elements, array $ids ): array {
+        foreach ( $elements as $index => $element ) {
+            if ( is_array( $element ) && isset( $element['id'] ) && in_array( $element['id'], $ids, true ) ) {
+                $elements[ $index ]['disabled'] = false;
+            }
+        }
+
+        return $elements;
+    }
+
+    /**
      * Lite's schema, before the filter.
      *
      * @return array
@@ -449,21 +467,24 @@ class Schema {
         $event_id = __( 'Starts with tw-', 'woocommerce-conversion-tracking' );
         $pattern  = '^tw-[a-z0-9]+-[a-z0-9]+$';
         $lower    = array( 'case' => 'lower' );
+        // Free sends X Purchase only; Pro unlocks the other event IDs.
+        $pro      = array_merge( $lower, array( 'pro' => true, 'disabled' => true ) );
 
         return array(
             self::page( 'twitter', __( 'X', 'woocommerce-conversion-tracking' ) ),
             self::section( 'twitter', 'twitter_connection', __( 'Connection', 'woocommerce-conversion-tracking' ) ),
             self::id_field( 'twitter_connection', 'pixel_id', __( 'Pixel ID', 'woocommerce-conversion-tracking' ), __( '5 letters and numbers, like o8x2k', 'woocommerce-conversion-tracking' ), __( 'The base tag on every page.', 'woocommerce-conversion-tracking' ), '^[a-z0-9]{5}$', 10, $lower ),
             self::id_field( 'twitter_connection', 'purchase_event_id', __( 'Purchase event ID', 'woocommerce-conversion-tracking' ), $event_id, '', $pattern, 20, $lower ),
-            self::id_field( 'twitter_connection', 'cart_event_id', __( 'Add to cart event ID (optional)', 'woocommerce-conversion-tracking' ), $event_id, '', $pattern, 30, $lower ),
-            self::id_field( 'twitter_connection', 'checkout_event_id', __( 'Start checkout event ID (optional)', 'woocommerce-conversion-tracking' ), $event_id, '', $pattern, 40, $lower ),
+            self::id_field( 'twitter_connection', 'cart_event_id', __( 'Add to cart event ID (optional)', 'woocommerce-conversion-tracking' ), $event_id, '', $pattern, 30, $pro ),
+            self::id_field( 'twitter_connection', 'checkout_event_id', __( 'Start checkout event ID (optional)', 'woocommerce-conversion-tracking' ), $event_id, '', $pattern, 40, $pro ),
+            self::id_field( 'twitter_connection', 'signup_event_id', __( 'Registration event ID (optional)', 'woocommerce-conversion-tracking' ), $event_id, '', $pattern, 50, $pro ),
             self::section( 'twitter', 'twitter_events', __( 'Events', 'woocommerce-conversion-tracking' ) ),
             self::events_field(
                 'twitter_events',
                 array(
                     self::event( 'page_view', __( 'Page view', 'woocommerce-conversion-tracking' ), __( 'The base tag on every page.', 'woocommerce-conversion-tracking' ), array( 'recommended' => true, 'always' => true ) ),
-                    self::event( 'add_to_cart', __( 'Add to cart', 'woocommerce-conversion-tracking' ), __( 'Classic and block buttons.', 'woocommerce-conversion-tracking' ), array( 'recommended' => true, 'needs' => 'cart_event_id' ) ),
-                    self::event( 'begin_checkout', __( 'Start checkout', 'woocommerce-conversion-tracking' ), __( 'Classic and block checkout.', 'woocommerce-conversion-tracking' ), array( 'recommended' => true, 'needs' => 'checkout_event_id' ) ),
+                    self::event( 'add_to_cart', __( 'Add to cart', 'woocommerce-conversion-tracking' ), __( 'Classic and block buttons.', 'woocommerce-conversion-tracking' ), array( 'recommended' => true, 'pro' => true, 'needs' => 'cart_event_id' ) ),
+                    self::event( 'begin_checkout', __( 'Start checkout', 'woocommerce-conversion-tracking' ), __( 'Classic and block checkout.', 'woocommerce-conversion-tracking' ), array( 'recommended' => true, 'pro' => true, 'needs' => 'checkout_event_id' ) ),
                     self::event( 'purchase', __( 'Purchase', 'woocommerce-conversion-tracking' ), __( 'Uses the Purchase event ID above. Once per order.', 'woocommerce-conversion-tracking' ), array( 'recommended' => true ) ),
                     self::event( 'sign_up', __( 'Registration', 'woocommerce-conversion-tracking' ), __( 'A new account on your store.', 'woocommerce-conversion-tracking' ), array( 'pro' => true, 'needs' => 'signup_event_id' ) ),
                 )

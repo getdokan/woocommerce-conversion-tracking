@@ -7,6 +7,7 @@ use StorePulse\ConversionTracking\Events\EventFactory;
 use StorePulse\ConversionTracking\Events\PurchaseConfirmation;
 use StorePulse\ConversionTracking\Events\PurchaseGate;
 use StorePulse\ConversionTracking\Events\SentFlags;
+use StorePulse\ConversionTracking\Privacy\OrderUrl;
 
 /**
  * Google Analytics 4 integration
@@ -152,8 +153,7 @@ class WCCT_Integration_GA4 extends WCCT_Integration {
      * The gtag.js loader is shared with the other gtag integrations, see
      * WCCT_Integration::print_gtag_loader().
      *
-     * The `key` query parameter (the order key on the order received and
-     * order pay pages) is removed from the page location and referrer.
+     * Order parameters are removed from the page location and referrer, see OrderUrl.
      *
      * @return void
      */
@@ -171,32 +171,7 @@ class WCCT_Integration_GA4 extends WCCT_Integration {
             <?php if ( $loader_printed ) { ?>
             wcctGtag('js', new Date());
             <?php } ?>
-            (function () {
-                var cleanUrl = function (url) {
-                    try {
-                        var hashPos = url.indexOf('#');
-                        var hash = hashPos > -1 ? url.substring(hashPos) : '';
-                        var base = hashPos > -1 ? url.substring(0, hashPos) : url;
-                        var queryPos = base.indexOf('?');
-                        if (queryPos == -1) return url;
-                        var pairs = base.substring(queryPos + 1).split('&'), kept = [];
-                        for (var i = 0; i < pairs.length; i++) {
-                            if (decodeURIComponent(pairs[i].split('=')[0].replace(/\+/g, ' ')) != 'key') kept.push(pairs[i]);
-                        }
-                        return base.substring(0, queryPos) + (kept.length ? '?' + kept.join('&') : '') + hash;
-                    } catch (e) {
-                        return String(url).split('?')[0];
-                    }
-                };
-                var config = {};
-                var pageLocation = cleanUrl(window.location.href);
-                if (pageLocation != window.location.href) config.page_location = pageLocation;
-                if (document.referrer) {
-                    var referrer = cleanUrl(document.referrer);
-                    if (referrer != document.referrer) config.page_referrer = referrer;
-                }
-                wcctGtag('config', <?php echo $this->encode( $measurement_id ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>, config);
-            })();
+            wcctGtag('config', <?php echo $this->encode( $measurement_id ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>, <?php echo OrderUrl::page_config_js(); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>);
         </script>
         <?php
     }

@@ -4,6 +4,7 @@ namespace StorePulse\ConversionTracking\Settings;
 
 use InvalidArgumentException;
 use StorePulse\ConversionTracking\Access\CustomScripts;
+use StorePulse\ConversionTracking\Platforms\XSettings;
 
 /**
  * Turns the stored settings into the API's values and applies a save to them.
@@ -16,7 +17,7 @@ class Values {
      * @param array $schema Normalized schema.
      * @param array $doc    Stored settings: global field values plus { platforms: id => values }.
      *
-     * @return array Global values plus { platforms: id => values + paused + credentials }.
+     * @return array Global values plus { platforms: id => values + paused + needs_resetup + credentials }.
      */
     public static function get( array $schema, array $doc ): array {
         $values = self::fill( Schema::fields( $schema['global'] ), $doc );
@@ -30,6 +31,9 @@ class Values {
 
             // Read-only until #103 adds Pause; a 2.x integration that was switched off reads as paused.
             $values['platforms'][ $id ]['paused'] = ! empty( $stored['paused'] );
+
+            // Read-only: events 2.x sent that need a new event ID (X); input for What's new (#124) and the migration (#122).
+            $values['platforms'][ $id ]['needs_resetup'] = self::needs_resetup( $id, $stored );
 
             // Reserved for tokens in 3.1; never returns a secret.
             $values['platforms'][ $id ]['credentials'] = new \stdClass();
@@ -125,6 +129,11 @@ class Values {
                 continue;
             }
 
+            // Locked fields (Pro fields on Free) keep what is stored.
+            if ( ! empty( $field['disabled'] ) ) {
+                continue;
+            }
+
             $current = array_key_exists( $id, $stored ) ? $stored[ $id ] : Schema::default_value( $field );
 
             try {
@@ -165,6 +174,22 @@ class Values {
         }
 
         return $values;
+    }
+
+    /**
+     * Events of a platform flagged for a re-setup.
+     *
+     * @param string $id     Platform ID.
+     * @param array  $stored Stored values.
+     *
+     * @return string[]
+     */
+    private static function needs_resetup( string $id, array $stored ): array {
+        if ( 'twitter' === $id ) {
+            return XSettings::from_v3( $stored )['needs_resetup'];
+        }
+
+        return isset( $stored['needs_resetup'] ) && is_array( $stored['needs_resetup'] ) ? array_values( array_filter( $stored['needs_resetup'], 'is_string' ) ) : array();
     }
 
     /**

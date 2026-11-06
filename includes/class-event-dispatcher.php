@@ -4,6 +4,7 @@ use StorePulse\ConversionTracking\Events\EventFactory;
 use StorePulse\ConversionTracking\Events\Pipeline;
 use StorePulse\ConversionTracking\Events\PurchaseConfirmation;
 use StorePulse\ConversionTracking\Events\SignUp;
+use StorePulse\ConversionTracking\Privacy\OrderUrl;
 
 /**
  * Event Manager
@@ -27,6 +28,13 @@ class WCCT_Event_Dispatcher {
     private $pipeline;
 
     /**
+     * Keeps the order key out of platform URLs
+     *
+     * @var OrderUrl
+     */
+    private $order_url;
+
+    /**
      * Constructor for WCCT_Event_Dispatcher class
      */
     function __construct() {
@@ -36,6 +44,9 @@ class WCCT_Event_Dispatcher {
         $this->pipeline->init_hooks();
 
         ( new PurchaseConfirmation( array( $this, 'get_integrations' ) ) )->init_hooks();
+
+        $this->order_url = new OrderUrl( array( $this, 'get_integrations' ) );
+        $this->order_url->init_hooks();
 
         add_action( 'wp_head', array( $this, 'enqueue_scripts' ) );
 
@@ -75,6 +86,15 @@ class WCCT_Event_Dispatcher {
      */
     public function get_pipeline() {
         return $this->pipeline;
+    }
+
+    /**
+     * The order URL cleaner
+     *
+     * @return OrderUrl
+     */
+    public function get_order_url() {
+        return $this->order_url;
     }
 
     /**

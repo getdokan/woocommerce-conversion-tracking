@@ -8,7 +8,38 @@
             function gtag(){dataLayer.push(arguments)};
                         gtag('js', new Date());
             
-            gtag('config', 'AW-123456789');
+            gtag('config', 'AW-123456789', (function (cleanUrl) {
+                var config = {};
+                var pageLocation = cleanUrl(window.location.href);
+                if (pageLocation != window.location.href) config.page_location = pageLocation;
+                if (document.referrer) {
+                    var referrer = cleanUrl(document.referrer);
+                    if (referrer != document.referrer) config.page_referrer = referrer;
+                }
+                return config;
+            })(function (url) {
+                    var names = ["key","order","order_id","order-pay","order_key"], numeric = ["order"];
+                    try {
+                        url = String(url);
+                        var hashPos = url.indexOf('#');
+                        var hash = hashPos > -1 ? url.substring(hashPos) : '';
+                        var base = hashPos > -1 ? url.substring(0, hashPos) : url;
+                        var queryPos = base.indexOf('?');
+                        if (queryPos == -1) return url;
+                        var pairs = base.substring(queryPos + 1).split('&'), kept = [];
+                        for (var i = 0; i < pairs.length; i++) {
+                            var pair = pairs[i];
+                            try { pair = decodeURIComponent(pair.replace(/\+/g, ' ')); } catch (e) {}
+                            pair = pair.toLowerCase();
+                            var name = pair.split('=')[0], value = pair.substring(name.length + 1);
+                            var drop = names.indexOf(name) > -1 && (numeric.indexOf(name) == -1 || /^\d+$/.test(value));
+                            if (!drop && pair.indexOf('wc_order_') == -1) kept.push(pairs[i]);
+                        }
+                        return base.substring(0, queryPos) + (kept.length ? '?' + kept.join('&') : '') + hash;
+                    } catch (e) {
+                        return String(url).split('?')[0];
+                    }
+                }));
         </script>
         <!-- End: Conversion Tracking for WooCommerce Codes -->
 

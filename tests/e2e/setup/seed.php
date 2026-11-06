@@ -99,36 +99,78 @@ if ( ! get_page_by_path( 'block-shop' ) ) {
 }
 
 // Tracking settings, in the shape the settings page saves. Test IDs only.
-update_option(
-    'wcct_settings',
-    array(
-        'facebook' => array(
-            'enabled' => true,
-            array(
-                'pixel_id' => $ct_e2e_ids['meta']['pixelId'],
-                'events'   => array(
-                    'AddToCart'        => 'on',
-                    'InitiateCheckout' => 'on',
-                    'Purchase'         => 'on',
-                    'Registration'     => 'on',
-                    // Pro's Meta reads the sign-up switch under this key.
-                    'CompleteRegistration' => 'on',
-                ),
+$ct_e2e_settings = array(
+    'facebook' => array(
+        'enabled' => true,
+        array(
+            'pixel_id' => $ct_e2e_ids['meta']['pixelId'],
+            'events'   => array(
+                'AddToCart'        => 'on',
+                'InitiateCheckout' => 'on',
+                'Purchase'         => 'on',
+                'Registration'     => 'on',
+                // Pro's Meta reads the sign-up switch under this key.
+                'CompleteRegistration' => 'on',
             ),
         ),
-        'ga4'      => array(
-            'enabled' => true,
-            array(
-                'measurement_id' => $ct_e2e_ids['ga4']['measurementId'],
-                'events'         => array(
-                    'view_item'      => 'on',
-                    'add_to_cart'    => 'on',
-                    'begin_checkout' => 'on',
-                    'purchase'       => 'on',
-                ),
+    ),
+    'ga4'      => array(
+        'enabled' => true,
+        array(
+            'measurement_id' => $ct_e2e_ids['ga4']['measurementId'],
+            'events'         => array(
+                'view_item'      => 'on',
+                'add_to_cart'    => 'on',
+                'begin_checkout' => 'on',
+                'purchase'       => 'on',
             ),
         ),
-    )
+    ),
+    'adwords'  => array(
+        'enabled' => true,
+        array(
+            'account_id' => $ct_e2e_ids['ads']['conversionId'],
+            'events'     => array(
+                'Purchase'       => 'on',
+                'Purchase-label' => $ct_e2e_ids['ads']['purchaseLabel'],
+            ),
+        ),
+    ),
+    'twitter'  => array(
+        'enabled' => true,
+        array(
+            'pixel_id' => $ct_e2e_ids['x']['pixelId'],
+            'events'   => array(
+                'Purchase'          => 'on',
+                'purchase_event_id' => $ct_e2e_ids['x']['purchaseEventId'],
+            ),
+        ),
+    ),
 );
+
+// With Pro: X's optional events and Microsoft, so their requests are checked too.
+if ( is_plugin_active( 'wc-conversion-tracking-pro/woocommerce-conversion-tracking-pro.php' ) ) {
+    $ct_e2e_settings['twitter'][0]['events'] += array(
+        'AddToCart'         => 'on',
+        'cart_event_id'     => 'tw-cte2x-ctadd',
+        'InitiateCheckout'  => 'on',
+        'checkout_event_id' => 'tw-cte2x-ctchk',
+        'Registration'      => 'on',
+        'signup_event_id'   => 'tw-cte2x-ctreg',
+    );
+    $ct_e2e_settings['bing_ads'] = array(
+        'enabled' => true,
+        array(
+            'tag_id' => '12345678',
+            'events' => array(
+                'AddToCart'     => 'on',
+                'BeginCheckout' => 'on',
+                'Purchase'      => 'on',
+            ),
+        ),
+    );
+}
+
+update_option( 'wcct_settings', $ct_e2e_settings );
 
 WP_CLI::success( sprintf( 'Seeded the e2e store (product #%d).', $ct_e2e_product->get_id() ) );

@@ -98,12 +98,17 @@ class WCCT_Pro_Features {
     public function twitter_pro_features( $settings ) {
 
         $settings['events']['options']['AddToCart-pro'] = array(
-            'label'         => __( 'Add to Cart ', 'woocommerce-conversion-tracking' ),
+            'label'         => __( 'Add to cart', 'woocommerce-conversion-tracking' ),
+            'profeature'    => true,
+        );
+
+        $settings['events']['options']['InitiateCheckout-pro'] = array(
+            'label'         => __( 'Start checkout', 'woocommerce-conversion-tracking' ),
             'profeature'    => true,
         );
 
         $settings['events']['options']['CompleteRegistration-pro'] = array(
-            'label'         => __( 'Complete Registration', 'woocommerce-conversion-tracking' ),
+            'label'         => __( 'Registration', 'woocommerce-conversion-tracking' ),
             'profeature'    => true,
         );
 

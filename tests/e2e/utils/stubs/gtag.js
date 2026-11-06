@@ -1,4 +1,4 @@
-// Stand-in for googletagmanager.com/gtag/js. Turns GA4 gtag() commands into /g/collect GET hits.
+// Stand-in for googletagmanager.com/gtag/js. Turns GA4 gtag() commands into /g/collect GET hits and Google Ads ones into conversion hits.
 ( function ( window, document ) {
     var dataLayer = ( window.dataLayer = window.dataLayer || [] );
 
@@ -52,6 +52,30 @@
         image.src = 'https://region1.google-analytics.com/g/collect?' + query.join( '&' );
     };
 
+    // Google Ads: a remarketing hit on config and a conversion hit per conversion event, with the page URL and referrer.
+    var sendAds = function ( id, label, params ) {
+        var config = configs[ id ] || {};
+        var query = [
+            'label=' + encode( label ),
+            'url=' + encode( params.page_location || config.page_location || document.location.href ),
+            'ref=' + encode( params.page_referrer || config.page_referrer || document.referrer ),
+            'value=' + encode( params.value ),
+            'currency_code=' + encode( params.currency ),
+            'oid=' + encode( params.transaction_id ),
+        ];
+        var path = label ? 'https://www.googleadservices.com/pagead/conversion/' : 'https://googleads.g.doubleclick.net/pagead/viewthroughconversion/';
+
+        var image = new Image();
+
+        if ( typeof params.event_callback === 'function' ) {
+            image.onload = image.onerror = function () {
+                params.event_callback();
+            };
+        }
+
+        image.src = path + encode( id.replace( /^AW-/, '' ) ) + '/?' + query.join( '&' );
+    };
+
     var handle = function ( args ) {
         if ( Object.prototype.toString.call( args ) !== '[object Arguments]' ) {
             return;
@@ -65,6 +89,13 @@
             if ( params.send_page_view !== false ) {
                 send( args[ 1 ], 'page_view', {} );
             }
+        } else if ( args[ 0 ] === 'config' && /^AW-/.test( args[ 1 ] ) ) {
+            configs[ args[ 1 ] ] = params;
+            sendAds( args[ 1 ], '', {} );
+        } else if ( args[ 0 ] === 'event' && params.send_to && /^AW-[^/]+\/./.test( String( params.send_to ) ) ) {
+            var target = String( params.send_to ).split( '/' );
+
+            sendAds( target[ 0 ], target[ 1 ], params );
         } else if ( args[ 0 ] === 'event' ) {
             var targets = params.send_to ? [].concat( params.send_to ) : Object.keys( configs );
 

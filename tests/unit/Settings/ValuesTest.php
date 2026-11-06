@@ -18,7 +18,8 @@ class ValuesTest extends TestCase {
         $this->assertSame( array( 'facebook', 'google', 'twitter', 'custom' ), array_keys( $values['platforms'] ) );
         $this->assertSame( '', $values['platforms']['facebook']['pixel_id'] );
         $this->assertSame( 'both', $values['platforms']['google']['mode'] );
-        $this->assertSame( array( 'page_view', 'add_to_cart', 'begin_checkout', 'purchase' ), $values['platforms']['twitter']['events'] );
+        // X Add to cart and Start checkout are Pro, so off by default on Free.
+        $this->assertSame( array( 'page_view', 'purchase' ), $values['platforms']['twitter']['events'] );
 
         foreach ( $values['platforms'] as $platform ) {
             $this->assertFalse( $platform['paused'] );
@@ -38,11 +39,42 @@ class ValuesTest extends TestCase {
         $values = Values::get( $schema, $result['doc'] );
 
         foreach ( $input['platforms'] as $id => $posted ) {
-            unset( $values['platforms'][ $id ]['credentials'], $values['platforms'][ $id ]['paused'] );
-            $this->assertSame( $posted, $values['platforms'][ $id ], $id );
+            unset( $values['platforms'][ $id ]['credentials'], $values['platforms'][ $id ]['paused'], $values['platforms'][ $id ]['needs_resetup'] );
+            // Locked fields aren't posted and keep their defaults.
+            $this->assertSame( $posted, array_intersect_key( $values['platforms'][ $id ], $posted ), $id );
         }
 
         $this->assertTrue( $values['consent_mode'] );
+    }
+
+    public function test_locked_x_event_ids_keep_what_is_stored_on_free() {
+        $doc    = array( 'platforms' => array( 'twitter' => array( 'cart_event_id' => 'tw-o8x2k-aaaaa' ) ) );
+        $posted = array(
+            'platforms' => array(
+                'twitter' => array(
+                    'purchase_event_id' => 'tw-o8x2k-bbbbb',
+                    'cart_event_id'     => 'tw-o8x2k-ccccc',
+                    'signup_event_id'   => 'tw-o8x2k-ddddd',
+                ),
+            ),
+        );
+        $result = Values::apply( Schema::get(), $doc, $posted, array( $this, 'can' ) );
+
+        $this->assertSame( 'tw-o8x2k-bbbbb', $result['doc']['platforms']['twitter']['purchase_event_id'] );
+        $this->assertSame( 'tw-o8x2k-aaaaa', $result['doc']['platforms']['twitter']['cart_event_id'] );
+        $this->assertArrayNotHasKey( 'signup_event_id', $result['doc']['platforms']['twitter'] );
+    }
+
+    public function test_needs_resetup_is_read_only_and_clears_once_the_event_has_an_id() {
+        $doc    = array( 'platforms' => array( 'twitter' => array( 'purchase_event_id' => 'tw-o8x2k-bbbbb', 'needs_resetup' => array( 'purchase', 'add_to_cart' ) ) ) );
+        $values = Values::get( Schema::get(), $doc );
+
+        $this->assertSame( array( 'add_to_cart' ), $values['platforms']['twitter']['needs_resetup'] );
+        $this->assertSame( array(), $values['platforms']['facebook']['needs_resetup'] );
+
+        $result = Values::apply( Schema::get(), $doc, array( 'platforms' => array( 'twitter' => array( 'needs_resetup' => array() ) ) ), array( $this, 'can' ) );
+
+        $this->assertSame( array( 'purchase', 'add_to_cart' ), $result['doc']['platforms']['twitter']['needs_resetup'] );
     }
 
     public function test_only_posted_keys_change_and_unknown_stored_keys_are_kept() {
@@ -155,6 +187,10 @@ class ValuesTest extends TestCase {
 
         foreach ( $schema['platforms'] as $id => $platform ) {
             foreach ( Schema::fields( $platform['schema'] ) as $key => $field ) {
+                if ( ! empty( $field['disabled'] ) ) {
+                    continue;
+                }
+
                 $input['platforms'][ $id ][ $key ] = $this->value_for( $field );
             }
         }

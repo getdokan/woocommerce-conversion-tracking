@@ -27,7 +27,16 @@ class LegacyViewTest extends TestCase {
         $this->assertSame(
             array(
                 'facebook' => array( 'pixel_id' => '123', 'events' => array( 'add_to_cart', 'sign_up' ), 'paused' => false ),
-                'twitter'  => array( 'pixel_id' => 'o8x2k', 'events' => array( 'page_view', 'purchase' ), 'paused' => false ),
+                'twitter'  => array(
+                    'pixel_id'          => 'o8x2k',
+                    'events'            => array( 'page_view', 'purchase' ),
+                    'purchase_event_id' => '',
+                    'cart_event_id'     => '',
+                    'checkout_event_id' => '',
+                    'signup_event_id'   => '',
+                    'needs_resetup'     => array( 'purchase', 'add_to_cart' ),
+                    'paused'            => false,
+                ),
                 'custom'   => array(
                     'thankyou_enabled' => true,
                     'thankyou_script'  => '<script>a()</script>',

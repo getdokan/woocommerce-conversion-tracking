@@ -97,7 +97,7 @@ class WCCT_Integration_Google extends WCCT_Integration {
             gtag('js', new Date());
             <?php } ?>
 
-            gtag('config', '<?php echo esc_attr( $account_id ); ?>');
+            gtag('config', '<?php echo esc_attr( $account_id ); ?>', <?php echo \StorePulse\ConversionTracking\Privacy\OrderUrl::page_config_js(); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>);
         </script>
         <?php
     }

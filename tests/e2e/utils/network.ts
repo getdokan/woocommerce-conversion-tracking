@@ -21,6 +21,8 @@ export interface CapturedRequest {
 const STUBS: { match: RegExp; file: string }[] = [
     { match: /^https:\/\/connect\.facebook\.net\/[^/]+\/fbevents\.js/, file: 'fbevents.js' },
     { match: /^https:\/\/www\.googletagmanager\.com\/gtag\/js/, file: 'gtag.js' },
+    { match: /^https:\/\/static\.ads-twitter\.com\/uwt\.js/, file: 'uwt.js' },
+    { match: /^https?:\/\/bat\.bing\.com\/bat\.js/, file: 'bat.js' },
 ];
 
 const PIXEL = Buffer.from('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7', 'base64');
@@ -34,8 +36,17 @@ const PURCHASE: Record<Tag, (request: CapturedRequest, ids: Record<string, strin
         request.platform === 'google' &&
         new URL(request.url).pathname.endsWith('/g/collect') &&
         request.params.some(p => p.get('en') === 'purchase' && p.get('tid') === ids.measurementId),
+    ads: (request, ids) =>
+        request.platform === 'google' &&
+        new URL(request.url).pathname === `/pagead/conversion/${ids.conversionId.replace(/^AW-/, '')}/` &&
+        request.params.some(p => p.get('label') === ids.purchaseLabel),
+    x: (request, ids) =>
+        request.platform === 'x' &&
+        new URL(request.url).pathname.endsWith('/i/adsct') &&
+        request.params.some(p => p.get('txn_id') === ids.purchaseEventId),
 };
 
+// X names an event by its event ID, Google Ads by its conversion label.
 const EVENT: Record<Tag, (request: CapturedRequest, ids: Record<string, string>, event: string) => boolean> = {
     meta: (request, ids, event) =>
         request.platform === 'meta' &&
@@ -45,6 +56,12 @@ const EVENT: Record<Tag, (request: CapturedRequest, ids: Record<string, string>,
         request.platform === 'google' &&
         new URL(request.url).pathname.endsWith('/g/collect') &&
         request.params.some(p => p.get('en') === event && p.get('tid') === ids.measurementId),
+    ads: (request, ids, event) =>
+        request.platform === 'google' &&
+        new URL(request.url).pathname === `/pagead/conversion/${ids.conversionId.replace(/^AW-/, '')}/` &&
+        request.params.some(p => p.get('label') === event),
+    x: (request, _ids, event) =>
+        request.platform === 'x' && new URL(request.url).pathname.endsWith('/i/adsct') && request.params.some(p => p.get('txn_id') === event),
 };
 
 const paramsOf = (request: Request): URLSearchParams[] => {
