@@ -2,6 +2,7 @@
 
 use StorePulse\ConversionTracking\Access\CustomScripts;
 use StorePulse\ConversionTracking\Access\SettingsIds;
+use StorePulse\ConversionTracking\Admin\PostedSettings;
 
 /**
  * Ajax handler class
@@ -46,24 +47,13 @@ class WCCT_Ajax {
             wp_send_json_error();
         }
 
-        $integration_settings = array();
+        $posted               = is_array( $_POST['settings'] ) ? wp_unslash( $_POST['settings'] ) : array(); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- PostedSettings cleans it field by field.
+        $integration_settings = PostedSettings::clean( $posted, $this->integration_fields() );
+        $stored_settings      = get_option( 'wcct_settings', array() );
+        $stored_settings      = is_array( $stored_settings ) ? $stored_settings : array();
+        $can_edit_script      = current_user_can( CustomScripts::CAPABILITY );
 
-        if ( ! empty( $_POST['settings'] ) ) {
-
-            foreach ( $_POST['settings'] as $field_id => $settings ) {
-                $is_enabled = isset( $settings['enabled'] ) ? true : false;
-
-                $settings = array_merge( $settings, array( 'enabled' => $is_enabled ) );
-                $integration_settings[ $field_id ] = $settings;
-            }
-        }
-
-
-        $stored_settings = get_option( 'wcct_settings', array() );
-        $stored_settings = is_array( $stored_settings ) ? $stored_settings : array();
-        $can_edit_script = current_user_can( CustomScripts::CAPABILITY );
-
-        if ( ! $can_edit_script && CustomScripts::changed( stripslashes_deep( $integration_settings ), $stored_settings ) ) {
+        if ( ! $can_edit_script && CustomScripts::changed( $integration_settings, $stored_settings ) ) {
             wp_send_json_error(
                 [
                     'message' => __( 'Only administrators can change custom scripts.', 'woocommerce-conversion-tracking' ),
@@ -72,8 +62,9 @@ class WCCT_Ajax {
             );
         }
 
-        $integration_settings = apply_filters( 'wcct_save_integrations_settings', $integration_settings );
-        $integration_settings = SettingsIds::clean( stripslashes_deep( $integration_settings ) );
+        // Callbacks have always received slashed data. Their output is trusted: only SettingsIds and the script guard run after.
+        $integration_settings = wp_unslash( apply_filters( 'wcct_save_integrations_settings', wp_slash( $integration_settings ) ) );
+        $integration_settings = SettingsIds::clean( is_array( $integration_settings ) ? $integration_settings : array() );
 
         if ( ! $can_edit_script ) {
             $integration_settings = CustomScripts::keep( $integration_settings, $stored_settings );
@@ -85,6 +76,24 @@ class WCCT_Ajax {
         ) );
 
     }
+
+    /**
+     * Settings fields of every integration, keyed by integration ID
+     *
+     * @return array
+     */
+    private function integration_fields() {
+        $fields = array();
+
+        foreach ( wcct_init()->manager->get_integrations() as $integration ) {
+            if ( $integration instanceof WCCT_Integration ) {
+                $fields[ $integration->get_id() ] = (array) $integration->get_settings();
+            }
+        }
+
+        return $fields;
+    }
+
     /**
      * Install the Happy addons via ajax
      *

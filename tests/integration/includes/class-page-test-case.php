@@ -146,6 +146,15 @@ abstract class WCCT_Test_Page_Case extends TestCase {
     }
 
     /**
+     * Markup removed from the output on purpose, taken out of the captured pages before comparing, markup => reason
+     *
+     * @return array
+     */
+    protected function captured_page_removals() {
+        return array();
+    }
+
+    /**
      * Assert today's output is all in the page captured from the released versions (html/<page>.html in the fixtures)
      *
      * The captured pages are the full storefront HTML the fixtures were derived from. WCCT_CAPTURE_HTML=1
@@ -177,7 +186,7 @@ abstract class WCCT_Test_Page_Case extends TestCase {
             $this->fail( "No captured page html/$page.html. Capture it from the released versions with WCCT_CAPTURE_HTML=1." );
         }
 
-        $captured = file_get_contents( $file );
+        $captured = str_replace( array_keys( $this->captured_page_removals() ), '', file_get_contents( $file ) );
         $outputs  = array_map(
             function ( $chunk ) {
                 return $chunk[1];

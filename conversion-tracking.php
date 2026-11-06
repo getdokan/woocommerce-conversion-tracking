@@ -12,6 +12,8 @@ Requires PHP: 7.4
 Requires Plugins: woocommerce
 WC requires at least: 8.5.0
 WC tested up to: 11.1
+Text Domain: woocommerce-conversion-tracking
+Domain Path: /languages
 */
 
 /**
@@ -312,7 +314,7 @@ class WeDevs_WC_Conversion_Tracking {
         if ( ! function_exists( 'WC' ) ) {
             ?>
                 <div class="error notice is-dismissible">
-                    <p><?php echo __( '<b>Conversion Tracking for WooCommerce</b> requires <a target="_blank" href="https://wordpress.org/plugins/woocommerce/">Woocommerce</a>', 'woocommerce-conversion-tracking' ); ?></p>
+                    <p><?php echo wp_kses_post( __( '<b>Conversion Tracking for WooCommerce</b> requires <a target="_blank" href="https://wordpress.org/plugins/woocommerce/">Woocommerce</a>', 'woocommerce-conversion-tracking' ) ); ?></p>
                 </div>
             <?php
         }
@@ -345,7 +347,7 @@ class WeDevs_WC_Conversion_Tracking {
                     <img src="<?php echo esc_attr( WCCT_ASSETS . '/images/happy-addons.png' )?>" alt="">
                 </div>
                 <div class="wcct-message-content">
-                    <p><?php echo __( 'Reach beyond your imagination in creating web pages. <strong> Try Happy Addons for Elementor to shape your dream.</strong> 😊' ); ?></p>
+                    <p><?php echo wp_kses_post( __( 'Reach beyond your imagination in creating web pages. <strong> Try Happy Addons for Elementor to shape your dream.</strong> 😊', 'woocommerce-conversion-tracking' ) ); ?></p>
                 </div>
                 <div class="wcct-message-action">
                     <a href="" id="wcct-install-happ-addons" class="button button-primary"> <i class="dashicons dashicons-update wcct-update-icon"></i> Install Now For FREE</a>

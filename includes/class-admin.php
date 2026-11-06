@@ -104,19 +104,18 @@ class WCCT_Admin {
             return;
         }
 
-        $html = '<h2 class="nav-tab-wrapper">';
-        foreach ( $tabs as $tab ) {
-            $active_class   = ( $tab['id'] == $active ) ? 'nav-tab-active' : '';
+        echo '<h2 class="nav-tab-wrapper">';
 
-            if ( !empty( $tab['id'] ) ) {
-                $html  .= sprintf( '<a href="admin.php?page=conversion-tracking&tab=%s" class="nav-tab %s">%s</a>', $tab['id'], $active_class, $tab['title'] );
+        foreach ( $tabs as $tab ) {
+            $active_class = ( $tab['id'] == $active ) ? 'nav-tab-active' : '';
+
+            if ( ! empty( $tab['id'] ) ) {
+                printf( '<a href="%s" class="nav-tab %s">%s</a>', esc_url( 'admin.php?page=conversion-tracking&tab=' . rawurlencode( $tab['id'] ) ), esc_attr( $active_class ), esc_html( $tab['title'] ) );
             } else {
-                $html  .= sprintf( '<a href="#" class="nav-tab disabled">%s</a>', $tab['title'] );
+                printf( '<a href="#" class="nav-tab disabled">%s</a>', esc_html( $tab['title'] ) );
             }
         }
 
-        $html   .= '</h2>';
-
-        echo $html;
+        echo '</h2>';
     }
 }

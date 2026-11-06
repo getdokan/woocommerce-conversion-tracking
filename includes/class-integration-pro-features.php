@@ -19,10 +19,21 @@ class WCCT_Pro_Features {
         add_action( 'wcct_sidebar', array( $this, 'profeature_ad' ) );
     }
 
-    public function enqueue_script() {
+    /**
+     * Enqueue SweetAlert for the Pro feature prompts, on the Conversion Tracking page only
+     *
+     * @param string $hook_suffix Current admin page hook.
+     *
+     * @return void
+     */
+    public function enqueue_script( $hook_suffix ) {
+        $admin = wcct_init()->admin;
 
-        wp_enqueue_script( 'sweetalert', plugins_url( 'assets/js/sweetalert.min.js', WCCT_FILE ), array(), false, false );
+        if ( empty( $admin->page_hook ) || $admin->page_hook !== $hook_suffix ) {
+            return;
+        }
 
+        wp_enqueue_script( 'sweetalert', plugins_url( 'assets/js/sweetalert.min.js', WCCT_FILE ), array(), WCCT_VERSION, false );
     }
 
     /**
@@ -131,7 +142,6 @@ class WCCT_Pro_Features {
                 <li><mark><strong>Multiple</strong> Facebook Pixels</mark></li>
                 <li>Advanced Google Adwords Events</li>
                 <li>Advanced X (formerly Twitter) Events</li>
-                <li>Perfect Audience Integration</li>
                 <li>Bing Ads</li>
             </ul>
 

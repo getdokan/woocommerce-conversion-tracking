@@ -101,7 +101,7 @@
                                                                         <?php
 
                                                                         if ( isset( $option['help'] ) && ! empty( $option['help'] ) ) {
-                                                                            echo '<p class="help">' . $option['help'] . '</p>';
+                                                                            echo '<p class="help">' . wp_kses_post( $option['help'] ) . '</p>';
                                                                         }
                                                                         ?>
                                                                         </div>
@@ -120,7 +120,7 @@
                                             }
 
                                             if ( isset( $field['help'] ) && ! empty( $field['help'] ) ) {
-                                                echo '<p class="help">' . $field['help'] . '</p>';
+                                                echo '<p class="help">' . wp_kses_post( $field['help'] ) . '</p>';
                                             }
                                             ?>
                                         </td>

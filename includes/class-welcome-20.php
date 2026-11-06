@@ -9,8 +9,6 @@ class WCCT_Welcome_20 {
 
     function __construct() {
         add_action( 'admin_init', array( $this, 'redirect_to_page' ), 9999 );
-
-        add_action( 'wp_ajax_wcct_dismiss_notice', array( $this, 'dismiss_notice' ) );
     }
 
     /**

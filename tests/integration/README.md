@@ -129,7 +129,7 @@ A failing run also writes the actual output to `tests/.output/<integration>/<pag
 
 ### Captured pages
 
-`tests/fixtures/html/<page>.html` is the full storefront HTML of each page with every integration on (`all`), captured from the released 2.1.6 code in the store above, with the store URL replaced by `{home}`. The fixtures are the plugin's part of these pages. `test_output_is_in_the_page_captured_from_2_1_6` checks that today's output for each page is still in its captured page, so the captures can't drift from the fixtures.
+`tests/fixtures/html/<page>.html` is the full storefront HTML of each page with every integration on (`all`), captured from the released 2.1.6 code in the store above, with the store URL replaced by `{home}`. The fixtures are the plugin's part of these pages. `test_output_is_in_the_page_captured_from_2_1_6` checks that today's output for each page is still in its captured page, so the captures can't drift from the fixtures. When output changes on purpose, a test class lists the pages that now differ in `captured_page_differences()` (their check is skipped), or markup removed from every page in `captured_page_removals()` (taken out of the captured pages before comparing).
 
 Pages captured elsewhere, for example from a real store, can be put next to them and compared with `php bin/extract-baseline.php page.html [home URL]`. It prints the tracking output found in a saved page (the plugin's head block, the queued WooCommerce JavaScript, and other inline scripts that call a tracking function) in the fixture's layout.
 
