@@ -422,7 +422,7 @@ class WCCT_Integration_GA4 extends WCCT_Integration {
             if ( $product ) {
                 $items[] = $this->get_product_item( $product, $order_item->get_quantity(), $values['price'], $values['discount'] );
             } else {
-                $item_id = $order_item->get_variation_id() ? $order_item->get_variation_id() : $order_item->get_product_id();
+                $item_id = \StorePulse\ConversionTracking\Events\ProductId::for_order_item( $order_item, \StorePulse\ConversionTracking\Events\ProductId::mode_for( $this->id ) );
                 $items[] = WCCT_GA4_Data::build_item(
                     array(
                         'id'   => apply_filters( 'wcct_ga4_item_id', (string) $item_id, false ),
@@ -452,8 +452,8 @@ class WCCT_Integration_GA4 extends WCCT_Integration {
     /**
      * Build a GA4 item for a product
      *
-     * Variations use the variation ID, the same ID the Meta integration
-     * sends for cart items.
+     * Variations use their own ID or SKU, per the Product ID sent setting,
+     * the same ID the Meta integration sends.
      *
      * @param  WC_Product $product
      * @param  int        $quantity
@@ -476,7 +476,7 @@ class WCCT_Integration_GA4 extends WCCT_Integration {
 
         return WCCT_GA4_Data::build_item(
             array(
-                'id'         => apply_filters( 'wcct_ga4_item_id', (string) $product->get_id(), $product ),
+                'id'         => apply_filters( 'wcct_ga4_item_id', (string) \StorePulse\ConversionTracking\Events\ProductId::for_product( $product, $this->id ), $product ),
                 'name'       => $product->get_title(),
                 'variant'    => $variant,
                 'categories' => $this->get_category_path( $parent_id ? $parent_id : $product->get_id() ),

@@ -371,20 +371,14 @@ abstract class WCCT_Integration {
     }
 
     /**
-     * Helper function to iterate through a cart and gather all content ids
+     * Helper function to iterate through a cart and gather all content ids, per the platform's Product ID sent setting
      *
      * @param  array $cart
      *
      * @return array
      */
     protected function get_content_ids_from_cart( $cart ) {
-        $product_ids = array();
-
-        foreach ($cart as $item) {
-            $product_ids[] = $item['data']->get_id();
-        }
-
-        return $product_ids;
+        return \StorePulse\ConversionTracking\Events\ProductId::for_cart( $cart, $this->id );
     }
 
     /**

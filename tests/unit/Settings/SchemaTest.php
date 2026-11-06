@@ -58,8 +58,21 @@ class SchemaTest extends TestCase {
         $google = Schema::get()['platforms']['google'];
 
         $this->assertSame( array( 'ga4', 'adwords' ), $google['integrations'] );
-        $this->assertSame( array( 'mode', 'measurement_id', 'ads_id', 'purchase_label', 'events', 'tag_id', 'value_mode' ), array_keys( Schema::fields( $google['schema'] ) ) );
+        $this->assertSame( array( 'mode', 'measurement_id', 'ads_id', 'purchase_label', 'events', 'tag_id', 'value_mode', 'product_id_mode' ), array_keys( Schema::fields( $google['schema'] ) ) );
         $this->assertSame( array( 'analytics', 'ads', 'both' ), array_column( Schema::fields( $google['schema'] )['mode']['options'], 'value' ) );
+    }
+
+    public function test_platforms_that_send_product_ids_have_product_id_sent_defaulting_to_the_id() {
+        foreach ( array( 'facebook', 'google', 'twitter' ) as $id ) {
+            $field = Schema::fields( Schema::get()['platforms'][ $id ]['schema'] )['product_id_mode'];
+
+            $this->assertSame( 'select', $field['variant'] );
+            $this->assertSame( 'id', $field['default'] );
+            $this->assertSame( array( 'id', 'sku' ), array_column( $field['options'], 'value' ) );
+            $this->assertSame( $id . '_advanced', $field['section_id'] );
+        }
+
+        $this->assertArrayNotHasKey( 'product_id_mode', Schema::fields( Schema::get()['platforms']['custom']['schema'] ) );
     }
 
     public function test_output_reserves_an_empty_credentials_block_per_platform() {

@@ -5,6 +5,7 @@ namespace StorePulse\ConversionTracking\Settings;
 use StorePulse\ConversionTracking\Access\CustomScripts;
 use StorePulse\ConversionTracking\Events\ValueMode;
 use StorePulse\ConversionTracking\Install;
+use StorePulse\ConversionTracking\Events\ProductId;
 
 /**
  * The 3.0 settings schema: global fields plus one plugin-ui element list per platform.
@@ -354,6 +355,7 @@ class Schema {
             ),
             self::section( 'facebook', 'facebook_advanced', __( 'Advanced settings', 'woocommerce-conversion-tracking' ), array( 'collapsible' => true, 'collapsed' => true ) ),
             self::value_mode_field( 'facebook_advanced', 'facebook' ),
+            self::product_id_field( 'facebook_advanced' ),
         );
     }
 
@@ -455,6 +457,7 @@ class Schema {
                 array( 'case' => 'upper' )
             ),
             self::value_mode_field( 'google_advanced', 'adwords', $ads ),
+            self::product_id_field( 'google_advanced' ),
         );
     }
 
@@ -491,6 +494,7 @@ class Schema {
             ),
             self::section( 'twitter', 'twitter_advanced', __( 'Advanced settings', 'woocommerce-conversion-tracking' ), array( 'collapsible' => true, 'collapsed' => true ) ),
             self::value_mode_field( 'twitter_advanced', 'twitter' ),
+            self::product_id_field( 'twitter_advanced' ),
         );
     }
 
@@ -598,6 +602,36 @@ class Schema {
                 'priority'    => $priority,
             ),
             $extra
+        );
+    }
+
+    /**
+     * Product ID sent: the product ID or the SKU, read through ProductId::mode_for().
+     *
+     * @param string $section Section ID.
+     *
+     * @return array
+     */
+    public static function product_id_field( string $section ): array {
+        return array(
+            'id'          => ProductId::FIELD,
+            'type'        => 'field',
+            'variant'     => 'select',
+            'section_id'  => $section,
+            'label'       => __( 'Product ID sent', 'woocommerce-conversion-tracking' ),
+            'description' => __( 'Must match the IDs in your catalog feed, or dynamic ads can\'t find the product. Variations send their own ID; a product without a SKU sends its Product ID.', 'woocommerce-conversion-tracking' ),
+            'default'     => ProductId::ID,
+            'priority'    => 55,
+            'options'     => array(
+                array(
+                    'value' => ProductId::ID,
+                    'label' => __( 'Product ID (recommended)', 'woocommerce-conversion-tracking' ),
+                ),
+                array(
+                    'value' => ProductId::SKU,
+                    'label' => __( 'SKU', 'woocommerce-conversion-tracking' ),
+                ),
+            ),
         );
     }
 

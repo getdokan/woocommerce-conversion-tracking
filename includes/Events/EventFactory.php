@@ -8,13 +8,15 @@ namespace StorePulse\ConversionTracking\Events;
 class EventFactory {
 
     /**
-     * View product event.
+     * View product event, about the variation the page opens on when one is picked.
      *
      * @param \WC_Product $product Product.
      *
      * @return Event
      */
     public static function view_product( $product ) {
+        $product = ProductId::viewed( $product );
+
         return new Event(
             Event::VIEW_PRODUCT,
             array(

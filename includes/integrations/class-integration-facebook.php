@@ -118,7 +118,7 @@ class WCCT_Integration_Facebook extends WCCT_Integration {
 
         // The product just added; the whole cart only when the event has no product.
         if ( $event && $event->get_product() ) {
-            $product_ids = $event->get_product_ids();
+            $product_ids = array( \StorePulse\ConversionTracking\Events\ProductId::for_product( $event->get_product(), $this->id ) );
             $value       = wc_format_decimal( $event->get_value(), wc_get_price_decimals() );
         } else {
             $product_ids = $this->get_content_ids_from_cart( WC()->cart->get_cart() );
@@ -181,31 +181,18 @@ class WCCT_Integration_Facebook extends WCCT_Integration {
             return;
         }
 
-        $order        = wc_get_order( $order_id );
-        $content_type = 'product';
-        $product_ids  = array();
+        $order = wc_get_order( $order_id );
 
         if ( ! $order ) {
             return;
         }
 
-        foreach ( $order->get_items() as $item ) {
-            $product = wc_get_product( $item['product_id'] );
-
-            if ( ! $product ) {
-                continue;
-            }
-
-            $product_ids[] = $product->get_id();
-
-            if ( $product->get_type() === 'variable' ) {
-                $content_type = 'product_group';
-            }
-        }
+        // Variations send their own ID, so the IDs are products, never groups.
+        $product_ids = \StorePulse\ConversionTracking\Events\ProductId::for_order( $order, $this->id );
 
         $code = $this->build_event( 'Purchase', array(
             'content_ids'  => json_encode($product_ids),
-            'content_type' => $content_type,
+            'content_type' => 'product',
             'value'        => $this->purchase_value( $order ),
             'currency'     => $order->get_currency()
         ) );

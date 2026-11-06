@@ -221,7 +221,7 @@ class WCCT_Integration_Twitter extends WCCT_Integration {
 
         $contents = array();
 
-        foreach ( $event->get_product_ids() as $product_id ) {
+        foreach ( \StorePulse\ConversionTracking\Events\ProductId::for_event( $event, $this->id ) as $product_id ) {
             $contents[] = array( 'content_id' => (string) $product_id );
         }
 
@@ -241,6 +241,7 @@ class WCCT_Integration_Twitter extends WCCT_Integration {
      */
     protected function order_contents( $order ) {
         $contents = array();
+        $mode     = \StorePulse\ConversionTracking\Events\ProductId::mode_for( $this->id );
 
         foreach ( $order->get_items() as $item ) {
             if ( ! $item instanceof WC_Order_Item_Product ) {
@@ -248,7 +249,7 @@ class WCCT_Integration_Twitter extends WCCT_Integration {
             }
 
             $contents[] = array(
-                'content_id'    => (string) ( $item->get_variation_id() ? $item->get_variation_id() : $item->get_product_id() ),
+                'content_id'    => (string) \StorePulse\ConversionTracking\Events\ProductId::for_order_item( $item, $mode ),
                 'content_name'  => $item->get_name(),
                 'content_price' => Event::amount( $order->get_item_total( $item, false, false ), wc_get_price_decimals() ),
                 'num_items'     => (int) $item->get_quantity(),
