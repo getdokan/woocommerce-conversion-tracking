@@ -182,6 +182,17 @@ class LegacySyncTest extends TestCase {
         $this->assertSame( '<script>ty()</script>', $this->sync( $v3, array( 'custom' => array( 'enabled' => true, 'checkout' => '<script>ty()</script>' ) ) )['platforms']['custom']['thankyou_script'] );
     }
 
+    public function test_a_live_pro_migration_lock_stops_the_write_through_and_a_stale_one_does_not() {
+        $v1 = array( 'custom' => array( 'enabled' => true, 'checkout' => '<script>ty()</script>' ) );
+        $v3 = array( 'platforms' => array( 'custom' => array( 'thankyou_script' => '<script>keep()</script>' ) ) );
+
+        $GLOBALS['wcct_test_options'][ LegacySync::PRO_LOCK ] = time() . '|pro';
+        $this->assertSame( $v3, $this->sync( $v3, $v1 ) );
+
+        $GLOBALS['wcct_test_options'][ LegacySync::PRO_LOCK ] = ( time() - 601 ) . '|pro';
+        $this->assertSame( '<script>ty()</script>', $this->sync( $v3, $v1 )['platforms']['custom']['thankyou_script'] );
+    }
+
     public function test_a_2_x_save_keeps_a_3_0_pause_of_an_integration_it_did_not_change() {
         $GLOBALS['wcct_test_options']['wcct_settings_v3']      = array( 'platforms' => array() );
         $GLOBALS['wcct_test_options']['wcct_paused_platforms'] = array( 'facebook' );

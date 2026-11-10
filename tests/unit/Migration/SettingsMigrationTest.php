@@ -392,6 +392,7 @@ class SettingsMigrationTest extends TestCase {
         $this->assertArrayNotHasKey( SettingsMigration::MARKER, $options );
         $this->assertArrayHasKey( 'wcct_pre3_snapshot', $options );
         $this->assertSame( 'disk full', $options[ SettingsMigration::ERROR_OPTION ]['message'] );
+        $this->assertSame( 'lite', $options[ SettingsMigration::ERROR_OPTION ]['source'] );
         $this->assertTrue( SettingsMigration::is_pending( $store ) );
 
         // The lock is kept, so the next requests wait for its timeout instead of retrying each time.
@@ -410,6 +411,23 @@ class SettingsMigrationTest extends TestCase {
         $this->assertArrayNotHasKey( SettingsMigration::LOCK, $options );
         $this->assertArrayNotHasKey( SettingsMigration::ERROR_OPTION, $options );
         $this->assertSame( Trigger::IDLE, SettingsMigration::maybe_run( $store ) );
+    }
+
+    public function test_retry_lets_pro_retry_its_own_run_and_pro_keeps_the_notice_due() {
+        $this->upgrader( self::fixture( 'meta-only' ) );
+        $store = new GlobalsOptionStore();
+
+        $this->assertSame( Trigger::RAN, SettingsMigration::maybe_run( $store ) );
+        $this->assertFalse( SettingsMigration::retry_pending() );
+
+        $GLOBALS['wcct_test_filters'][ SettingsMigration::RETRY_PENDING_FILTER ] = function () {
+            return true;
+        };
+        $this->assertTrue( SettingsMigration::retry_pending() );
+
+        $GLOBALS['wcct_test_actions'] = array();
+        $this->assertSame( Trigger::IDLE, SettingsMigration::retry( $store ) );
+        $this->assertContains( array( SettingsMigration::RETRY_ACTION, array( Trigger::IDLE ) ), $GLOBALS['wcct_test_actions'] );
     }
 
     public function test_retry_leaves_a_lock_taken_after_the_failure() {

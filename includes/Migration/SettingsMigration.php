@@ -40,9 +40,19 @@ class SettingsMigration {
     const LOCK = 'wcct_migration_lock';
 
     /**
-     * The last failed run: { message, time }; removed once a run succeeds.
+     * The last failed run: { message, time, source }; source is lite, or pro for Pro's migration. Removed once that run succeeds.
      */
     const ERROR_OPTION = 'wcct_migration_error';
+
+    /**
+     * Fired by retry() after Lite's run, so Pro retries its own.
+     */
+    const RETRY_ACTION = 'wcct_migration_retry';
+
+    /**
+     * Filter of whether a migration Retry can still finish is due, besides Lite's own.
+     */
+    const RETRY_PENDING_FILTER = 'wcct_migration_retry_pending';
 
     /**
      * Filter of the migrated 3.0 settings, before they are written.
@@ -130,7 +140,38 @@ class SettingsMigration {
             $store->delete( self::LOCK, $held );
         }
 
-        return self::report( self::trigger( $store ) );
+        $status = self::report( self::trigger( $store ) );
+
+        /**
+         * Fires when the merchant retries the migration, after Lite's run.
+         *
+         * @since 3.0.0
+         *
+         * @param string $status Lite's Trigger status.
+         */
+        do_action( self::RETRY_ACTION, $status );
+
+        return $status;
+    }
+
+    /**
+     * Whether a failed migration is still due: Lite's, or one added through the filter (Pro's).
+     *
+     * @return bool
+     */
+    public static function retry_pending(): bool {
+        if ( Store::migration_pending() ) {
+            return true;
+        }
+
+        /**
+         * Filter whether another migration the Retry notice can finish is still due.
+         *
+         * @since 3.0.0
+         *
+         * @param bool $pending Whether one is due.
+         */
+        return (bool) apply_filters( self::RETRY_PENDING_FILTER, false );
     }
 
     /**
@@ -149,6 +190,7 @@ class SettingsMigration {
             $failure = array(
                 'message' => $message,
                 'time'    => time(),
+                'source'  => 'lite',
             );
 
             update_option( self::ERROR_OPTION, $failure, false );

@@ -2,7 +2,6 @@
 
 namespace StorePulse\ConversionTracking\Migration;
 
-use StorePulse\ConversionTracking\Settings\Store;
 
 /**
  * Admin notice with "Retry migration" after the 3.0 settings migration failed; tracking keeps the 2.x settings meanwhile.
@@ -31,7 +30,7 @@ class RetryNotice {
      */
     public static function visible(): bool {
         // Pending first: a finished store answers from the autoloaded marker.
-        return function_exists( 'wcct_manage_cap' ) && current_user_can( wcct_manage_cap() ) && Store::migration_pending() && false !== get_option( SettingsMigration::ERROR_OPTION, false );
+        return function_exists( 'wcct_manage_cap' ) && current_user_can( wcct_manage_cap() ) && false !== get_option( SettingsMigration::ERROR_OPTION, false ) && SettingsMigration::retry_pending();
     }
 
     /**

@@ -37,6 +37,11 @@ class LegacySync {
     private static $running = false;
 
     /**
+     * Pro's migration lock (Pro also writes the 3.0 settings), read by name so Pro needn't be loaded.
+     */
+    const PRO_LOCK = 'wcct_pro_migration_lock';
+
+    /**
      * Hook the writes of the 2.x option.
      *
      * @return void
@@ -108,14 +113,20 @@ class LegacySync {
     }
 
     /**
-     * Whether a migration holds a live lock; one older than its timeout was abandoned.
+     * Whether Lite's or Pro's migration holds a live lock; one older than its timeout was abandoned.
      *
      * @return bool
      */
     private static function migration_running(): bool {
-        $lock = get_option( SettingsMigration::LOCK, null );
+        foreach ( array( SettingsMigration::LOCK, self::PRO_LOCK ) as $name ) {
+            $lock = get_option( $name, null );
 
-        return null !== $lock && time() - (int) $lock < Lock::DEFAULT_TIMEOUT;
+            if ( null !== $lock && time() - (int) $lock < Lock::DEFAULT_TIMEOUT ) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
