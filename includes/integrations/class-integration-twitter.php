@@ -89,12 +89,14 @@ class WCCT_Integration_Twitter extends WCCT_Integration {
     }
 
     /**
-     * Settings in the 3.0 shape, see XSettings
+     * Settings in the 3.0 shape, see XSettings: wcct_settings_v3 once it exists, else the 2.x settings
      *
      * @return array
      */
     public function get_x_settings() {
-        return XSettings::from_v1( parent::get_integration_settings() );
+        $values = $this->get_platform_values();
+
+        return null !== $values ? XSettings::from_v3( $values ) : XSettings::from_v1( parent::get_integration_settings() );
     }
 
     /**

@@ -3,6 +3,8 @@
 use StorePulse\ConversionTracking\Events\Event;
 use StorePulse\ConversionTracking\Events\OrderReceived;
 use StorePulse\ConversionTracking\Events\UserData;
+use StorePulse\ConversionTracking\Platforms\PlatformSettings;
+use StorePulse\ConversionTracking\Settings\LegacyView;
 
 /**
  * WCCT gate way facebook
@@ -134,9 +136,24 @@ class WCCT_Integration_Facebook extends WCCT_Integration {
      * @return string
      */
     public function get_pixel_id() {
+        $values = $this->get_platform_values();
+
+        if ( null !== $values ) {
+            return PlatformSettings::text( $values, 'pixel_id' );
+        }
+
         $settings = $this->get_integration_settings();
 
         return ! empty( $settings[0]['pixel_id'] ) && is_scalar( $settings[0]['pixel_id'] ) ? (string) $settings[0]['pixel_id'] : '';
+    }
+
+    /**
+     * 2.x event keys => 3.0 events, for event_enabled()
+     *
+     * @return array
+     */
+    protected function get_v1_event_map() {
+        return LegacyView::FACEBOOK_EVENTS;
     }
 
     /**

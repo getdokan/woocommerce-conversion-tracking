@@ -112,7 +112,7 @@ const applies = ( field: SchemaElement, values: PlatformValues ): boolean =>
     );
 
 /**
- * Whether a platform has what it needs to send: an ID, or an enabled custom script.
+ * Whether a platform has what it needs to send: the server's `connected` (PlatformSettings::connected()), else an ID or an enabled custom script.
  *
  * @param {SchemaPlatform} platform Platform schema.
  * @param {Object}         values   Platform values.
@@ -121,25 +121,32 @@ export const isConnected = (
     platform: SchemaPlatform,
     values: PlatformValues
 ): boolean =>
-    platform.schema.some( ( field ) => {
-        if ( field.type !== 'field' || ! applies( field, values ) ) {
-            return false;
-        }
+    typeof values.connected === 'boolean'
+        ? values.connected
+        : platform.schema.some( ( field ) => {
+              if ( field.type !== 'field' || ! applies( field, values ) ) {
+                  return false;
+              }
 
-        if ( field.format === 'id' ) {
-            return filled( values[ field.id ] );
-        }
+              if ( field.format === 'id' ) {
+                  return filled( values[ field.id ] );
+              }
 
-        // Custom script placements: an `<placement>_enabled` switch with its `<placement>_script`.
-        if ( field.variant === 'switch' && field.id.endsWith( '_enabled' ) ) {
-            return (
-                values[ field.id ] === true &&
-                filled( values[ field.id.replace( /_enabled$/, '_script' ) ] )
-            );
-        }
+              // Custom script placements: an `<placement>_enabled` switch with its `<placement>_script`.
+              if (
+                  field.variant === 'switch' &&
+                  field.id.endsWith( '_enabled' )
+              ) {
+                  return (
+                      values[ field.id ] === true &&
+                      filled(
+                          values[ field.id.replace( /_enabled$/, '_script' ) ]
+                      )
+                  );
+              }
 
-        return false;
-    } );
+              return false;
+          } );
 
 /**
  * A long ID shortened for a card, like 1234…456.

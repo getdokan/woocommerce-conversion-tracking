@@ -19,6 +19,13 @@ abstract class WCCT_Test_Page_Case extends TestCase {
     private static $results = array();
 
     /**
+     * Migrated 3.0 settings by 2.x settings, shared by the tests in one run
+     *
+     * @var array
+     */
+    private static $migrated = array();
+
+    /**
      * Directory holding this suite's fixtures
      *
      * @return string
@@ -28,13 +35,13 @@ abstract class WCCT_Test_Page_Case extends TestCase {
     /**
      * Request a page with the given tracking settings
      *
-     * @param string $page     Page name from WCCT_Test_Pages.
-     * @param array  $settings The wcct_settings option.
-     * @param array  $options  Other options for this request.
+     * @param string     $page     Page name from WCCT_Test_Pages.
+     * @param array|null $settings The wcct_settings option; null deletes it (a store set up only through the 3.0 settings).
+     * @param array      $options  Other options for this request.
      *
      * @return array Result from bin/run.php.
      */
-    protected function request_page( $page, array $settings, array $options = array() ) {
+    protected function request_page( $page, ?array $settings, array $options = array() ) {
         $request = WCCT_Test_Pages::get( $page );
         $key     = md5( serialize( array( $page, $settings, $options ) ) );
 
@@ -71,6 +78,58 @@ abstract class WCCT_Test_Page_Case extends TestCase {
         }
 
         return self::$results[ $key ] = $result;
+    }
+
+    /**
+     * The wcct_settings_v3 and pauses the migration writes for 2.x settings
+     *
+     * @param array $settings The wcct_settings option.
+     *
+     * @return array { v3, paused }
+     */
+    protected function migrated( array $settings ) {
+        $result = WCCT_Test_WP::run(
+            array(
+                'type'     => 'file',
+                'file'     => dirname( __DIR__ ) . '/jobs/migration-state.php',
+                'rollback' => true,
+                'options'  => array( 'wcct_settings' => $settings ),
+                'args'     => array(),
+            )
+        );
+
+        $this->assertNull( $result['error'] );
+        $this->assertIsArray( $result['value']['after_request']['v3'] );
+
+        return array(
+            'v3'     => $result['value']['after_request']['v3'],
+            'paused' => $result['value']['after_request']['paused'],
+        );
+    }
+
+    /**
+     * Request a page on a store set up only through the 3.0 settings (no wcct_settings), with what the migration writes for these 2.x settings
+     *
+     * @param string $page     Page name from WCCT_Test_Pages.
+     * @param array  $settings 2.x settings the 3.0 settings are built from.
+     *
+     * @return array Result from bin/run.php.
+     */
+    protected function request_v3_page( $page, array $settings ) {
+        $key = md5( serialize( $settings ) );
+
+        if ( ! isset( self::$migrated[ $key ] ) ) {
+            self::$migrated[ $key ] = $this->migrated( $settings );
+        }
+
+        return $this->request_page(
+            $page,
+            null,
+            array(
+                'wcct_settings_v3'      => self::$migrated[ $key ]['v3'],
+                'wcct_paused_platforms' => self::$migrated[ $key ]['paused'],
+            )
+        );
     }
 
     /**

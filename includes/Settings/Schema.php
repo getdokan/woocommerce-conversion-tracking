@@ -26,7 +26,7 @@ class Schema {
     /**
      * Keys used on the server only, never sent to the browser.
      */
-    const SERVER_KEYS = array( 'capability', 'sanitize_callback' );
+    const SERVER_KEYS = array( 'capability', 'sanitize_callback', 'required_to_send' );
 
     /**
      * The filtered schema.
@@ -340,7 +340,8 @@ class Schema {
                 '^[0-9]{15,16}$',
                 10,
                 array(
-                    'onboarding' => array(
+                    'required_to_send' => true,
+                    'onboarding'       => array(
                         'required' => true,
                         'hint'     => __( 'In Meta Events Manager, open your data source, then Settings. The Pixel ID is the number at the top.', 'woocommerce-conversion-tracking' ),
                         'valid'    => __( 'Looks like a Pixel ID.', 'woocommerce-conversion-tracking' ),
@@ -526,7 +527,7 @@ class Schema {
         return array(
             self::page( 'twitter', __( 'X', 'woocommerce-conversion-tracking' ) ),
             self::section( 'twitter', 'twitter_connection', __( 'Connection', 'woocommerce-conversion-tracking' ) ),
-            self::id_field( 'twitter_connection', 'pixel_id', __( 'Pixel ID', 'woocommerce-conversion-tracking' ), __( '5 letters and numbers, like o8x2k', 'woocommerce-conversion-tracking' ), __( 'The base tag on every page.', 'woocommerce-conversion-tracking' ), '^[a-z0-9]{5}$', 10, array_merge( $lower, array( 'onboarding' => $wizard['pixel_id'] ) ) ),
+            self::id_field( 'twitter_connection', 'pixel_id', __( 'Pixel ID', 'woocommerce-conversion-tracking' ), __( '5 letters and numbers, like o8x2k', 'woocommerce-conversion-tracking' ), __( 'The base tag on every page.', 'woocommerce-conversion-tracking' ), '^[a-z0-9]{5}$', 10, array_merge( $lower, array( 'required_to_send' => true, 'onboarding' => $wizard['pixel_id'] ) ) ),
             self::id_field( 'twitter_connection', 'purchase_event_id', __( 'Purchase event ID', 'woocommerce-conversion-tracking' ), $event_id, '', $pattern, 20, array_merge( $lower, array( 'onboarding' => $wizard['purchase_event_id'] ) ) ),
             self::id_field( 'twitter_connection', 'cart_event_id', __( 'Add to cart event ID (optional)', 'woocommerce-conversion-tracking' ), $event_id, '', $pattern, 30, $pro ),
             self::id_field( 'twitter_connection', 'checkout_event_id', __( 'Start checkout event ID (optional)', 'woocommerce-conversion-tracking' ), $event_id, '', $pattern, 40, $pro ),
@@ -633,7 +634,7 @@ class Schema {
      * @param string $description Help text.
      * @param string $pattern     Format the value must match once cleaned (empty clears the field); extra 'case' (upper, lower) is applied first.
      * @param int    $priority    Order in the section.
-     * @param array  $extra       More element keys; 'onboarding' { required, with, hint, valid, invalid, missing } puts the field in the setup wizard.
+     * @param array  $extra       More element keys; 'onboarding' { required, with, hint, valid, invalid, missing } puts the field in the setup wizard; 'required_to_send' marks an ID the platform needs to be on (Platforms\PlatformSettings).
      *
      * @return array
      */

@@ -7,6 +7,7 @@ use StorePulse\ConversionTracking\Events\EventFactory;
 use StorePulse\ConversionTracking\Events\PurchaseConfirmation;
 use StorePulse\ConversionTracking\Events\PurchaseGate;
 use StorePulse\ConversionTracking\Platforms\GoogleTag;
+use StorePulse\ConversionTracking\Settings\Google;
 
 /**
  * Google Analytics 4 integration
@@ -86,7 +87,7 @@ class WCCT_Integration_GA4 extends WCCT_Integration {
 
         $help .= '<br><br>' . __( '<strong>Avoid double counting:</strong> if this GA4 property is already a destination of the Google tag you use for Google Ads (Google tag settings &rarr; Destinations), page views can be counted twice. Remove that destination, or turn on "Ignore duplicate instances of on-page configuration" in your Google tag settings.', 'woocommerce-conversion-tracking' );
 
-        if ( $this->is_enabled() && '' === $this->get_measurement_id() ) {
+        if ( $this->is_switched_on() && '' === $this->get_measurement_id() ) {
             $help .= '<br><br><strong>' . __( 'The saved Measurement ID is missing or invalid, so nothing is sent to Google Analytics. Only IDs that start with G- or GT- are accepted.', 'woocommerce-conversion-tracking' ) . '</strong>';
         }
 
@@ -158,6 +159,21 @@ class WCCT_Integration_GA4 extends WCCT_Integration {
         }
 
         return $settings;
+    }
+
+    /**
+     * Whether GA4 has its IDs in wcct_settings_v3 once that exists (as is_active(), pause apart), else the 2.x switch
+     *
+     * @return boolean
+     */
+    public function is_enabled() {
+        if ( null === $this->get_platform_values() ) {
+            return parent::is_enabled();
+        }
+
+        $integrations = Google::integrations( GoogleTag::platform() );
+
+        return ! empty( $integrations[ $this->id ]['enabled'] );
     }
 
     /**

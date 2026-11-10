@@ -5,6 +5,7 @@ namespace StorePulse\ConversionTracking\Settings;
 use InvalidArgumentException;
 use StorePulse\ConversionTracking\Access\CustomScripts;
 use StorePulse\ConversionTracking\Platforms\Pause;
+use StorePulse\ConversionTracking\Platforms\PlatformSettings;
 use StorePulse\ConversionTracking\Platforms\XSettings;
 use StorePulse\ConversionTracking\Privacy\CustomerDetails;
 
@@ -19,7 +20,7 @@ class Values {
      * @param array $schema Normalized schema.
      * @param array $doc    Stored settings: global field values plus { platforms: id => values }.
      *
-     * @return array Global values plus { platforms: id => values + paused + needs_resetup + credentials }.
+     * @return array Global values plus { platforms: id => values + connected + paused + needs_resetup + credentials }.
      */
     public static function get( array $schema, array $doc ): array {
         $values = self::fill( Schema::fields( $schema['global'] ), $doc );
@@ -35,6 +36,9 @@ class Values {
             if ( CustomerDetails::PLATFORM === $id && isset( $values['platforms'][ $id ][ CustomerDetails::SETTING ] ) && ! array_key_exists( CustomerDetails::SETTING, $stored ) ) {
                 $values['platforms'][ $id ][ CustomerDetails::SETTING ] = CustomerDetails::v1_default();
             }
+
+            // Read-only: whether it has the IDs it needs (PlatformSettings::connected()), the one rule for the storefront, the app and the Doctor.
+            $values['platforms'][ $id ]['connected'] = PlatformSettings::connected( (string) $id, $platform['schema'], $values['platforms'][ $id ] );
 
             // Read-only here; Pause owns it (settings/pause). A 2.x integration that was switched off reads as paused.
             $values['platforms'][ $id ]['paused'] = Pause::is_platform_paused( (string) $id, $doc );

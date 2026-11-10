@@ -2,6 +2,7 @@
 
 namespace StorePulse\ConversionTracking\Doctor;
 
+use StorePulse\ConversionTracking\Platforms\PlatformSettings;
 use StorePulse\ConversionTracking\Settings\Google;
 use StorePulse\ConversionTracking\Settings\Schema;
 use StorePulse\ConversionTracking\Settings\Values;
@@ -42,7 +43,7 @@ class Platforms {
             $own          = isset( $values[ $id ] ) && is_array( $values[ $id ] ) ? $values[ $id ] : array();
             $schema       = isset( $platform['schema'] ) && is_array( $platform['schema'] ) ? $platform['schema'] : array();
             $integrations = isset( $platform['integrations'] ) && is_array( $platform['integrations'] ) ? array_values( array_map( 'strval', $platform['integrations'] ) ) : array( $id );
-            $connected    = self::connected( $schema, $own );
+            $connected    = self::connected( $schema, $own, $id );
             $relevant     = self::sending_integrations( $id, $integrations, $own );
             $paused       = ! empty( $own['paused'] ) || call_user_func( $is_paused, $id ) || count( array_filter( $relevant, $is_paused ) ) === count( $relevant );
 
@@ -96,47 +97,20 @@ class Platforms {
      * @return bool
      */
     public static function applies( array $field, array $values ) {
-        foreach ( isset( $field['dependencies'] ) && is_array( $field['dependencies'] ) ? $field['dependencies'] : array() as $dependency ) {
-            if ( ! is_array( $dependency ) || ! isset( $dependency['key'], $dependency['value'] ) || ! is_array( $dependency['value'] ) ) {
-                continue;
-            }
-
-            $current = isset( $values[ $dependency['key'] ] ) ? $values[ $dependency['key'] ] : null;
-
-            if ( ! in_array( $current, $dependency['value'], true ) ) {
-                return false;
-            }
-        }
-
-        return true;
+        return PlatformSettings::applies( $field, $values );
     }
 
     /**
-     * Whether a platform has what it needs to send: an ID, or an enabled custom script (as the admin app's isConnected()).
+     * Whether a platform has what it needs to send: Values::get()'s connected when given, else PlatformSettings::connected()
      *
-     * @param array $schema Platform schema elements.
-     * @param array $values Platform values.
+     * @param array  $schema   Platform schema elements.
+     * @param array  $values   Platform values.
+     * @param string $platform Settings platform ID, for Google's rule.
      *
      * @return bool
      */
-    public static function connected( array $schema, array $values ) {
-        foreach ( $schema as $field ) {
-            if ( ! is_array( $field ) || ! isset( $field['type'], $field['id'] ) || 'field' !== $field['type'] || ! self::applies( $field, $values ) ) {
-                continue;
-            }
-
-            if ( isset( $field['format'] ) && 'id' === $field['format'] && self::filled( $values, $field['id'] ) ) {
-                return true;
-            }
-
-            $id = (string) $field['id'];
-
-            if ( isset( $field['variant'] ) && 'switch' === $field['variant'] && '_enabled' === substr( $id, -8 ) && isset( $values[ $id ] ) && true === $values[ $id ] &&self::filled( $values, substr( $id, 0, -8 ) . '_script' ) ) {
-                return true;
-            }
-        }
-
-        return false;
+    public static function connected( array $schema, array $values, $platform = '' ) {
+        return isset( $values['connected'] ) && is_bool( $values['connected'] ) ? $values['connected'] : PlatformSettings::connected( (string) $platform, $schema, $values );
     }
 
     /**

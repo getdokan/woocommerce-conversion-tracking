@@ -58,7 +58,7 @@ class WCCT_Integration_Manager {
         $platforms = $this->apply_legacy_filter( $platforms );
 
         /**
-         * Platforms, keyed by integration ID. Add or replace a WCCT_Integration under its ID.
+         * Platforms, keyed by integration ID. Add or replace a WCCT_Integration under its ID; a third-party platform keeps its 2.x switch unless its schema marks required_to_send IDs or it overrides is_enabled().
          *
          * @since 3.0.0
          *

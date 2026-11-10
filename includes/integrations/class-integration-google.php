@@ -3,6 +3,7 @@
 use StorePulse\ConversionTracking\Events\OrderReceived;
 use StorePulse\ConversionTracking\Platforms\EnhancedConversions;
 use StorePulse\ConversionTracking\Platforms\GoogleTag;
+use StorePulse\ConversionTracking\Settings\Google;
 
 /**
  * WCCT gate way google
@@ -93,6 +94,21 @@ class WCCT_Integration_Google extends WCCT_Integration {
      */
     public function get_ads_settings() {
         return GoogleTag::settings( $this->id );
+    }
+
+    /**
+     * Whether Ads has its IDs in wcct_settings_v3 once that exists (as is_active(), pause apart), else the 2.x switch
+     *
+     * @return boolean
+     */
+    public function is_enabled() {
+        if ( null === $this->get_platform_values() ) {
+            return parent::is_enabled();
+        }
+
+        $integrations = Google::integrations( GoogleTag::platform() );
+
+        return ! empty( $integrations[ $this->id ]['enabled'] );
     }
 
     /**

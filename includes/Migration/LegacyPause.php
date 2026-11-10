@@ -242,6 +242,15 @@ class LegacyPause {
             $value = trim( (string) $first['events']['universal_tag_id'] );
         }
 
+        // Pro's extra Meta pixels (indices 1..N) count when the main Pixel ID is empty, so a switched-off Meta with only those stays off.
+        if ( '' === $value && 'facebook' === $id ) {
+            foreach ( $v1['facebook'] as $index => $pixel ) {
+                if ( '' === $value && is_int( $index ) && $index > 0 && is_array( $pixel ) && isset( $pixel['pixel_id'] ) && is_scalar( $pixel['pixel_id'] ) ) {
+                    $value = trim( (string) $pixel['pixel_id'] );
+                }
+            }
+        }
+
         return $value;
     }
 

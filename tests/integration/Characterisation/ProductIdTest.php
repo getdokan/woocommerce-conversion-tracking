@@ -15,7 +15,25 @@ class ProductIdTest extends TestCase {
             $settings['platforms'][ $platform ] = array( 'product_id_mode' => 'sku' );
         }
 
-        // Google reads its IDs from wcct_settings_v3 once it exists (#92): the lite_all() values.
+        // Every platform reads its IDs from wcct_settings_v3 once it exists (#92, #84, #89): the lite_all() values.
+        $ids = array(
+            'facebook' => array(
+                'pixel_id' => '111111111111111',
+                'events'   => array( 'view_product', 'add_to_cart', 'begin_checkout', 'purchase', 'search', 'sign_up' ),
+            ),
+            'twitter'  => array(
+                'pixel_id'          => 'ct0x1',
+                'purchase_event_id' => 'tw-ct0x1-ctpur',
+                'events'            => array( 'page_view', 'purchase' ),
+            ),
+        );
+
+        foreach ( $ids as $platform => $values ) {
+            if ( isset( $settings['platforms'][ $platform ] ) ) {
+                $settings['platforms'][ $platform ] += $values;
+            }
+        }
+
         if ( isset( $settings['platforms']['google'] ) ) {
             $settings['platforms']['google'] += array(
                 'mode'           => 'both',

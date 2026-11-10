@@ -42,6 +42,8 @@ class LegacyPauseTest extends TestCase {
             'meta off with its id'           => array( array( 'facebook' => self::entry( false, $meta ) ), array( 'facebook' ) ),
             'meta off without an id'         => array( array( 'facebook' => self::entry( false, array( 'pixel_id' => ' ' ) ) ), array() ),
             'meta on'                        => array( array( 'facebook' => self::entry( true, $meta ) ), array() ),
+            'meta off with only extra pixels' => array( array( 'facebook' => array( 'enabled' => false, 0 => array( 'pixel_id' => '' ), 2 => $meta ) ), array( 'facebook' ) ),
+            'meta on with only extra pixels' => array( array( 'facebook' => array( 'enabled' => true, 0 => array( 'pixel_id' => '' ), 2 => $meta ) ), array() ),
             'meta off as the string false'   => array( array( 'facebook' => self::entry( 'false', $meta ) ), array( 'facebook' ) ),
             'meta on as the string yes'      => array( array( 'facebook' => self::entry( 'yes', $meta ) ), array() ),
             'ga4 and ads both off'           => array( array( 'ga4' => self::entry( false, $ga4 ), 'adwords' => self::entry( false, $ads ) ), array( 'google' ) ),

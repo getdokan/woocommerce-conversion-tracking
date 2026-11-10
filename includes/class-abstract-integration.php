@@ -7,6 +7,7 @@ use StorePulse\ConversionTracking\Events\PurchaseGate;
 use StorePulse\ConversionTracking\Events\ValueMode;
 use StorePulse\ConversionTracking\Platforms\GoogleTag;
 use StorePulse\ConversionTracking\Platforms\Pause;
+use StorePulse\ConversionTracking\Platforms\PlatformSettings;
 
 /**
  * Abstract Class
@@ -130,19 +131,57 @@ abstract class WCCT_Integration {
      * @return boolean
      */
     public function is_switched_on() {
-        return $this->is_enabled();
+        return $this->v1_switch();
     }
 
     /**
-     * Whether the integration is on (its pause is checked apart, see is_active())
+     * Whether the integration is on: its required IDs set in wcct_settings_v3 once that exists, else the 2.x switch (pause apart, see is_active())
      *
      * @return boolean
      */
     public function is_enabled() {
+        $on = PlatformSettings::is_on( $this->get_platform_id() );
+
+        return null !== $on ? $on : $this->v1_switch();
+    }
+
+    /**
+     * The 2.x switch as stored
+     *
+     * @return boolean
+     */
+    private function v1_switch() {
         $settings = $this->get_integration_settings();
 
         // A malformed option (say, a string, or an array as the switch) reads as off instead of a fatal.
         return is_array( $settings ) && isset( $settings['enabled'] ) && is_scalar( $settings['enabled'] ) && wc_string_to_bool( $settings['enabled'] );
+    }
+
+    /**
+     * The settings platform this integration belongs to (ga4 and adwords are google)
+     *
+     * @return string
+     */
+    public function get_platform_id() {
+        return Pause::platform_of( (string) $this->id );
+    }
+
+    /**
+     * This integration's values in wcct_settings_v3; null until that option exists, when the 2.x settings are read
+     *
+     * @return array|null
+     */
+    public function get_platform_values() {
+        return PlatformSettings::values( $this->get_platform_id() );
+    }
+
+    /**
+     * 2.x event key => 3.0 event, so event_enabled() reads the 3.0 events; empty keeps it on the 2.x settings
+     *
+     * @return array
+     */
+    protected function get_v1_event_map() {
+        return array();
     }
 
     /**
@@ -450,6 +489,13 @@ abstract class WCCT_Integration {
      * @return boolean
      */
     public function event_enabled( $event ) {
+        $map    = $this->get_v1_event_map();
+        $values = $map ? $this->get_platform_values() : null;
+
+        if ( null !== $values ) {
+            return isset( $map[ $event ], $values['events'] ) && is_array( $values['events'] ) && in_array( $map[ $event ], $values['events'], true );
+        }
+
         $settings = $this->get_integration_settings();
 
         if ( isset( $settings[0]['events'] ) && array_key_exists( $event, $settings[0]['events'] ) && $settings[0]['events'][ $event ] == 'on' ) {

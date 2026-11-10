@@ -11,6 +11,7 @@ require_once __DIR__ . '/unit/Fakes/InMemorySecretStorage.php';
 require_once __DIR__ . '/unit/Fakes/wp-functions.php';
 require_once dirname( __DIR__ ) . '/includes/class-abstract-integration.php';
 require_once __DIR__ . '/unit/Fakes/FakeIntegration.php';
+require_once __DIR__ . '/unit/Fakes/ResetStatics.php';
 require_once __DIR__ . '/unit/Fakes/FakeOrder.php';
 require_once __DIR__ . '/unit/Fakes/FakeSession.php';
 require_once __DIR__ . '/unit/Fakes/FakeConsentApi.php';
