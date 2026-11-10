@@ -154,4 +154,94 @@ class RedirectTest extends TestCase {
         $this->assertSame( '', Redirect::target( self::PAGE ) );
         $this->assertFalse( Redirect::queue( self::ACTIVATION ) );
     }
+
+    /**
+     * A store the migration upgraded: 2.x settings, a snapshot and the 3.0 settings.
+     */
+    private function upgraded() {
+        $GLOBALS['wcct_test_options'] = array(
+            'wcct_install_type'  => 'upgrade',
+            'wcct_settings'      => array( 'facebook' => array( 'enabled' => true ) ),
+            'wcct_pre3_snapshot' => array( 'wcct_settings' => array( 'facebook' => array( 'enabled' => true ) ) ),
+            'wcct_settings_v3'   => array( 'platforms' => array() ),
+        );
+    }
+
+    public function test_an_upgrade_opens_whats_new_once_instead_of_the_wizard() {
+        $this->upgraded();
+
+        $this->assertTrue( Redirect::queue_whats_new() );
+        $this->assertFalse( Redirect::queue_whats_new(), 'Only once' );
+        $this->assertSame( 'https://shop.test/wp-admin/admin.php?page=conversion-tracking#/whats-new', Redirect::target( self::PAGE ) );
+        $this->assertSame( 'done', $GLOBALS['wcct_test_options']['wcct_onboarding_redirect'] );
+        $this->assertSame( '', Redirect::target( self::PAGE ) );
+        $this->assertFalse( Redirect::queue( self::ACTIVATION ), 'Activating again never queues the wizard' );
+    }
+
+    public function test_a_fresh_install_never_queues_whats_new() {
+        $this->assertFalse( Redirect::queue_whats_new() );
+        $this->assertArrayNotHasKey( 'wcct_onboarding_redirect', $GLOBALS['wcct_test_options'] );
+    }
+
+    /**
+     * @dataProvider background_requests
+     */
+    public function test_whats_new_waits_for_a_page_that_can_show_it( array $flags ) {
+        $this->upgraded();
+        Redirect::queue_whats_new();
+
+        $this->assertSame( '', Redirect::target( array_merge( self::PAGE, $flags ) ) );
+        $this->assertTrue( Redirect::whats_new_pending() );
+        $this->assertStringEndsWith( '#/whats-new', Redirect::target( self::PAGE ) );
+    }
+
+    /**
+     * @dataProvider dropping_pages
+     */
+    public function test_a_bulk_or_network_page_uses_up_whats_new( array $flags ) {
+        $this->upgraded();
+        Redirect::queue_whats_new();
+
+        $this->assertSame( '', Redirect::target( array_merge( self::PAGE, $flags ) ) );
+        $this->assertFalse( Redirect::whats_new_pending() );
+    }
+
+    public function test_whats_new_opened_on_its_own_or_gone_drops_the_redirect() {
+        $this->upgraded();
+        Redirect::queue_whats_new();
+        Redirect::drop_whats_new();
+
+        $this->assertSame( '', Redirect::target( self::PAGE ) );
+
+        // Queued, but the 3.0 settings are gone again (say, deleted by hand): no page to open.
+        $this->upgraded();
+        Redirect::queue_whats_new();
+        unset( $GLOBALS['wcct_test_options']['wcct_settings_v3'] );
+
+        $this->assertSame( '', Redirect::target( self::PAGE ) );
+        $this->assertSame( 'done', $GLOBALS['wcct_test_options']['wcct_onboarding_redirect'] );
+    }
+
+    public function test_dropping_whats_new_leaves_the_wizard_redirect_alone() {
+        Redirect::queue( self::ACTIVATION );
+        Redirect::drop_whats_new();
+
+        $this->assertSame( 'pending', $GLOBALS['wcct_test_options']['wcct_onboarding_redirect'] );
+    }
+
+    public function test_whats_new_waits_while_a_migration_has_failed() {
+        $this->upgraded();
+        Redirect::queue_whats_new();
+
+        // Pro's migration failed after Lite's ran.
+        $GLOBALS['wcct_test_options']['wcct_migration_error'] = array( 'message' => 'Boom', 'time' => 1700000000, 'source' => 'pro' );
+
+        $this->assertSame( '', Redirect::target( self::PAGE ) );
+        $this->assertTrue( Redirect::whats_new_pending() );
+
+        // Retry succeeded.
+        unset( $GLOBALS['wcct_test_options']['wcct_migration_error'] );
+
+        $this->assertStringEndsWith( '#/whats-new', Redirect::target( self::PAGE ) );
+    }
 }

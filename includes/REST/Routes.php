@@ -41,6 +41,7 @@ class Routes {
                 LogController::class,
                 EventsController::class,
                 VerifyController::class,
+                WhatsNewController::class,
             )
         );
 

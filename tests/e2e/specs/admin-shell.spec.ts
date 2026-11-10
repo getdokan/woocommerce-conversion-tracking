@@ -11,8 +11,8 @@ const ROUTES = [
     { hash: '#/catalog', title: 'Catalog', tab: 'Catalog' },
     { hash: '#/settings', title: 'Settings', tab: 'Settings' },
     { hash: '#/settings/plan', title: 'Settings', tab: 'Settings' },
-    { hash: '#/whats-new', title: "What's new", tab: 'Dashboard' },
 ];
+// #/whats-new exists only on stores upgraded from 2.x: whats-new.spec.ts.
 
 const NAV = '#wcct-topbar-root nav[aria-label="Conversion Tracking pages"]';
 

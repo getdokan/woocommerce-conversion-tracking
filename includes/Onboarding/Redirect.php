@@ -3,9 +3,10 @@
 namespace StorePulse\ConversionTracking\Onboarding;
 
 use StorePulse\ConversionTracking\Install;
+use StorePulse\ConversionTracking\Migration\WhatsNew;
 
 /**
- * Opens the setup wizard once, on the first admin page after a fresh single-site activation.
+ * Opens the setup wizard once after a fresh single-site activation, or What's new once after an upgrade's migration.
  */
 class Redirect {
 
@@ -25,9 +26,19 @@ class Redirect {
     const DONE = 'done';
 
     /**
+     * Queued by an upgrade's migration: What's new instead of the wizard.
+     */
+    const WHATS_NEW = 'whats_new';
+
+    /**
      * The wizard, relative to wp-admin.
      */
     const PATH = 'admin.php?page=conversion-tracking#/onboarding';
+
+    /**
+     * What's new, relative to wp-admin.
+     */
+    const WHATS_NEW_PATH = 'admin.php?page=conversion-tracking#/whats-new';
 
     /**
      * The request, as the rules read it; every flag off by default.
@@ -67,7 +78,7 @@ class Redirect {
     }
 
     /**
-     * Redirect to the wizard when it is queued and this request can show it.
+     * Redirect to the wizard or What's new when one is queued and this request can show it.
      *
      * @return void
      */
@@ -107,14 +118,45 @@ class Redirect {
     }
 
     /**
-     * The wizard URL when this admin request redirects, else an empty string; a queued redirect is used once.
+     * Queue What's new for an upgrade; only once, and never over the wizard's own state.
+     *
+     * @return bool Whether it was queued.
+     */
+    public static function queue_whats_new(): bool {
+        return Install::is_upgrade() && add_option( self::OPTION, self::WHATS_NEW );
+    }
+
+    /**
+     * Whether What's new still waits for its redirect.
+     *
+     * @return bool
+     */
+    public static function whats_new_pending(): bool {
+        return self::WHATS_NEW === get_option( self::OPTION );
+    }
+
+    /**
+     * Drop a queued What's new redirect, say once the merchant opened the page on their own.
+     *
+     * @return void
+     */
+    public static function drop_whats_new() {
+        if ( self::whats_new_pending() ) {
+            update_option( self::OPTION, self::DONE );
+        }
+    }
+
+    /**
+     * The wizard or What's new URL when this admin request redirects, else an empty string; a queued redirect is used once.
      *
      * @param array $request Request flags, see REQUEST.
      *
      * @return string
      */
     public static function target( array $request ): string {
-        if ( self::PENDING !== get_option( self::OPTION ) ) {
+        $queued = get_option( self::OPTION );
+
+        if ( self::PENDING !== $queued && self::WHATS_NEW !== $queued ) {
             return '';
         }
 
@@ -125,14 +167,23 @@ class Redirect {
             return '';
         }
 
-        update_option( self::OPTION, self::DONE );
-
-        // A late redirect would land on someone else's screen, so these drop it for good.
-        if ( $request['bulk'] || $request['network_admin'] || ! $request['woocommerce'] || ! self::first_run() ) {
+        // A failed migration shows the Retry notice first; What's new waits until it succeeds.
+        if ( self::WHATS_NEW === $queued && WhatsNew::migration_failed() ) {
             return '';
         }
 
-        return admin_url( self::PATH );
+        update_option( self::OPTION, self::DONE );
+
+        // A late redirect would land on someone else's screen, so these drop it for good.
+        if ( $request['bulk'] || $request['network_admin'] || ! $request['woocommerce'] ) {
+            return '';
+        }
+
+        if ( self::WHATS_NEW === $queued ) {
+            return WhatsNew::is_available() ? admin_url( self::WHATS_NEW_PATH ) : '';
+        }
+
+        return self::first_run() ? admin_url( self::PATH ) : '';
     }
 
     /**

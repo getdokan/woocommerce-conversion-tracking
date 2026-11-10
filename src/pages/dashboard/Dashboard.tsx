@@ -29,6 +29,7 @@ import { CardSkeleton } from '../../shell/PageSkeleton';
 import { DoctorCard } from './DoctorCard';
 import { ConnectedPlatformCard, SetupPlatformCard } from './PlatformCard';
 import { StatCards } from './StatCards';
+import { UpdatedBanner } from './UpdatedBanner';
 import { WelcomeCard } from './WelcomeCard';
 
 type Filter = 'all' | 'working' | 'attention';
@@ -90,6 +91,7 @@ const Dashboard = () => {
                     'woocommerce-conversion-tracking'
                 ) }
             >
+                <UpdatedBanner />
                 <WelcomeCard onboarding={ data.onboarding } />
                 <section
                     className="flex flex-col gap-3"
@@ -146,6 +148,7 @@ const Dashboard = () => {
             }
         >
             <div className="flex flex-col gap-5" data-testid="wcct-dashboard">
+                <UpdatedBanner />
                 { setupOpen && <WelcomeCard onboarding={ data.onboarding } /> }
                 <StatCards
                     refreshing={ refreshing }

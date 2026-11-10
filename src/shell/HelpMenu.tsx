@@ -8,7 +8,13 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from '@wedevs/plugin-ui';
-import { BookOpen, CircleHelp, Lightbulb, MessageSquare } from 'lucide-react';
+import {
+    BookOpen,
+    CircleHelp,
+    Lightbulb,
+    MessageSquare,
+    Sparkles,
+} from 'lucide-react';
 
 /**
  * WordPress dependencies
@@ -16,7 +22,12 @@ import { BookOpen, CircleHelp, Lightbulb, MessageSquare } from 'lucide-react';
 import { __ } from '@wordpress/i18n';
 
 /**
- * The top bar's Help (?) menu: Docs, Support and Feature request.
+ * Internal dependencies
+ */
+import { hasWhatsNew } from '../data/whatsNew';
+
+/**
+ * The top bar's Help (?) menu: Docs, Support and Feature request, plus What's new for upgraders.
  */
 export const HelpMenu = () => {
     const help = window.wcctAdmin?.help;
@@ -82,6 +93,22 @@ export const HelpMenu = () => {
                         </span>
                     </DropdownMenuItem>
                 ) ) }
+                { hasWhatsNew() && (
+                    <DropdownMenuItem
+                        // eslint-disable-next-line jsx-a11y/anchor-has-content -- the item renders the label inside.
+                        render={ <a href="#/whats-new" /> }
+                        className="cursor-pointer text-popover-foreground no-underline"
+                    >
+                        <Sparkles
+                            className="text-muted-foreground"
+                            aria-hidden="true"
+                        />
+                        { __(
+                            'What’s new in 3.0',
+                            'woocommerce-conversion-tracking'
+                        ) }
+                    </DropdownMenuItem>
+                ) }
             </DropdownMenuContent>
         </DropdownMenu>
     );

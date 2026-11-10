@@ -179,11 +179,30 @@ add_action(
     }
 );
 
-// ct-e2e/v1/state: lets the onboarding spec read, set and restore the setup state, and switch plugins without a page view.
+// ct-e2e/v1/state: lets the onboarding and What's new specs read, set and restore the setup and migration state, and switch plugins without a page view.
 add_action(
     'rest_api_init',
     static function () {
-        $options = array( 'wcct_onboarding', 'wcct_onboarding_redirect', 'wcct_install_type', 'wcct_settings', 'wcct_settings_v3', 'wcct_consent_mode', 'wcct_verify' );
+        $options = array(
+            'wcct_onboarding',
+            'wcct_onboarding_redirect',
+            'wcct_install_type',
+            'wcct_settings',
+            'wcct_settings_v3',
+            'wcct_consent_mode',
+            'wcct_verify',
+            // The 3.0 migration's options (whats-new.spec.ts).
+            'wcct_pre3_snapshot',
+            'wcct_migration_flags',
+            'wcct_migration_done',
+            'wcct_migration_lock',
+            'wcct_migration_error',
+            'wcct_paused_platforms',
+            'wcct_whats_new',
+            'wcct_data_feed',
+            'wcct_pro_migration_done',
+            'wcct_feed_login',
+        );
 
         register_rest_route(
             'ct-e2e/v1',

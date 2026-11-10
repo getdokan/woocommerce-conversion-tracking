@@ -25,6 +25,7 @@ import Placeholder from '../pages/Placeholder';
 import Platforms from '../pages/platforms/Platforms';
 import Settings from '../pages/settings/Settings';
 import { pageInfo } from '../pages/titles';
+import WhatsNew from '../pages/whats-new/WhatsNew';
 import { AppTopBar } from './AppTopBar';
 import { PageSkeleton } from './PageSkeleton';
 
@@ -64,6 +65,10 @@ const RoutePage = ( { route }: { route: Route } ) => {
 
     if ( route.name === 'onboarding' ) {
         return <Onboarding query={ route.query } />;
+    }
+
+    if ( route.name === 'whats-new' ) {
+        return <WhatsNew />;
     }
 
     return <Placeholder { ...pageInfo( route ) } />;

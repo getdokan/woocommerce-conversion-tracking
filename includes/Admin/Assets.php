@@ -4,6 +4,7 @@ namespace StorePulse\ConversionTracking\Admin;
 
 use StorePulse\ConversionTracking\Compat\ProGuard;
 use StorePulse\ConversionTracking\Compat\ProVersion;
+use StorePulse\ConversionTracking\Migration\WhatsNew;
 
 // don't call the file directly
 if ( ! defined( 'ABSPATH' ) ) {
@@ -120,6 +121,8 @@ class Assets {
                 'logosUrl'   => WCCT_ASSETS . '/images/platforms/',
                 'classicUrl' => admin_url( 'admin.php?page=conversion-tracking&tab=integrations' ),
                 'homeUrl'    => home_url( '/' ),
+                // Upgraded from 2.x: What's new and its dashboard banner exist.
+                'whatsNew'   => WhatsNew::is_available(),
             )
         );
     }

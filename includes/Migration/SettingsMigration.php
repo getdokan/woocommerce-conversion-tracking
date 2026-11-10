@@ -281,6 +281,11 @@ class SettingsMigration {
         $settings = apply_filters( self::FILTER, $result['settings'], $v1, $upgrade );
 
         Store::save( is_array( $settings ) ? $settings : $result['settings'] );
+
+        // Upgraders see What's new once instead of the wizard.
+        if ( $upgrade ) {
+            WhatsNew::queue_redirect();
+        }
     }
 
     /**
