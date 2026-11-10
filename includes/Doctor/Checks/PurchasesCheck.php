@@ -7,38 +7,16 @@ use StorePulse\ConversionTracking\Doctor\Check;
 use StorePulse\ConversionTracking\Doctor\Context;
 use StorePulse\ConversionTracking\Doctor\Finding;
 use StorePulse\ConversionTracking\Doctor\Platforms;
-use StorePulse\ConversionTracking\Events\PurchaseGate;
+use StorePulse\ConversionTracking\Log\Activity;
 use StorePulse\ConversionTracking\Log\OrderLog;
 use StorePulse\ConversionTracking\Log\RepeatSends;
+use StorePulse\ConversionTracking\Log\Statuses;
 
 /**
  * The last 24 hours' purchases: sent, none twice, and whether shoppers' browsers can reach the check-in route.
  * Remote: it also asks the check-in route as a logged-out visitor, so the quiet re-check after an activation skips it.
  */
 class PurchasesCheck extends AbstractCheck {
-
-    /**
-     * A check-in not handed over within this many seconds is "Not confirmed"; same as Log\Statuses::SETTLE (#113).
-     */
-    const SETTLE = 600;
-
-    /**
-     * Orders read at most.
-     */
-    const MAX_ORDERS = 1000;
-
-    /**
-     * Orders that never reach a thank-you page from a shopper's browser; same list as Log\Statuses::SKIPPED_VIA (#113).
-     */
-    const EXCLUDED_CREATED_VIA = array( 'admin', 'pos', 'pos-rest-api', 'woocommerce-pos', 'rest-api', 'subscription' );
-
-    /**
-     * Statuses per row, see status(); the same strings as Log\Statuses (#113), so switching to it is a small change.
-     */
-    const CONFIRMED     = 'confirmed';
-    const NOT_CONFIRMED = 'not_confirmed';
-    const PENDING       = 'pending';
-    const SKIPPED       = 'skipped';
 
     /**
      * Working line, set by run().
@@ -83,10 +61,7 @@ class PurchasesCheck extends AbstractCheck {
      */
     public function run( Context $context ) {
         $now     = time();
-        $orders  = self::orders( $now );
-        $rows    = $orders && OrderLog::is_installed() ? OrderLog::for_orders( array_keys( $orders ) ) : array();
-        $repeats = RepeatSends::since( $now - OrderLog::RETENTION );
-        $summary = self::summarise( $orders, $rows, $repeats, $now );
+        $summary = self::summarise( Activity::orders( $now ), RepeatSends::since( $now - OrderLog::RETENTION ) );
 
         return $this->report( $summary, Platforms::from_context( $context ), self::route_answer( $context ) );
     }
@@ -129,37 +104,40 @@ class PurchasesCheck extends AbstractCheck {
     }
 
     /**
-     * Count the 24 hours: orders, orders sent to at least one platform, not confirmed and repeated pairs.
+     * Count the 24 hours from the Activity log's statuses (Log\Statuses): orders, orders sent to at least one platform, not confirmed and repeated pairs.
      *
-     * @param array $orders  Order ID => { created: Unix time }.
-     * @param array $rows    Order log rows of those orders.
-     * @param array $repeats From RepeatSends::since().
-     * @param int   $now     Unix time.
+     * @param array[] $orders  Evaluated orders, from Log\Activity::orders().
+     * @param array   $repeats From RepeatSends::since().
      *
      * @return array { orders: int, sent: int, pending: int (orders with a check-in still in its window), not_confirmed: [ order_id:platform ], repeats: [ order_id:platform ] }.
      */
-    public static function summarise( array $orders, array $rows, array $repeats, $now ) {
+    public static function summarise( array $orders, array $repeats ) {
+        $count         = 0;
         $sent          = array();
         $pending       = array();
         $not_confirmed = array();
         $repeated      = array();
 
-        foreach ( $rows as $row ) {
-            $order_id = isset( $row['order_id'] ) ? (int) $row['order_id'] : 0;
-
-            if ( ! isset( $orders[ $order_id ] ) ) {
+        foreach ( $orders as $order ) {
+            // Failed and cancelled orders aren't purchases.
+            if ( Statuses::SKIPPED === $order['status'] && Statuses::CAUSE_ORDER_STATUS === $order['cause'] ) {
                 continue;
             }
 
-            $status = self::status( $orders[ $order_id ], $row, $now );
-            $pair   = $order_id . ':' . ( isset( $row['platform'] ) ? (string) $row['platform'] : '' );
+            ++$count;
 
-            if ( self::CONFIRMED === $status ) {
-                $sent[ $order_id ] = true;
-            } elseif ( self::NOT_CONFIRMED === $status ) {
-                $not_confirmed[] = $pair;
-            } elseif ( self::PENDING === $status ) {
-                $pending[ $order_id ] = true;
+            foreach ( $order['platforms'] as $platform ) {
+                if ( ! empty( $platform['unknown'] ) ) {
+                    continue;
+                }
+
+                if ( $platform['sent'] ) {
+                    $sent[ $order['id'] ] = true;
+                } elseif ( Statuses::NOT_CONFIRMED === $platform['status'] ) {
+                    $not_confirmed[] = (int) $order['id'] . ':' . $platform['id'];
+                } elseif ( Statuses::WAITING === $platform['status'] && $platform['checked_in_at'] ) {
+                    $pending[ $order['id'] ] = true;
+                }
             }
         }
 
@@ -171,111 +149,12 @@ class PurchasesCheck extends AbstractCheck {
         sort( $repeated );
 
         return array(
-            'orders'        => count( $orders ),
+            'orders'        => $count,
             'sent'          => count( $sent ),
             'pending'       => count( $pending ),
             'not_confirmed' => array_values( array_unique( $not_confirmed ) ),
             'repeats'       => array_values( array_unique( $repeated ) ),
         );
-    }
-
-    /**
-     * Status of one order log row.
-     * Seam for #113: whichever of #113 and #116 lands second makes this Log\Statuses::for_order() (or reads
-     * Log\Activity::orders()) and drops these rules. The 10 minutes run from the check-in, as in #113.
-     *
-     * @param array $order { created: Unix time }.
-     * @param array $row   Order log row.
-     * @param int   $now   Unix time.
-     *
-     * @return string One of the status constants.
-     */
-    public static function status( array $order, array $row, $now ) {
-        if ( ! empty( $row['library_loaded'] ) ) {
-            return self::CONFIRMED;
-        }
-
-        // Declined cookies: nothing is handed over before consent, by design.
-        if ( isset( $row['consent'] ) && 'denied' === $row['consent'] ) {
-            return self::SKIPPED;
-        }
-
-        return $now - self::checked_in_at( $order, $row ) < self::SETTLE ? self::PENDING : self::NOT_CONFIRMED;
-    }
-
-    /**
-     * When a row's check-in started, as a Unix time: the thank-you page time, else the row's creation, else the order's.
-     *
-     * @param array $order { created: Unix time }.
-     * @param array $row   Order log row.
-     *
-     * @return int
-     */
-    private static function checked_in_at( array $order, array $row ) {
-        foreach ( array( 'thankyou_seen_at', 'created_at' ) as $column ) {
-            $time = ! empty( $row[ $column ] ) && is_string( $row[ $column ] ) ? strtotime( $row[ $column ] . ' UTC' ) : false;
-
-            if ( $time ) {
-                return (int) $time;
-            }
-        }
-
-        return isset( $order['created'] ) ? (int) $order['created'] : 0;
-    }
-
-    /**
-     * Shopper orders of the last 24 hours whose status sends a Purchase, through WooCommerce CRUD.
-     *
-     * @param int $now Unix time.
-     *
-     * @return array Order ID => { created: Unix time }.
-     */
-    public static function orders( $now ) {
-        if ( ! function_exists( 'wc_get_orders' ) || ! function_exists( 'wc_get_order_statuses' ) ) {
-            return array();
-        }
-
-        $statuses = array_values( array_filter( array_keys( wc_get_order_statuses() ), array( PurchaseGate::class, 'status_sends' ) ) );
-
-        if ( ! $statuses ) {
-            return array();
-        }
-
-        $found = wc_get_orders(
-            array(
-                'type'         => 'shop_order',
-                'status'       => $statuses,
-                'date_created' => '>=' . ( (int) $now - OrderLog::RETENTION ),
-                'limit'        => self::MAX_ORDERS,
-                'orderby'      => 'date',
-                'order'        => 'DESC',
-            )
-        );
-
-        $orders = array();
-
-        /**
-         * Filter how orders are created that never reach a thank-you page in the shopper's browser; the Doctor leaves them out.
-         *
-         * @since 3.0.0
-         *
-         * @param string[] $excluded created_via values.
-         */
-        $excluded = (array) apply_filters( 'wcct_doctor_excluded_created_via', self::EXCLUDED_CREATED_VIA );
-
-        foreach ( is_array( $found ) ? $found : array() as $order ) {
-            if ( ! is_object( $order ) || ! method_exists( $order, 'get_created_via' ) || in_array( (string) $order->get_created_via(), $excluded, true ) ) {
-                continue;
-            }
-
-            $created = $order->get_date_created();
-
-            $orders[ (int) $order->get_id() ] = array(
-                'created' => $created instanceof \DateTimeInterface ? $created->getTimestamp() : (int) $now,
-            );
-        }
-
-        return $orders;
     }
 
     /**

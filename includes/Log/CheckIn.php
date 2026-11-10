@@ -149,7 +149,13 @@ class CheckIn {
             OrderLog::upsert( array_merge( self::order_columns( $order, $now ), $changes, array( 'platform' => (string) $platform, 'created_at' => OrderLog::datetime( $now ) ) ) );
         }
 
-        return $flagged || null !== $changes ? self::RECORDED : self::UNCHANGED;
+        if ( $flagged || null !== $changes ) {
+            Activity::flush();
+
+            return self::RECORDED;
+        }
+
+        return self::UNCHANGED;
     }
 
     /**

@@ -46,7 +46,7 @@ const fillClassicCheckout = async (page: Page): Promise<void> => {
     await page.locator('#place_order').click();
 };
 
-const fillBlockCheckout = async (page: Page): Promise<void> => {
+export const fillBlockCheckout = async (page: Page): Promise<void> => {
     await page.goto('/checkout/');
     await page.locator('#email').fill(GUEST.email);
     await page.locator('#billing-first_name').fill(GUEST.firstName);

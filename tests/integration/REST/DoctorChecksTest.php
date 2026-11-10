@@ -163,9 +163,10 @@ class DoctorChecksTest extends WCCT_Test_Rest_Case {
     }
 
     public function test_purchases_of_the_last_24_hours() {
-        // Orders 0 (sent), 1 (not confirmed) and 2 (created in admin).
+        // Orders 0 (sent), 1 (not confirmed) and 2 (created in admin, paid on the pay page); placed after 3.0 first ran, as the Activity log counts.
         $results = $this->rest(
             array(
+                array( 'set_option', 'wcct_count_once_since', time() - 7200 ),
                 array( 'set_option', 'wcct_settings_v3', self::settings() ),
                 array( 'call', 'wcct_test_doctor_order', array( 3600 ) ),
                 array( 'call', 'wcct_test_doctor_order', array( 3600 ) ),
@@ -187,17 +188,18 @@ class DoctorChecksTest extends WCCT_Test_Rest_Case {
             'doctor-checks'
         );
 
-        $sent = $results[1];
+        $sent = $results[2];
 
-        $this->assertSame( array(), self::of( $results[6], 'purchases-24h' ), 'The admin-ajax retry is not a repeat' );
-        $this->assertSame( 'Purchases in the last 24 hours were sent, and none of them twice by this plugin', self::working( $results[6] )['purchases-24h'] );
+        $this->assertSame( array(), self::of( $results[7], 'purchases-24h' ), 'The admin-ajax retry is not a repeat' );
+        $this->assertSame( 'Purchases in the last 24 hours were sent, and none of them twice by this plugin', self::working( $results[7] )['purchases-24h'] );
 
-        $found = self::of( $results[12], 'purchases-24h' );
+        $found = self::of( $results[13], 'purchases-24h' );
 
-        $this->assertSame( array( 'We couldn\'t confirm 1 purchase from the last 24 hours', '1 purchase was sent twice in the last 24 hours' ), array_keys( $found ), 'The admin order never counts' );
-        $this->assertSame( array( array( 'Meta' ), '#/log' ), array( $found['We couldn\'t confirm 1 purchase from the last 24 hours']['tags'], $found['We couldn\'t confirm 1 purchase from the last 24 hours']['action']['url'] ) );
-        $this->assertCount( 1, $results[13] );
-        $this->assertSame( array( $sent, 'facebook' ), array( $results[13][0]['order_id'], $results[13][0]['platform'] ) );
+        // The admin order checked in from its thank-you page (paid on the pay page), so it counts, as in the Activity log.
+        $this->assertSame( array( 'We couldn\'t confirm 2 purchases from the last 24 hours', '1 purchase was sent twice in the last 24 hours' ), array_keys( $found ) );
+        $this->assertSame( array( array( 'Meta' ), '#/log' ), array( $found['We couldn\'t confirm 2 purchases from the last 24 hours']['tags'], $found['We couldn\'t confirm 2 purchases from the last 24 hours']['action']['url'] ) );
+        $this->assertCount( 1, $results[14] );
+        $this->assertSame( array( $sent, 'facebook' ), array( $results[14][0]['order_id'], $results[14][0]['platform'] ) );
     }
 
     public function test_no_purchases_reads_no_purchases_in_the_last_24_hours() {

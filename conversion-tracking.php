@@ -213,6 +213,7 @@ class WeDevs_WC_Conversion_Tracking {
         $this->container['doctor_recheck']->register();
 
         \StorePulse\ConversionTracking\Log\Prune::init_hooks();
+        \StorePulse\ConversionTracking\Log\Activity::init_hooks();
 
         // Every settings save and pause purges the known page caches.
         \StorePulse\ConversionTracking\Cache\PageCache::register();

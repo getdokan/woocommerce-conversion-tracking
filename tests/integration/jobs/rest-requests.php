@@ -98,6 +98,131 @@ function wcct_test_query( $sql ) {
     return $wpdb->get_results( str_replace( '{log}', \StorePulse\ConversionTracking\Log\OrderLog::table(), $sql ), ARRAY_A );
 }
 
+/**
+ * An order for the Activity log tests, for 'call' steps: placed $props['age'] seconds ago from the checkout, paid by cash on delivery.
+ *
+ * @param array $props status, created_via, age, thankyou_age (null for no thank-you page visit), renewal, rows (each: platform, loaded, columns, age; see wcct_test_log_row()).
+ *
+ * @return int Order ID.
+ */
+function wcct_test_log_order( array $props = array() ) {
+    $props = array_merge( array( 'status' => 'processing', 'created_via' => 'checkout', 'age' => 3600, 'thankyou_age' => 3595, 'renewal' => false, 'rows' => array() ), $props );
+    $order = new WC_Order();
+
+    $order->set_currency( 'USD' );
+    $order->set_payment_method( 'cod' );
+    $order->set_created_via( $props['created_via'] );
+    $order->set_billing_first_name( 'Private' );
+    $order->set_billing_last_name( 'Person' );
+    $order->set_billing_email( 'private.person@example.com' );
+    $order->add_product( wc_get_product( 2001 ), 1 );
+    $order->calculate_totals( false );
+    $order->set_status( $props['status'] );
+    $order->set_date_created( time() - $props['age'] );
+    $order->set_date_paid( in_array( $props['status'], array( 'processing', 'completed' ), true ) ? time() - $props['age'] : null );
+
+    if ( null !== $props['thankyou_age'] ) {
+        $order->update_meta_data( \StorePulse\ConversionTracking\Log\CheckIn::THANKYOU_META, time() - $props['thankyou_age'] );
+    }
+
+    if ( $props['renewal'] ) {
+        $order->update_meta_data( '_subscription_renewal', 99 );
+    }
+
+    $order->save();
+
+    foreach ( $props['rows'] as $row ) {
+        wcct_test_log_row( $order->get_id(), $row[0], $row[1], isset( $row[2] ) ? $row[2] : array(), isset( $row[3] ) ? $row[3] : 3590 );
+    }
+
+    return $order->get_id();
+}
+
+/**
+ * A check-in row written $age seconds ago, for 'call' steps.
+ *
+ * @param int    $order_id Order ID.
+ * @param string $platform Platform ID.
+ * @param bool   $loaded   Handed over.
+ * @param array  $columns  Other columns.
+ * @param int    $age      Seconds ago.
+ *
+ * @return bool
+ */
+function wcct_test_log_row( $order_id, $platform, $loaded, array $columns = array(), $age = 3590 ) {
+    $at = \StorePulse\ConversionTracking\Log\OrderLog::datetime( time() - $age );
+
+    return \StorePulse\ConversionTracking\Log\OrderLog::upsert(
+        array_merge(
+            array(
+                'order_id'         => (int) $order_id,
+                'platform'         => $platform,
+                'source'           => 'browser',
+                'status'           => 'processing',
+                'library_loaded'   => $loaded ? 1 : 0,
+                'consent'          => 'off',
+                'reason'           => $loaded ? '' : 'timeout',
+                'event_id'         => 'wcct_' . (int) $order_id . '_purchase',
+                'thankyou_seen_at' => $at,
+                'sent_at'          => $loaded ? $at : null,
+                'created_at'       => $at,
+                'updated_at'       => $at,
+            ),
+            $columns
+        )
+    );
+}
+
+/**
+ * Move the seeded orders (3001, 3002) out of the Activity log window, or 3001 to $age seconds ago, and drop the count-once cutoff, for 'call' steps.
+ *
+ * @param int|null $age Seconds ago for order 3001; null moves both out.
+ *
+ * @return null
+ */
+function wcct_test_log_clear( $age = null ) {
+    foreach ( array( 3001, 3002 ) as $order_id ) {
+        $order = wc_get_order( $order_id );
+        $order->set_date_created( time() - ( null !== $age && 3001 === $order_id ? $age : 3 * DAY_IN_SECONDS ) );
+        $order->save();
+    }
+
+    delete_option( 'wcct_count_once_since' );
+
+    return null;
+}
+
+/**
+ * Move rows of an order back in time, for 'call' steps.
+ *
+ * @param int $order_id Order ID.
+ * @param int $seconds  Seconds.
+ *
+ * @return null
+ */
+function wcct_test_log_age_rows( $order_id, $seconds ) {
+    global $wpdb;
+
+    $table = \StorePulse\ConversionTracking\Log\OrderLog::table();
+
+    foreach ( array( 'thankyou_seen_at', 'created_at', 'updated_at', 'sent_at' ) as $column ) {
+        $wpdb->query( $wpdb->prepare( "UPDATE {$table} SET {$column} = DATE_SUB({$column}, INTERVAL %d SECOND) WHERE order_id = %d AND {$column} IS NOT NULL", $seconds, $order_id ) );
+    }
+
+    return null;
+}
+
+/**
+ * How many orders the cached Activity list holds, as a new request would read it, for 'call' steps.
+ *
+ * @return int
+ */
+function wcct_test_log_cached_count() {
+    \StorePulse\ConversionTracking\Log\Activity::reset();
+
+    return count( \StorePulse\ConversionTracking\Log\Activity::orders() );
+}
+
 $wcct_results = array();
 
 foreach ( $GLOBALS['wcct_job']['steps'] as $wcct_step ) {

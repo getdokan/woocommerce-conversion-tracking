@@ -16,6 +16,11 @@ class Pause {
     const OPTION = 'wcct_paused_platforms';
 
     /**
+     * When each pause started: ID => Unix time; written by set(), not autoloaded (the Activity log reads it).
+     */
+    const SINCE_OPTION = 'wcct_paused_since';
+
+    /**
      * Fired after a platform is paused or resumed.
      */
     const CHANGED_ACTION = 'wcct_platform_pause_changed';
@@ -174,6 +179,7 @@ class Pause {
 
         // Autoloaded: the storefront reads it on every page.
         update_option( self::OPTION, $ids, true );
+        self::record_since( $remove, $paused ? $platform : '' );
 
         if ( ! $paused ) {
             self::switch_on_v1( $platform );
@@ -193,6 +199,47 @@ class Pause {
         do_action( self::CHANGED_ACTION, $platform, $paused, $ids );
 
         return $ids;
+    }
+
+    /**
+     * When the pause covering an integration or platform started, as a Unix time; 0 when unknown (paused before 3.0 kept the time).
+     *
+     * @param string $id Integration or platform ID.
+     *
+     * @return int
+     */
+    public static function paused_since( string $id ): int {
+        $since = get_option( self::SINCE_OPTION, array() );
+        $since = is_array( $since ) ? $since : array();
+
+        foreach ( array( $id, self::platform_of( $id ) ) as $key ) {
+            if ( isset( $since[ $key ] ) && is_numeric( $since[ $key ] ) ) {
+                return (int) $since[ $key ];
+            }
+        }
+
+        return 0;
+    }
+
+    /**
+     * Drop the start times of the IDs a set() touched and stamp the one it paused.
+     *
+     * @param string[] $removed IDs whose pause ends or restarts.
+     * @param string   $paused  ID paused now, empty on resume.
+     *
+     * @return void
+     */
+    private static function record_since( array $removed, string $paused ) {
+        $stored = get_option( self::SINCE_OPTION, array() );
+        $stored = is_array( $stored ) ? $stored : array();
+        $since  = array_diff_key( $stored, array_flip( $removed ) );
+
+        // Pausing again keeps the first start time.
+        if ( '' !== $paused ) {
+            $since[ $paused ] = isset( $stored[ $paused ] ) ? (int) $stored[ $paused ] : time();
+        }
+
+        update_option( self::SINCE_OPTION, $since, false );
     }
 
     /**

@@ -273,6 +273,80 @@ add_action(
     }
 );
 
+// Test-only routes for the Activity log spec (#113, #114): move an order and its log rows back in time, past the 10-minute settle time, and create an order in admin.
+add_action(
+    'rest_api_init',
+    static function () {
+        register_rest_route(
+            'ct-e2e/v1',
+            '/order-log/(?P<id>\d+)/age',
+            array(
+                'methods'             => 'POST',
+                'permission_callback' => '__return_true',
+                'callback'            => static function ( $request ) {
+                    global $wpdb;
+
+                    $seconds = max( 0, (int) $request['seconds'] );
+                    $order   = wc_get_order( (int) $request['id'] );
+
+                    if ( ! $order ) {
+                        return new WP_Error( 'ct_e2e_no_order', 'No such order', array( 'status' => 404 ) );
+                    }
+
+                    $order->set_date_created( $order->get_date_created()->getTimestamp() - $seconds );
+
+                    if ( $order->get_date_paid() ) {
+                        $order->set_date_paid( $order->get_date_paid()->getTimestamp() - $seconds );
+                    }
+
+                    $seen = \StorePulse\ConversionTracking\Log\CheckIn::thankyou_seen( $order );
+
+                    if ( $seen ) {
+                        $order->update_meta_data( \StorePulse\ConversionTracking\Log\CheckIn::THANKYOU_META, $seen - $seconds );
+                    }
+
+                    $order->save();
+
+                    // A fresh store's count-once cutoff is minutes old; keep the moved order after it.
+                    $since = (int) get_option( 'wcct_count_once_since', 0 );
+
+                    if ( $since > $order->get_date_created()->getTimestamp() ) {
+                        update_option( 'wcct_count_once_since', $order->get_date_created()->getTimestamp() - 60 );
+                    }
+
+                    $table = \StorePulse\ConversionTracking\Log\OrderLog::table();
+
+                    foreach ( array( 'thankyou_seen_at', 'sent_at', 'created_at', 'updated_at' ) as $column ) {
+                        $wpdb->query( $wpdb->prepare( "UPDATE {$table} SET {$column} = DATE_SUB({$column}, INTERVAL %d SECOND) WHERE order_id = %d AND {$column} IS NOT NULL", $seconds, $order->get_id() ) );
+                    }
+
+                    return array( 'id' => $order->get_id() );
+                },
+            )
+        );
+        register_rest_route(
+            'ct-e2e/v1',
+            '/admin-order',
+            array(
+                'methods'             => 'POST',
+                'permission_callback' => '__return_true',
+                'callback'            => static function () {
+                    $products = wc_get_products( array( 'limit' => 1, 'status' => 'publish' ) );
+                    $order    = new WC_Order();
+
+                    $order->set_created_via( 'admin' );
+                    $order->add_product( $products[0], 1 );
+                    $order->calculate_totals( false );
+                    $order->set_status( 'processing' );
+                    $order->save();
+
+                    return array( 'id' => $order->get_id() );
+                },
+            )
+        );
+    }
+);
+
 // The ct_e2e_block_rest cookie answers 403 on wcct/v1/events, like a security plugin that blocks REST for guests.
 add_filter(
     'rest_pre_dispatch',

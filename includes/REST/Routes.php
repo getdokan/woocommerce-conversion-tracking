@@ -38,6 +38,7 @@ class Routes {
                 CatalogController::class,
                 AccessController::class,
                 DoctorController::class,
+                LogController::class,
                 EventsController::class,
                 VerifyController::class,
             )

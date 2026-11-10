@@ -87,6 +87,14 @@ const platformMeta = (): Record< string, PlatformMeta > => ( {
 export const platformLogoUrl = ( file: string ): string =>
     file ? `${ window.wcctAdmin?.logosUrl ?? '' }${ file }` : '';
 
+/**
+ * A platform's logo URL by platform ID, or an empty string for a platform the app has no logo for.
+ *
+ * @param {string} id Platform ID.
+ */
+export const platformLogo = ( id: string ): string =>
+    platformLogoUrl( platformMeta()[ id ]?.logo ?? '' );
+
 const filled = ( value: unknown ): boolean =>
     typeof value === 'string' && value.trim() !== '';
 

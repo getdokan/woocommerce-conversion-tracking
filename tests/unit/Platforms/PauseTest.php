@@ -110,6 +110,30 @@ class PauseTest extends TestCase {
         $this->assertSame( array( 'facebook', 'twitter' ), Pause::set( 'twitter', true ) );
     }
 
+    public function test_each_pause_records_when_it_started_and_resume_clears_it() {
+        $GLOBALS['wcct_test_options']['wcct_paused_since'] = array( 'ga4' => 100 );
+
+        $before = time();
+
+        Pause::set( 'twitter', true );
+        Pause::set( 'google', true );
+
+        $since = $GLOBALS['wcct_test_options']['wcct_paused_since'];
+
+        $this->assertSame( array( 'twitter', 'google' ), array_keys( $since ) );
+        $this->assertGreaterThanOrEqual( $before, $since['twitter'] );
+        $this->assertSame( $since['google'], Pause::paused_since( 'adwords' ), 'Google covers its integrations' );
+
+        // Pausing again keeps the first start; resuming forgets it.
+        $GLOBALS['wcct_test_options']['wcct_paused_since']['twitter'] = 200;
+        Pause::set( 'twitter', true );
+        $this->assertSame( 200, Pause::paused_since( 'twitter' ) );
+
+        Pause::set( 'twitter', false );
+        $this->assertSame( 0, Pause::paused_since( 'twitter' ) );
+        $this->assertSame( 0, Pause::paused_since( 'facebook' ), 'unknown start' );
+    }
+
     public function test_the_first_write_keeps_the_pauses_read_from_the_settings() {
         $GLOBALS['wcct_test_options']['wcct_settings_v3'] = array( 'platforms' => array( 'google' => self::GOOGLE + array( 'paused' => true ) ) );
 
