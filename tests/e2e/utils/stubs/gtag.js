@@ -9,6 +9,8 @@
     }
 
     var configs = {};
+    // gtag('set', 'user_data', ...) for enhanced conversions, sent with later conversions as gtag.js's em parameter.
+    var userData = null;
     var skipped = [ 'page_location', 'page_referrer', 'event_callback', 'event_timeout', 'send_to', 'items', 'currency' ];
 
     var encode = function ( value ) {
@@ -65,6 +67,10 @@
             'currency_code=' + encode( params.currency ),
             'oid=' + encode( params.transaction_id ),
         ];
+
+        if ( label && userData ) {
+            query.push( 'em=' + encode( 'tv.1~em.' + ( userData.sha256_email_address || '' ) + '~pn.' + ( userData.sha256_phone_number || '' ) ) );
+        }
         var path = label ? 'https://www.googleadservices.com/pagead/conversion/' : 'https://googleads.g.doubleclick.net/pagead/viewthroughconversion/';
 
         var image = new Image();
@@ -85,7 +91,9 @@
 
         var params = args[ 2 ] || {};
 
-        if ( args[ 0 ] === 'config' && /^G-/.test( args[ 1 ] ) ) {
+        if ( args[ 0 ] === 'set' && args[ 1 ] === 'user_data' ) {
+            userData = params;
+        } else if ( args[ 0 ] === 'config' && /^G-/.test( args[ 1 ] ) ) {
             configs[ args[ 1 ] ] = params;
 
             if ( params.send_page_view !== false ) {

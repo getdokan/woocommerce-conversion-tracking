@@ -46,7 +46,7 @@ class Google {
      *
      * @param array $google Google platform values.
      *
-     * @return array { ga4: { enabled, measurement_id, tag_id, events }, adwords: { enabled, account_id, purchase_label, registration_label, events } }
+     * @return array { ga4: { enabled, measurement_id, tag_id, events }, adwords: { enabled, account_id, purchase_label, registration_label, enhanced_conversions, events } }
      */
     public static function integrations( array $google ): array {
         $mode   = self::mode( $google );
@@ -63,11 +63,12 @@ class Google {
                 'events'         => array_values( array_intersect( $events, self::ANALYTICS_EVENTS ) ),
             ),
             'adwords' => array(
-                'enabled'            => self::MODE_ANALYTICS !== $mode && '' !== $ads_id,
-                'account_id'         => $ads_id,
-                'purchase_label'     => self::text( $google, 'purchase_label' ),
-                'registration_label' => self::text( $google, 'registration_label' ),
-                'events'             => array_values( array_intersect( $events, self::ADS_EVENTS ) ),
+                'enabled'              => self::MODE_ANALYTICS !== $mode && '' !== $ads_id,
+                'account_id'           => $ads_id,
+                'purchase_label'       => self::text( $google, 'purchase_label' ),
+                'registration_label'   => self::text( $google, 'registration_label' ),
+                'enhanced_conversions' => ! empty( $google['enhanced_conversions'] ),
+                'events'               => array_values( array_intersect( $events, self::ADS_EVENTS ) ),
             ),
         );
     }

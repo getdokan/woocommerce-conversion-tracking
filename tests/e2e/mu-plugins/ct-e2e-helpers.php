@@ -83,6 +83,37 @@ add_filter(
     }
 );
 
+// The ct_e2e_enhanced_conversions cookie turns on Google's Enhanced conversions (Pro) for this browser, on top of the stored settings.
+add_filter(
+    'pre_option_wcct_settings_v3',
+    static function ( $pre ) {
+        static $reading = false;
+
+        if ( $reading || false !== $pre || ! isset( $_COOKIE['ct_e2e_enhanced_conversions'] ) || ! class_exists( '\StorePulse\ConversionTracking\Settings\Store' ) ) {
+            return $pre;
+        }
+
+        $reading = true;
+        $doc     = \StorePulse\ConversionTracking\Settings\Store::load();
+        $reading = false;
+
+        $doc['platforms']['google']['enhanced_conversions'] = true;
+
+        return $doc;
+    },
+    20
+);
+
+// /?ct_e2e_thankyou=<order ID> fires woocommerce_thankyou off the order received page, as a funnel thank-you page does.
+add_action(
+    'template_redirect',
+    static function () {
+        if ( isset( $_GET['ct_e2e_thankyou'] ) ) {
+            do_action( 'woocommerce_thankyou', absint( $_GET['ct_e2e_thankyou'] ) );
+        }
+    }
+);
+
 // Tracking Doctor: the ct_e2e_doctor cookie registers a sample check that finds a duplicate plugin named by the cookie
 // (the name is its evidence) and one whose action asks for confirmation; ct_e2e_consent=on turns consent mode on.
 add_filter(

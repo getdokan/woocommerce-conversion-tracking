@@ -33,14 +33,20 @@ class GoogleTest extends TestCase {
         );
         $this->assertSame(
             array(
-                'enabled'            => true,
-                'account_id'         => 'AW-123456789',
-                'purchase_label'     => 'AbCdEfGhIj',
-                'registration_label' => 'RegLabel12',
-                'events'             => array( 'purchase', 'sign_up' ),
+                'enabled'              => true,
+                'account_id'           => 'AW-123456789',
+                'purchase_label'       => 'AbCdEfGhIj',
+                'registration_label'   => 'RegLabel12',
+                'enhanced_conversions' => false,
+                'events'               => array( 'purchase', 'sign_up' ),
             ),
             $integrations['adwords']
         );
+    }
+
+    public function test_enhanced_conversions_is_read_as_a_boolean() {
+        $this->assertTrue( Google::integrations( array_merge( self::GOOGLE, array( 'enhanced_conversions' => true ) ) )['adwords']['enhanced_conversions'] );
+        $this->assertFalse( Google::integrations( array_merge( self::GOOGLE, array( 'enhanced_conversions' => '' ) ) )['adwords']['enhanced_conversions'] );
     }
 
     public function test_each_mode_enables_only_its_integration() {

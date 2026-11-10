@@ -3,7 +3,7 @@
 namespace StorePulse\ConversionTracking\Events;
 
 /**
- * Customer data for advanced matching: normalised per Meta's rules and SHA-256 hashed, never in plain text.
+ * Customer data for Meta's advanced matching and Google's enhanced conversions: normalised per platform and SHA-256 hashed, never in plain text.
  */
 class UserData {
 
@@ -11,6 +11,11 @@ class UserData {
      * Fields that are hashed, in output order.
      */
     const FIELDS = array( 'em', 'ph', 'fn', 'ln', 'ct', 'st', 'zp', 'external_id' );
+
+    /**
+     * Calling codes (IT, SM, VA) whose national numbers keep their leading 0.
+     */
+    const KEEP_LEADING_ZERO = array( '39', '378', '379' );
 
     /**
      * Normalise one field.
@@ -172,6 +177,81 @@ class UserData {
     }
 
     /**
+     * Google's user_data of an order: SHA-256 of the email and phone normalised per Google's enhanced conversions rules.
+     *
+     * @param \WC_Order $order Order.
+     *
+     * @return array { sha256_email_address?, sha256_phone_number? }
+     */
+    public static function google_from_order( $order ) {
+        if ( ! is_object( $order ) || ! method_exists( $order, 'get_billing_email' ) ) {
+            return array();
+        }
+
+        $country = method_exists( $order, 'get_billing_country' ) ? (string) $order->get_billing_country() : '';
+        $email   = self::google_email( $order->get_billing_email() );
+        $phone   = method_exists( $order, 'get_billing_phone' ) ? self::google_phone( $order->get_billing_phone(), self::calling_code( $country ) ) : '';
+
+        return array_filter(
+            array(
+                'sha256_email_address' => '' !== $email ? hash( 'sha256', $email ) : '',
+                'sha256_phone_number'  => '' !== $phone ? hash( 'sha256', $phone ) : '',
+            )
+        );
+    }
+
+    /**
+     * Email for Google: trimmed, lower case, without the dots before @ on gmail.com and googlemail.com.
+     *
+     * @param mixed $value Raw email.
+     *
+     * @return string Empty when it isn't an email.
+     */
+    public static function google_email( $value ) {
+        $email = self::normalise( 'em', $value );
+        $at    = strrpos( $email, '@' );
+
+        if ( false === $at || 0 === $at ) {
+            return '';
+        }
+
+        $local  = substr( $email, 0, $at );
+        $domain = substr( $email, $at + 1 );
+
+        if ( in_array( $domain, array( 'gmail.com', 'googlemail.com' ), true ) ) {
+            $local = str_replace( '.', '', $local );
+        }
+
+        return '' !== $local && '' !== $domain ? $local . '@' . $domain : '';
+    }
+
+    /**
+     * Phone for Google in E.164 (+ and the country code); empty when the country code is unknown or it isn't a valid number.
+     *
+     * @param mixed  $value        Raw phone number.
+     * @param string $calling_code Calling code of the address country; empty when unknown.
+     *
+     * @return string
+     */
+    public static function google_phone( $value, $calling_code = '' ) {
+        if ( ! is_scalar( $value ) || is_bool( $value ) ) {
+            return '';
+        }
+
+        $value         = trim( (string) $value );
+        $international = 0 === strpos( $value, '+' ) || 0 === strpos( preg_replace( '/\D+/', '', $value ), '00' );
+
+        // A national number without its country's calling code can't be written in E.164.
+        if ( ! $international && '' === preg_replace( '/\D+/', '', (string) $calling_code ) ) {
+            return '';
+        }
+
+        $phone = '+' . self::phone( $value, $calling_code );
+
+        return preg_match( '/^\+[1-9][0-9]{6,14}$/', $phone ) ? $phone : '';
+    }
+
+    /**
      * Phone as digits with the country code: an international number keeps its own, a national one gets the calling code.
      *
      * @param string $value        Raw phone number.
@@ -191,8 +271,10 @@ class UserData {
             return ltrim( $digits, '0' );
         }
 
-        $digits = ltrim( $digits, '0' );
-        $code   = preg_replace( '/\D+/', '', (string) $calling_code );
+        $code = preg_replace( '/\D+/', '', (string) $calling_code );
+
+        // Italy, San Marino and Vatican City keep the leading 0 of national numbers in E.164.
+        $digits = in_array( $code, self::KEEP_LEADING_ZERO, true ) ? $digits : ltrim( $digits, '0' );
 
         // A number that already starts with the calling code and is long enough for one keeps it.
         if ( '' === $code || '' === $digits || ( 0 === strpos( $digits, $code ) && strlen( $digits ) >= 11 ) ) {

@@ -140,10 +140,11 @@ class GoogleTag {
      *
      * @param array $ids         Config IDs.
      * @param bool  $with_loader Print the loader and gtag('js').
+     * @param array $params      Extra config parameters by config ID.
      *
      * @return string HTML, empty without IDs.
      */
-    public static function head_html( array $ids, bool $with_loader = true ): string {
+    public static function head_html( array $ids, bool $with_loader = true, array $params = array() ): string {
         $ids = self::ordered( array_filter( array_map( 'trim', array_filter( $ids, 'is_string' ) ) ) );
 
         if ( ! $ids ) {
@@ -164,7 +165,8 @@ class GoogleTag {
         $js .= "(function (pageConfig) {\n";
 
         foreach ( $ids as $id ) {
-            $js .= '    wcctGtag(\'config\', ' . self::encode( $id ) . ", pageConfig());\n";
+            $extra = isset( $params[ $id ] ) && is_array( $params[ $id ] ) ? $params[ $id ] : array();
+            $js   .= '    wcctGtag(\'config\', ' . self::encode( $id ) . ', ' . ( $extra ? self::merge_js( 'pageConfig()', $extra ) : 'pageConfig()' ) . ");\n";
         }
 
         $js .= '})(function () { return ' . OrderUrl::page_config_js() . "; });\n";
@@ -198,10 +200,18 @@ class GoogleTag {
             return;
         }
 
+        $params = array();
+
+        foreach ( $integrations as $integration ) {
+            if ( $integration instanceof \WCCT_Integration ) {
+                $params = array_merge( $params, (array) $integration->get_gtag_config() );
+            }
+        }
+
         // Code that prints its own loader fires wcct_gtag_loader_printed, see WCCT_Integration::print_gtag_loader().
         $with_loader = ! did_action( 'wcct_gtag_loader_printed' );
 
-        echo self::head_html( $ids, $with_loader ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- IDs are attribute-escaped and JSON-encoded.
+        echo self::head_html( $ids, $with_loader, $params ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- IDs are attribute-escaped and JSON-encoded.
 
         if ( $with_loader ) {
             do_action( 'wcct_gtag_loader_printed', $ids[0] );
@@ -215,6 +225,18 @@ class GoogleTag {
          * @param string[] $ids Config IDs, Analytics first.
          */
         do_action( self::PRINTED_ACTION, $ids );
+    }
+
+    /**
+     * JavaScript adding parameters to a config object (ES5).
+     *
+     * @param string $config JavaScript expression of the config object.
+     * @param array  $extra  Parameters.
+     *
+     * @return string
+     */
+    private static function merge_js( string $config, array $extra ): string {
+        return '(function (config, extra) { for (var key in extra) { config[key] = extra[key]; } return config; })(' . $config . ', ' . self::encode( (object) $extra ) . ')';
     }
 
     /**

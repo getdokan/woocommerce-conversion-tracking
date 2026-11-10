@@ -58,8 +58,18 @@ class SchemaTest extends TestCase {
         $google = Schema::get()['platforms']['google'];
 
         $this->assertSame( array( 'ga4', 'adwords' ), $google['integrations'] );
-        $this->assertSame( array( 'mode', 'measurement_id', 'ads_id', 'purchase_label', 'events', 'tag_id', 'value_mode', 'product_id_mode', 'skip_roles' ), array_keys( Schema::fields( $google['schema'] ) ) );
+        $this->assertSame( array( 'mode', 'measurement_id', 'ads_id', 'purchase_label', 'enhanced_conversions', 'events', 'tag_id', 'value_mode', 'product_id_mode', 'skip_roles' ), array_keys( Schema::fields( $google['schema'] ) ) );
         $this->assertSame( array( 'analytics', 'ads', 'both' ), array_column( Schema::fields( $google['schema'] )['mode']['options'], 'value' ) );
+    }
+
+    public function test_enhanced_conversions_is_a_locked_pro_switch_off_by_default() {
+        $field = Schema::fields( Schema::get()['platforms']['google']['schema'] )['enhanced_conversions'];
+
+        $this->assertSame( 'switch', $field['variant'] );
+        $this->assertFalse( $field['default'] );
+        $this->assertTrue( $field['pro'] );
+        $this->assertTrue( $field['disabled'] );
+        $this->assertFalse( Schema::unlock_fields( array( $field ), array( 'enhanced_conversions' ) )[0]['disabled'] );
     }
 
     public function test_platforms_that_send_product_ids_have_product_id_sent_defaulting_to_the_id() {

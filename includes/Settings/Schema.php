@@ -457,6 +457,20 @@ class Schema {
                     ),
                 )
             ),
+            // Pro unlocks it; Free shows the locked row and sets nothing.
+            array(
+                'id'           => 'enhanced_conversions',
+                'type'         => 'field',
+                'variant'      => 'switch',
+                'section_id'   => 'google_connection',
+                'label'        => __( 'Enhanced conversions', 'woocommerce-conversion-tracking' ),
+                'description'  => __( 'Hashed customer details so Ads matches more sales; with Respect cookie choices on, only after marketing consent. Turn on Enhanced conversions in Google Ads too. Google Analytics may also receive the hashed data if user-provided data collection is on in GA4.', 'woocommerce-conversion-tracking' ),
+                'default'      => false,
+                'priority'     => 50,
+                'pro'          => true,
+                'disabled'     => true,
+                'dependencies' => $ads,
+            ),
             self::section( 'google', 'google_events', __( 'Events', 'woocommerce-conversion-tracking' ) ),
             self::events_field(
                 'google_events',

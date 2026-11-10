@@ -1,5 +1,7 @@
 <?php
 
+use StorePulse\ConversionTracking\Events\OrderReceived;
+use StorePulse\ConversionTracking\Platforms\EnhancedConversions;
 use StorePulse\ConversionTracking\Platforms\GoogleTag;
 
 /**
@@ -85,7 +87,7 @@ class WCCT_Integration_Google extends WCCT_Integration {
     }
 
     /**
-     * The adwords settings from the google platform: { enabled, account_id, purchase_label, registration_label, events }
+     * The adwords settings from the google platform: { enabled, account_id, purchase_label, registration_label, enhanced_conversions, events }
      *
      * @return array
      */
@@ -124,6 +126,17 @@ class WCCT_Integration_Google extends WCCT_Integration {
         $account_id = $this->is_active() ? trim( (string) $this->get_ads_settings()['account_id'] ) : '';
 
         return '' !== $account_id ? array( $account_id ) : array();
+    }
+
+    /**
+     * The conversion ID's config allows enhanced conversions while they are on
+     *
+     * @return array
+     */
+    public function get_gtag_config() {
+        $ids = $this->get_gtag_ids();
+
+        return $ids && $this->enhanced_conversions_on() ? array( $ids[0] => array( 'allow_enhanced_conversions' => true ) ) : array();
     }
 
     /**
@@ -180,7 +193,56 @@ class WCCT_Integration_Google extends WCCT_Integration {
         ) );
 
         // gtag.js calls event_callback once it has sent the conversion; the flag is written then.
-        return str_replace( '"' . self::CALLBACK_PLACEHOLDER . '"', $this->purchase_sent_callback( $order ), $code );
+        $code = str_replace( '"' . self::CALLBACK_PLACEHOLDER . '"', $this->purchase_sent_callback( $order ), $code );
+
+        $user_data = $this->user_data_script( $order );
+
+        return '' !== $user_data ? $user_data . "\n" . $code : $code;
+    }
+
+    /**
+     * Whether enhanced conversions are on; Pro's switch turns them on
+     *
+     * @return boolean
+     */
+    public function enhanced_conversions_on() {
+        return false;
+    }
+
+    /**
+     * The order received page's verified order (key, owner and email checks), or false
+     *
+     * @return \WC_Order|false
+     */
+    protected function verified_order() {
+        return OrderReceived::get_order();
+    }
+
+    /**
+     * Enhanced conversions: the verified order's hashed email and phone, set before the conversion with marketing consent
+     *
+     * @param \WC_Order $order Order.
+     *
+     * @return string JavaScript, empty when nothing is set
+     */
+    protected function user_data_script( $order ) {
+        if ( ! $this->enhanced_conversions_on() ) {
+            return '';
+        }
+
+        $user_data = EnhancedConversions::user_data( $order, $this->verified_order() );
+
+        if ( ! $user_data ) {
+            return '';
+        }
+
+        $js = EnhancedConversions::gate( $this->build_event( 'user_data', $user_data, 'set' ) );
+
+        if ( '' !== $js ) {
+            EnhancedConversions::skip_page_cache();
+        }
+
+        return $js;
     }
 
     /**

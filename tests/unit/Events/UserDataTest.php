@@ -30,6 +30,16 @@ class UserDataTest extends TestCase {
         $this->assertSame( '', UserData::phone( '---', '+1' ) );
     }
 
+    public function test_italy_san_marino_and_vatican_keep_the_leading_zero() {
+        $this->assertSame( '390612345678', UserData::phone( '06 1234 5678', '+39' ) );
+        $this->assertSame( '3780549123456', UserData::phone( '0549 123456', '+378' ) );
+        $this->assertSame( '379066981234', UserData::phone( '06 698 1234', '+379' ) );
+        $this->assertSame( '390612345678', UserData::phone( '+39 06 1234 5678', '' ) );
+        $this->assertSame( '393471234567', UserData::phone( '347 123 4567', '+39' ) );
+        $this->assertSame( '+390612345678', UserData::google_phone( '06 1234 5678', '+39' ) );
+        $this->assertSame( '+3780549123456', UserData::google_phone( '0549 123456', '378' ) );
+    }
+
     public function test_names_are_lower_case_without_punctuation() {
         $this->assertSame( 'mary ann', UserData::normalise( 'fn', '  Mary  Ann. ' ) );
         $this->assertSame( "oconnor", UserData::normalise( 'ln', "O'Connor" ) );
@@ -76,6 +86,46 @@ class UserDataTest extends TestCase {
         $this->assertSame( hash( 'sha256', '94105' ), $hashed['zp'] );
     }
 
+    public function test_google_email_drops_the_dots_of_gmail_addresses_only() {
+        $this->assertSame( 'janedoe@gmail.com', UserData::google_email( ' Jane.Doe@GMAIL.com ' ) );
+        $this->assertSame( 'janedoe@googlemail.com', UserData::google_email( 'jane.doe@googlemail.com' ) );
+        $this->assertSame( 'jane.doe@example.com', UserData::google_email( 'Jane.Doe@Example.com' ) );
+        $this->assertSame( 'jane+shop@gmail.com', UserData::google_email( 'jane+shop@gmail.com' ) );
+        $this->assertSame( '', UserData::google_email( 'not an email' ) );
+        $this->assertSame( '', UserData::google_email( '@gmail.com' ) );
+        $this->assertSame( '', UserData::google_email( array( 'a@b.co' ) ) );
+    }
+
+    public function test_google_phone_is_e164_with_the_plus() {
+        $this->assertSame( '+14155550100', UserData::google_phone( '(415) 555-0100', '+1' ) );
+        $this->assertSame( '+447700900123', UserData::google_phone( '07700 900123', '44' ) );
+        $this->assertSame( '+4915112345678', UserData::google_phone( '+49 151 12345678', '' ) );
+        $this->assertSame( '+4915112345678', UserData::google_phone( '0049 151 12345678', '+1' ) );
+    }
+
+    public function test_google_phone_is_empty_without_a_country_code_or_digits() {
+        $this->assertSame( '', UserData::google_phone( '(415) 555-0100', '' ) );
+        $this->assertSame( '', UserData::google_phone( 'n/a', '+1' ) );
+        $this->assertSame( '', UserData::google_phone( '+1 23', '' ) );
+        $this->assertSame( '', UserData::google_phone( '+1 2345 6789 0123 4567', '' ) );
+        $this->assertSame( '', UserData::google_phone( true, '+1' ) );
+    }
+
+    public function test_google_user_data_hashes_email_and_phone_only() {
+        $order = new UserDataTestOrder( '  Casey.Tester@Gmail.com ', '+1 415 555 0100' );
+
+        $this->assertSame(
+            array(
+                'sha256_email_address' => hash( 'sha256', 'caseytester@gmail.com' ),
+                'sha256_phone_number'  => hash( 'sha256', '+14155550100' ),
+            ),
+            UserData::google_from_order( $order )
+        );
+        $this->assertSame( array( 'sha256_email_address' ), array_keys( UserData::google_from_order( new UserDataTestOrder( 'a@b.co', '415 555 0100' ) ) ) );
+        $this->assertSame( array(), UserData::google_from_order( new UserDataTestOrder( '', '' ) ) );
+        $this->assertSame( array(), UserData::google_from_order( null ) );
+    }
+
     public function test_no_plain_text_survives() {
         $hashed = UserData::from_user( (object) array( 'ID' => 3, 'user_email' => 'a@b.co', 'first_name' => 'Sam', 'last_name' => 'Buyer' ) );
 
@@ -83,5 +133,35 @@ class UserDataTest extends TestCase {
         $this->assertStringNotContainsString( 'a@b.co', implode( ',', $hashed ) );
         $this->assertSame( array(), UserData::from_user( null ) );
         $this->assertSame( array(), UserData::from_order( null ) );
+    }
+}
+
+/**
+ * An order with a billing email and phone only.
+ */
+class UserDataTestOrder {
+
+    private $email;
+    private $phone;
+
+    public function __construct( $email, $phone ) {
+        $this->email = $email;
+        $this->phone = $phone;
+    }
+
+    public function get_id() {
+        return 7;
+    }
+
+    public function get_billing_email() {
+        return $this->email;
+    }
+
+    public function get_billing_phone() {
+        return $this->phone;
+    }
+
+    public function get_billing_country() {
+        return 'US';
     }
 }

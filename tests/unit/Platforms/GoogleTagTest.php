@@ -131,6 +131,13 @@ class GoogleTagTest extends TestCase {
         $this->assertStringContainsString( "wcctGtag('config', \"G-ABC123\"", $html );
     }
 
+    public function test_head_html_adds_extra_config_parameters_to_their_id_only() {
+        $html = GoogleTag::head_html( array( 'G-ABC123', 'AW-123456789' ), true, array( 'AW-123456789' => array( 'allow_enhanced_conversions' => true ) ) );
+
+        $this->assertStringContainsString( "wcctGtag('config', \"G-ABC123\", pageConfig());", $html );
+        $this->assertStringContainsString( "wcctGtag('config', \"AW-123456789\", (function (config, extra) { for (var key in extra) { config[key] = extra[key]; } return config; })(pageConfig(), {\"allow_enhanced_conversions\":true}));", $html );
+    }
+
     public function test_head_html_is_empty_without_ids() {
         $this->assertSame( '', GoogleTag::head_html( array( '', ' ' ) ) );
     }

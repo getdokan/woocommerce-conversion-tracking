@@ -510,6 +510,15 @@ abstract class WCCT_Integration {
     }
 
     /**
+     * Extra gtag config parameters by config ID; empty for none
+     *
+     * @return array
+     */
+    public function get_gtag_config() {
+        return array();
+    }
+
+    /**
      * Print the shared Google tag once per page: one loader, then one config per ID of every active integration
      *
      * @return void
