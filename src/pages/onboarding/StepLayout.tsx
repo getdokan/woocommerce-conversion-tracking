@@ -20,6 +20,8 @@ type StepLayoutProps = {
     onBack?: () => void;
     note?: ReactNode;
     onSkip?: () => void;
+    // A re-run says "Close without saving" instead.
+    skipLabel?: string;
     action?: ReactNode;
 };
 
@@ -37,6 +39,7 @@ export const StepLayout = ( {
     onBack,
     note,
     onSkip,
+    skipLabel,
     action,
 }: StepLayoutProps ) => (
     <div className="px-8 py-8 max-[782px]:px-4">
@@ -85,10 +88,11 @@ export const StepLayout = ( {
                         className={ cn( action ? 'ml-auto' : '' ) }
                         onClick={ onSkip }
                     >
-                        { __(
-                            'Skip for now',
-                            'woocommerce-conversion-tracking'
-                        ) }
+                        { skipLabel ??
+                            __(
+                                'Skip for now',
+                                'woocommerce-conversion-tracking'
+                            ) }
                     </Button>
                 ) }
                 { action && (

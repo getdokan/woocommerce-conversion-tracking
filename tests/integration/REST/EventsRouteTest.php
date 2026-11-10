@@ -263,5 +263,22 @@ class EventsRouteTest extends WCCT_Test_Rest_Case {
         $this->assertGreaterThan( 0, $results[8]['data']['seen_at'] );
         $this->assertSame( array( 'facebook' => true, 'adwords' => false, 'twitter' => false, 'ga4' => false, 'custom' => false ), $results[8]['data']['platforms'] );
         $this->assertArrayNotHasKey( 'token', $results[8]['data'] );
+        // The admin-only GET names the test without its token, and gives the wizard the link back after a reload.
+        $this->assertSame( substr( hash( 'sha256', $token ), 0, 8 ), $results[8]['data']['test'] );
+        $this->assertStringContainsString( '?wcct_verify=' . $token, $results[8]['data']['url'] );
+        $this->assertGreaterThanOrEqual( 0, $results[8]['data']['age'] );
+        $this->assertMatchesRegularExpression( '/^[0-9a-f]{8}$/', $results[3]['data']['test'] );
+    }
+
+    public function test_an_expired_test_gives_no_link_back() {
+        $results = $this->rest(
+            array(
+                array( 'set_option', 'wcct_verify', array( 'token' => 'abcdefghijklmnopqrstuvwxyz012345', 'started' => time() - 3600, 'seen' => 0, 'platforms' => array() ) ),
+                array( 'request', 'GET', '/wcct/v1/onboarding/verify', null, 'admin' ),
+            )
+        );
+
+        $this->assertFalse( $results[1]['data']['active'] );
+        $this->assertSame( '', $results[1]['data']['url'] );
     }
 }

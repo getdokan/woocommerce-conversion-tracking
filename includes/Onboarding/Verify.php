@@ -2,6 +2,7 @@
 
 namespace StorePulse\ConversionTracking\Onboarding;
 
+use StorePulse\ConversionTracking\Log\AjaxCheckIn;
 use StorePulse\ConversionTracking\Log\CheckIn;
 
 /**
@@ -67,7 +68,7 @@ class Verify {
      *
      * @param int|null $now Unix time, default now.
      *
-     * @return array url and started_at.
+     * @return array url, test and started_at.
      */
     public static function start( $now = null ) {
         $state = array(
@@ -81,12 +82,38 @@ class Verify {
 
         return array(
             'url'        => self::url( $state['token'] ),
+            'test'       => self::test_id( $state['token'] ),
             'started_at' => $state['started'],
         );
     }
 
     /**
-     * The open test without its token: active, started_at, seen_at and platforms (ID => library loaded).
+     * A non-secret ID of a test link, so the wizard can tell its own test from a newer one.
+     *
+     * @param string $token Token.
+     *
+     * @return string
+     */
+    public static function test_id( $token ) {
+        return '' === $token ? '' : substr( hash( 'sha256', $token ), 0, 8 );
+    }
+
+    /**
+     * The open test's link, or an empty string once it expired; for the wizard to pick up a test after a reload.
+     *
+     * @param int|null $now Unix time, default now.
+     *
+     * @return string
+     */
+    public static function current_url( $now = null ) {
+        $state = self::stored();
+        $now   = null === $now ? time() : (int) $now;
+
+        return '' !== $state['token'] && $now - $state['started'] < self::TTL ? self::url( $state['token'] ) : '';
+    }
+
+    /**
+     * The open test without its token: active, test, started_at, seen_at and platforms (ID => library loaded).
      *
      * @param int|null $now Unix time, default now.
      *
@@ -98,6 +125,7 @@ class Verify {
 
         return array(
             'active'     => '' !== $state['token'] && $now - $state['started'] < self::TTL,
+            'test'       => self::test_id( $state['token'] ),
             'started_at' => $state['started'],
             'seen_at'    => $state['seen'],
             'platforms'  => $state['platforms'],
@@ -130,7 +158,7 @@ class Verify {
     }
 
     /**
-     * Record a seen ping; platforms maps known platform IDs to whether their library loaded.
+     * Record a seen ping; platforms maps known platform IDs to whether their library loaded, and a library seen once stays loaded while the test is open.
      *
      * @param string   $token     Token from the ping.
      * @param array    $platforms Platform ID => library loaded.
@@ -151,7 +179,7 @@ class Verify {
         $loaded = array();
 
         foreach ( $known as $id ) {
-            $loaded[ $id ] = isset( $platforms[ $id ] ) && in_array( $platforms[ $id ], array( true, 1, '1', 'true' ), true );
+            $loaded[ $id ] = ( isset( $platforms[ $id ] ) && in_array( $platforms[ $id ], array( true, 1, '1', 'true' ), true ) ) || ! empty( $state['platforms'][ $id ] );
         }
 
         $state['seen']      = $now;
@@ -236,45 +264,67 @@ class Verify {
             return;
         }
 
-        wp_print_inline_script_tag( self::ping_script( CheckIn::url(), $token, $checks ), array( 'data-no-optimize' => '1' ) );
+        wp_print_inline_script_tag( self::ping_script( CheckIn::url(), admin_url( 'admin-ajax.php' ), $token, $checks ), array( 'data-no-optimize' => '1' ) );
     }
 
     /**
-     * The ping: waits up to 8 seconds for every library, then sends once per test link and tab every THROTTLE seconds.
+     * The ping: waits up to 8 seconds for every library, then sends once per test link and tab every THROTTLE seconds; fetch first, admin-ajax when REST is blocked, sendBeacon only when the page goes away first.
      *
-     * @param string   $url    Check-in URL.
-     * @param string   $token  Token.
-     * @param string[] $checks JS object members, platform ID => function.
+     * @param string   $url      Check-in URL.
+     * @param string   $ajax_url admin-ajax.php URL.
+     * @param string   $token    Token.
+     * @param string[] $checks   JS object members, platform ID => function.
      *
      * @return string
      */
-    public static function ping_script( $url, $token, array $checks ) {
+    public static function ping_script( $url, $ajax_url, $token, array $checks ) {
         $flags = JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_SLASHES;
 
         return '(function (window) {
-    var url = ' . wp_json_encode( $url, $flags ) . ', token = ' . wp_json_encode( $token, $flags ) . ', checks = {' . implode( ', ', $checks ) . '};
-    var memo = "wcct_verify_" + token, started = new Date().getTime();
+    var url = ' . wp_json_encode( $url, $flags ) . ', ajax = ' . wp_json_encode( $ajax_url, $flags ) . ', token = ' . wp_json_encode( $token, $flags ) . ', checks = {' . implode( ', ', $checks ) . '};
+    var memo = "wcct_verify_" + token, started = new Date().getTime(), sent = false, timer;
     try {
         var last = +window.sessionStorage.getItem(memo);
         if (last && started - last < ' . (int) self::THROTTLE * 1000 . ') return;
     } catch (e) {}
-    (function poll() {
-        var body = "type=seen&token=" + encodeURIComponent(token), all = true;
+    var body = function () {
+        var out = "type=seen&token=" + encodeURIComponent(token), all = true;
         for (var id in checks) {
             var loaded = false;
             try { loaded = !!checks[id](); } catch (e) {}
             all = all && loaded;
-            body += "&platforms[" + encodeURIComponent(id) + "]=" + (loaded ? 1 : 0);
+            out += "&platforms[" + encodeURIComponent(id) + "]=" + (loaded ? 1 : 0);
         }
-        if (!all && new Date().getTime() - started < 8000) {
-            setTimeout(poll, 250);
+        return { text: out, all: all };
+    };
+    var post = function (target, text, retry) {
+        var fallback = function () { if (retry) post(ajax, "action=' . AjaxCheckIn::ACTION . '&" + text, false); };
+        try {
+            window.fetch(target, { method: "POST", body: text, keepalive: true, credentials: "same-origin", headers: { "Content-Type": "application/x-www-form-urlencoded" } })
+                .then(function (response) { if (response.status == 401 || response.status == 403 || response.status == 404) fallback(); })
+                .catch(fallback);
+        } catch (e) { fallback(); }
+    };
+    var send = function (unloading) {
+        if (sent) return;
+        sent = true;
+        clearTimeout(timer);
+        var text = body().text;
+        try { window.sessionStorage.setItem(memo, String(new Date().getTime())); } catch (e) {}
+        if (!unloading && window.fetch) return post(url, text, true);
+        try {
+            if (navigator.sendBeacon && navigator.sendBeacon(url, new Blob([text], { type: "application/x-www-form-urlencoded" }))) return;
+        } catch (e) {}
+        if (window.fetch) post(url, text, false);
+    };
+    window.addEventListener("pagehide", function () { send(true); });
+    (function poll() {
+        if (sent) return;
+        if (!body().all && new Date().getTime() - started < 8000) {
+            timer = setTimeout(poll, 250);
             return;
         }
-        try { window.sessionStorage.setItem(memo, String(new Date().getTime())); } catch (e) {}
-        try {
-            if (navigator.sendBeacon && navigator.sendBeacon(url, new Blob([body], { type: "application/x-www-form-urlencoded" }))) return;
-        } catch (e) {}
-        if (window.fetch) window.fetch(url, { method: "POST", body: body, keepalive: true, credentials: "same-origin", headers: { "Content-Type": "application/x-www-form-urlencoded" } }).catch(function () {});
+        send(false);
     })();
 })(window);';
     }

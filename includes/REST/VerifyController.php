@@ -43,18 +43,24 @@ class VerifyController extends Controller {
     }
 
     /**
-     * The open test: active, started_at, seen_at and platforms (integration ID => library loaded).
+     * The open test: active, test, started_at, seen_at, platforms (integration ID => library loaded), and for the wizard after a reload its url and age in seconds.
      *
      * @param WP_REST_Request $request Request.
      *
      * @return \WP_REST_Response
      */
     public function get_item( $request ) {
-        return rest_ensure_response( Verify::state() );
+        $now   = time();
+        $state = Verify::state( $now );
+
+        $state['url'] = $state['active'] ? Verify::current_url( $now ) : '';
+        $state['age'] = $state['started_at'] ? max( 0, $now - $state['started_at'] ) : 0;
+
+        return rest_ensure_response( $state );
     }
 
     /**
-     * Open a new test link: url and started_at.
+     * Open a new test link: url, test and started_at.
      *
      * @param WP_REST_Request $request Request.
      *

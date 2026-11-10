@@ -43,16 +43,47 @@ class VerifyTest extends TestCase {
         Verify::record_seen( self::TOKEN, array( 'facebook' => '1', 'twitter' => '0', 'evil' => '1' ), array( 'facebook', 'twitter' ), self::NOW );
 
         $this->assertSame(
-            array( 'active' => true, 'started_at' => self::NOW - 60, 'seen_at' => self::NOW, 'platforms' => array( 'facebook' => true, 'twitter' => false ) ),
+            array( 'active' => true, 'test' => substr( hash( 'sha256', self::TOKEN ), 0, 8 ), 'started_at' => self::NOW - 60, 'seen_at' => self::NOW, 'platforms' => array( 'facebook' => true, 'twitter' => false ) ),
             Verify::state( self::NOW )
         );
     }
 
+    public function test_the_test_id_names_a_test_without_its_token() {
+        $id = Verify::test_id( self::TOKEN );
+
+        $this->assertMatchesRegularExpression( '/^[0-9a-f]{8}$/', $id );
+        $this->assertStringNotContainsString( $id, self::TOKEN );
+        $this->assertNotSame( $id, Verify::test_id( strrev( self::TOKEN ) ) );
+        $this->assertSame( '', Verify::test_id( '' ) );
+        $this->assertSame( '', Verify::current_url( self::NOW + Verify::TTL ) );
+    }
+
+    public function test_a_library_seen_once_stays_loaded_while_the_test_is_open() {
+        Verify::record_seen( self::TOKEN, array( 'facebook' => '1', 'twitter' => '0' ), array( 'facebook', 'twitter' ), self::NOW );
+        Verify::record_seen( self::TOKEN, array( 'facebook' => '0', 'twitter' => '1' ), array( 'facebook', 'twitter' ), self::NOW + Verify::THROTTLE );
+
+        $this->assertSame( array( 'facebook' => true, 'twitter' => true ), Verify::state( self::NOW + Verify::THROTTLE )['platforms'] );
+
+        // Once expired, nothing is merged.
+        $this->assertSame( Verify::EXPIRED, Verify::record_seen( self::TOKEN, array( 'facebook' => '1' ), array( 'facebook' ), self::NOW + Verify::TTL ) );
+    }
+
     public function test_the_ping_sends_once_per_link_and_tab() {
-        $script = Verify::ping_script( 'https://shop.test/wp-json/wcct/v1/events', self::TOKEN, array( '"facebook": function () { return window.fbq; }' ) );
+        $script = Verify::ping_script( 'https://shop.test/wp-json/wcct/v1/events', 'https://shop.test/wp-admin/admin-ajax.php', self::TOKEN, array( '"facebook": function () { return window.fbq; }' ) );
 
         $this->assertStringContainsString( 'var memo = "wcct_verify_" + token', $script );
         $this->assertStringContainsString( 'started - last < 10000) return;', $script );
         $this->assertStringContainsString( '"type=seen&token="', $script );
+    }
+
+    public function test_the_ping_falls_back_to_admin_ajax_and_beacons_only_on_page_hide() {
+        $script = Verify::ping_script( 'https://shop.test/wp-json/wcct/v1/events', 'https://shop.test/wp-admin/admin-ajax.php', self::TOKEN, array() );
+
+        $this->assertStringContainsString( 'ajax = "https://shop.test/wp-admin/admin-ajax.php"', $script );
+        $this->assertStringContainsString( 'post(ajax, "action=wcct_events&" + text, false)', $script );
+        $this->assertStringContainsString( 'response.status == 401 || response.status == 403 || response.status == 404', $script );
+        $this->assertStringContainsString( 'keepalive: true', $script );
+        $this->assertStringContainsString( 'window.addEventListener("pagehide", function () { send(true); });', $script );
+        $this->assertStringContainsString( 'if (!unloading && window.fetch) return post(url, text, true);', $script );
     }
 }

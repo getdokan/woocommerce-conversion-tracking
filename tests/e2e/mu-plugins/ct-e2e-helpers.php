@@ -175,7 +175,7 @@ add_action(
 add_action(
     'rest_api_init',
     static function () {
-        $options = array( 'wcct_onboarding', 'wcct_onboarding_redirect', 'wcct_install_type', 'wcct_settings', 'wcct_settings_v3', 'wcct_consent_mode' );
+        $options = array( 'wcct_onboarding', 'wcct_onboarding_redirect', 'wcct_install_type', 'wcct_settings', 'wcct_settings_v3', 'wcct_consent_mode', 'wcct_verify' );
 
         register_rest_route(
             'ct-e2e/v1',
@@ -234,6 +234,35 @@ add_action(
                         return array( 'active' => array_values( (array) get_option( 'active_plugins', array() ) ) );
                     },
                 ),
+            )
+        );
+    }
+);
+
+// ct-e2e/v1/options: every Conversion Tracking option, so the onboarding spec can check that closing a re-run of the wizard changes none.
+add_action(
+    'rest_api_init',
+    static function () {
+        register_rest_route(
+            'ct-e2e/v1',
+            '/options',
+            array(
+                'methods'             => 'GET',
+                'permission_callback' => static function () {
+                    return current_user_can( 'manage_options' );
+                },
+                'callback'            => static function () {
+                    global $wpdb;
+
+                    $rows    = $wpdb->get_results( "SELECT option_name, option_value FROM {$wpdb->options} WHERE option_name LIKE 'wcct\\_%' OR option_name LIKE 'woocommerce\\_wc\\_conv\\_%' ORDER BY option_name" );
+                    $options = array();
+
+                    foreach ( $rows as $row ) {
+                        $options[ $row->option_name ] = maybe_unserialize( $row->option_value );
+                    }
+
+                    return (object) $options;
+                },
             )
         );
     }

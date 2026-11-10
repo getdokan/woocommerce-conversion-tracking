@@ -1,8 +1,11 @@
 <?php
 
+require_once dirname( __DIR__ ) . '/Fakes/settings-functions.php';
+
 use PHPUnit\Framework\TestCase;
 use StorePulse\ConversionTracking\Log\AjaxCheckIn;
 use StorePulse\ConversionTracking\Log\CheckIn;
+use StorePulse\ConversionTracking\Onboarding\Verify;
 
 if ( ! class_exists( 'WCCT_Test_Json_Sent' ) ) {
     /**
@@ -61,7 +64,7 @@ class AjaxCheckInTest extends TestCase {
 
     protected function tearDown(): void {
         $_POST = array();
-        unset( $GLOBALS['wcct_test_deprecated'] );
+        unset( $GLOBALS['wcct_test_deprecated'], $GLOBALS['wcct_test_options'] );
     }
 
     private function handler() {
@@ -120,5 +123,18 @@ class AjaxCheckInTest extends TestCase {
         $this->assertSame( array( 'wp_ajax_nopriv_wcct_purchase_sent' ), $GLOBALS['wcct_test_deprecated'] );
         $this->assertSame( array(), $this->recorded );
         $this->assertSame( array( 'wcct_purchase_sent', 'wcct_ga4_purchase_sent' ), AjaxCheckIn::LEGACY_ACTIONS );
+    }
+
+    public function test_the_test_links_seen_ping_has_the_routes_token_check_and_throttle() {
+        $token = 'abcdefghijklmnopqrstuvwxyz012345';
+
+        $GLOBALS['wcct_test_options'] = array( Verify::OPTION => array( 'token' => $token, 'started' => time() - 5, 'seen' => 0, 'platforms' => array() ) );
+
+        $this->assertSame( array( false, array( 'code' => 'wcct_rest_invalid_token' ), 403 ), $this->post( array( 'action' => 'wcct_events', 'type' => 'seen', 'token' => 'wrong' ) ) );
+        $this->assertSame( array( false, array( 'code' => 'wcct_rest_invalid_token' ), 403 ), $this->post( array( 'type' => 'seen', 'token' => array( $token ) ) ) );
+        $this->assertSame( array( true, array( 'result' => 'ok' ), null ), $this->post( array( 'type' => 'seen', 'token' => $token, 'platforms' => array( 'facebook' => '1', 'twitter' => '0', 'evil' => '1' ) ) ) );
+        $this->assertSame( array( false, array( 'code' => 'wcct_rest_throttled' ), 429 ), $this->post( array( 'type' => 'seen', 'token' => $token, 'platforms' => array( 'twitter' => '1' ) ) ) );
+        $this->assertSame( array( 'facebook' => true, 'twitter' => false ), Verify::stored()['platforms'] );
+        $this->assertSame( array(), $this->recorded );
     }
 }

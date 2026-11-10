@@ -3,6 +3,7 @@
 namespace StorePulse\ConversionTracking\Log;
 
 use StorePulse\ConversionTracking\Events\PurchaseConfirmation;
+use StorePulse\ConversionTracking\Onboarding\Verify;
 
 /**
  * The admin-ajax fallback of the check-in, for hosts that block REST for guests; same checks as the wcct/v1/events route.
@@ -41,16 +42,25 @@ class AjaxCheckIn {
     private $record;
 
     /**
-     * Fallback over the platforms, order lookup and recorder given; the defaults are the real ones.
+     * Receives ( token, platforms, known IDs ), returns a Verify result.
+     *
+     * @var callable
+     */
+    private $record_seen;
+
+    /**
+     * Fallback over the platforms, order lookup and recorders given; the defaults are the real ones.
      *
      * @param callable|null $platform_ids Returns the active platform IDs.
      * @param callable|null $find_order   Order lookup by ID and key.
      * @param callable|null $record       Records the check-in.
+     * @param callable|null $record_seen  Records the test link's seen ping.
      */
-    public function __construct( $platform_ids = null, $find_order = null, $record = null ) {
+    public function __construct( $platform_ids = null, $find_order = null, $record = null, $record_seen = null ) {
         $this->platform_ids = is_callable( $platform_ids ) ? $platform_ids : array( CheckIn::class, 'platform_ids' );
         $this->find_order   = is_callable( $find_order ) ? $find_order : array( PurchaseConfirmation::class, 'order_by_key' );
         $this->record       = is_callable( $record ) ? $record : array( CheckIn::class, 'record' );
+        $this->record_seen  = is_callable( $record_seen ) ? $record_seen : array( Verify::class, 'record_seen' );
     }
 
     /**
@@ -74,6 +84,11 @@ class AjaxCheckIn {
      * @return void
      */
     public function handle() {
+        // phpcs:ignore WordPress.Security.NonceVerification.Missing -- the token or order key is the credential.
+        if ( isset( $_POST['type'] ) && 'seen' === $_POST['type'] ) {
+            $this->seen();
+        }
+
         $params = array();
 
         foreach ( array( 'order_id', 'key', 'platform', 'loaded', 'consent', 'reason', 'event_id' ) as $name ) {
@@ -88,6 +103,30 @@ class AjaxCheckIn {
         }
 
         wp_send_json_success( array( 'result' => $result['result'] ) );
+    }
+
+    /**
+     * The test link's seen ping, with the route's token check and throttle.
+     *
+     * @return void
+     */
+    private function seen() {
+        // phpcs:disable WordPress.Security.NonceVerification.Missing, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- the token is the credential; Verify::record_seen() checks it and keeps only known platform IDs.
+        $token     = isset( $_POST['token'] ) && is_string( $_POST['token'] ) ? wp_unslash( $_POST['token'] ) : '';
+        $platforms = isset( $_POST['platforms'] ) && is_array( $_POST['platforms'] ) ? wp_unslash( $_POST['platforms'] ) : array();
+        // phpcs:enable
+
+        $result = call_user_func( $this->record_seen, $token, $platforms, (array) call_user_func( $this->platform_ids ) );
+
+        if ( Verify::THROTTLED === $result ) {
+            wp_send_json_error( array( 'code' => 'wcct_rest_throttled' ), 429 );
+        }
+
+        if ( Verify::OK !== $result ) {
+            wp_send_json_error( array( 'code' => 'wcct_rest_invalid_token' ), 403 );
+        }
+
+        wp_send_json_success( array( 'result' => $result ) );
     }
 
     /**

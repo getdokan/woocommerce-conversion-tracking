@@ -8,7 +8,9 @@ import { __, _x, sprintf } from '@wordpress/i18n';
  * Internal dependencies
  */
 import { NAMESPACE } from './api';
+import { platformCards } from './platforms';
 import type {
+    AppData,
     EuAnswer,
     OnboardingState,
     PlatformValues,
@@ -44,6 +46,27 @@ export const queryStep = ( query: string ): number => {
         ? step
         : 0;
 };
+
+/**
+ * Whether ?rerun=1 opens the wizard on a draft: once setup is finished, or on a store that never ran it but already tracks.
+ *
+ * @param {AppData} data Settings, schema and progress.
+ */
+export const canRerun = ( data: AppData ): boolean =>
+    data.onboarding.status === 'done' ||
+    ( data.onboarding.status === 'new' &&
+        platformCards( data ).some( ( card ) => card.connected ) );
+
+/**
+ * The wizard's address for a step; a re-run keeps ?rerun=1.
+ *
+ * @param {number}  step  Step, from 1.
+ * @param {boolean} draft A re-run.
+ */
+export const stepHash = ( step: number, draft: boolean ): string =>
+    draft
+        ? `#/onboarding?rerun=1&step=${ step }`
+        : `#/onboarding?step=${ step }`;
 
 export type OnboardingField = {
     id: string;
@@ -368,3 +391,9 @@ export const saveSettings = (
         method: 'POST',
         data,
     } );
+
+/**
+ * The saved settings now, to spot a draft gone stale.
+ */
+export const fetchSettings = (): Promise< SettingsValues > =>
+    apiFetch< SettingsValues >( { path: `${ NAMESPACE }/settings` } );

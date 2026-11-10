@@ -24,7 +24,10 @@ import { errorMessage } from '../../data/api';
 import {
     POPULAR,
     STEP_COUNT,
+    canRerun,
     checkPanel,
+    fetchSettings,
+    listOf,
     onboardingFields,
     panelChanged,
     panelValues,
@@ -32,6 +35,7 @@ import {
     recommendedEvents,
     saveProgress,
     saveSettings,
+    stepHash,
 } from '../../data/onboarding';
 import { isPro, isProOutdated } from '../../data/plan';
 import { platformCards, type PlatformCardInfo } from '../../data/platforms';
@@ -46,7 +50,7 @@ import type {
 import { ConnectPanel } from './ConnectPanel';
 import { PickTiles } from './PickTiles';
 import { StepLayout } from './StepLayout';
-import { VerifyStep } from './VerifyStep';
+import { VerifyStep, type VerifyRow } from './VerifyStep';
 
 type Values = Record< string, Record< string, string > >;
 
@@ -137,6 +141,19 @@ const savedValues = ( data: AppData ): Values => {
 };
 
 /**
+ * A platform's saved values as text, for comparing with typed IDs.
+ *
+ * @param {PlatformValues|undefined} values Saved values.
+ */
+const textValues = ( values?: PlatformValues ): Record< string, string > =>
+    Object.fromEntries(
+        Object.entries( values ?? {} ).map( ( [ key, value ] ) => [
+            key,
+            typeof value === 'string' ? value : '',
+        ] )
+    );
+
+/**
  * Move focus to the step heading, so keyboard and screen reader users follow the step.
  */
 const focusStepHeading = () =>
@@ -147,13 +164,22 @@ const focusStepHeading = () =>
         ?.focus();
 
 /**
- * The setup wizard on a store that hasn't finished it; progress is kept so "Continue setup" resumes it.
+ * The setup wizard. A first run keeps its progress so "Continue setup" resumes it; a re-run works on a draft and saves only on finish.
  *
  * @param {Object}  props       Component props.
  * @param {AppData} props.data  Settings, schema and progress.
  * @param {string}  props.query Route query; ?step=N opens a step reached before.
+ * @param {boolean} props.draft A re-run from Settings > Setup.
  */
-const Wizard = ( { data, query }: { data: AppData; query: string } ) => {
+const Wizard = ( {
+    data,
+    query,
+    draft,
+}: {
+    data: AppData;
+    query: string;
+    draft: boolean;
+} ) => {
     const registered = useMemo(
         () =>
             new Map< string, SchemaPlatform >(
@@ -173,10 +199,22 @@ const Wizard = ( { data, query }: { data: AppData; query: string } ) => {
         } ) );
     }, [ data ] );
 
+    // A re-run starts at Welcome, with the connected platforms picked and the saved Europe answer.
+    const liveEu: EuAnswer = data.settings.consent_mode === true ? 'yes' : 'no';
     const [ furthest, setFurthest ] = useState( () =>
-        Math.max( 1, data.onboarding.step )
+        draft ? 1 : Math.max( 1, data.onboarding.step )
     );
     const [ picked, setPicked ] = useState< string[] >( () => {
+        if ( draft ) {
+            const live = platforms
+                .filter( ( card ) => card.connected )
+                .map( ( card ) => card.id );
+
+            return live.length
+                ? live
+                : POPULAR.filter( ( id ) => registered.has( id ) );
+        }
+
         if ( data.onboarding.platforms.length ) {
             return data.onboarding.platforms;
         }
@@ -188,11 +226,13 @@ const Wizard = ( { data, query }: { data: AppData; query: string } ) => {
     const [ values, setValues ] = useState< Values >( () =>
         savedValues( data )
     );
-    const [ eu, setEu ] = useState< EuAnswer >( data.onboarding.eu );
+    const [ eu, setEu ] = useState< EuAnswer >(
+        draft ? liveEu : data.onboarding.eu
+    );
     // What the settings route holds, to tell typed but unsaved IDs and answers apart.
     const [ committed, setCommitted ] = useState( () => ( {
         values: savedValues( data ),
-        eu: data.onboarding.eu,
+        eu: draft ? liveEu : data.onboarding.eu,
     } ) );
     // Skip and finish leave on purpose; nothing to ask.
     const [ leaving, setLeaving ] = useState( false );
@@ -233,11 +273,13 @@ const Wizard = ( { data, query }: { data: AppData; query: string } ) => {
             JSON.stringify( values ) !== JSON.stringify( committed.values ) );
 
     // Moving between steps keeps the draft; leaving the wizard asks first.
-    useUnsavedChanges( dirty, ( hash ) => hash.startsWith( '#/onboarding' ) );
+    useUnsavedChanges( dirty, ( hash ) =>
+        hash.startsWith( draft ? '#/onboarding?rerun=1' : '#/onboarding' )
+    );
 
-    // Opening the wizard the first time marks it in progress.
+    // Opening the wizard the first time marks it in progress; a re-run writes nothing.
     useEffect( () => {
-        if ( data.onboarding.status === 'new' ) {
+        if ( ! draft && data.onboarding.status === 'new' ) {
             saveProgress( { step: current, platforms: savedPicks } ).catch(
                 () => {}
             );
@@ -248,9 +290,9 @@ const Wizard = ( { data, query }: { data: AppData; query: string } ) => {
     // The URL always names the step shown, so the top bar and a reload agree with it.
     useEffect( () => {
         if ( queryStep( query ) !== current ) {
-            replaceHash( `#/onboarding?step=${ current }` );
+            replaceHash( stepHash( current, draft ) );
         }
-    }, [ query, current ] );
+    }, [ query, current, draft ] );
 
     useEffect( () => {
         if ( shown.current !== current ) {
@@ -261,14 +303,20 @@ const Wizard = ( { data, query }: { data: AppData; query: string } ) => {
     }, [ current ] );
 
     const show = ( step: number ) => {
-        window.location.hash = `#/onboarding?step=${ step }`;
+        window.location.hash = stepHash( step, draft );
     };
 
     const go = ( step: number ) => {
         setFailure( null );
         setFurthest( ( previous ) => Math.max( previous, step ) );
+
         // Progress is best effort; the next step opens either way.
-        saveProgress( { step, platforms: savedPicks, eu } ).catch( () => {} );
+        if ( ! draft ) {
+            saveProgress( { step, platforms: savedPicks, eu } ).catch(
+                () => {}
+            );
+        }
+
         show( step );
     };
 
@@ -329,13 +377,24 @@ const Wizard = ( { data, query }: { data: AppData; query: string } ) => {
             );
 
         setPicked( next );
-        saveProgress( {
-            platforms: next.filter( ( item ) => registered.has( item ) ),
-        } ).catch( () => {} );
+
+        if ( ! draft ) {
+            saveProgress( {
+                platforms: next.filter( ( item ) => registered.has( item ) ),
+            } ).catch( () => {} );
+        }
     };
 
+    // A re-run closes without saving anything.
     const skip = () => {
         setLeaving( true );
+
+        if ( draft ) {
+            window.location.hash = '#/settings/setup';
+
+            return;
+        }
+
         saveProgress( {
             action: 'skip',
             step: current,
@@ -348,21 +407,87 @@ const Wizard = ( { data, query }: { data: AppData; query: string } ) => {
             } );
     };
 
-    const finish = () =>
+    // A re-run saves its whole draft here; a store that never finished setup is marked done too.
+    const save = () =>
         commit(
             {
                 platforms: changes(),
                 ...( eu ? { consent_mode: eu === 'yes' } : {} ),
             },
             () => {
+                const target = draft ? '#/settings/setup' : '#/dashboard';
+
                 setLeaving( true );
+
+                if ( data.onboarding.status === 'done' ) {
+                    window.location.hash = target;
+
+                    return;
+                }
+
                 saveProgress( { action: 'finish', platforms: savedPicks, eu } )
                     .catch( () => {} )
                     .finally( () => {
-                        window.location.hash = '#/dashboard';
+                        window.location.hash = target;
                     } );
             }
         );
+
+    // A re-run asks first when a platform it changes was saved elsewhere since the draft started.
+    const finish = () => {
+        if ( ! draft ) {
+            save();
+
+            return;
+        }
+
+        const changed = Object.keys( changes() );
+
+        setBusy( true );
+        fetchSettings()
+            .then( ( live ) => {
+                const stale = panels
+                    .filter(
+                        ( panel ) =>
+                            changed.includes( panel.platform.id ) &&
+                            panelChanged(
+                                panel.fields,
+                                textValues(
+                                    live.platforms?.[ panel.platform.id ]
+                                ),
+                                committed.values[ panel.platform.id ] ?? {}
+                            )
+                    )
+                    .map( ( panel ) => panel.platform.name );
+
+                setBusy( false );
+
+                if (
+                    stale.length &&
+                    // eslint-disable-next-line no-alert -- a native confirm, like the unsaved changes prompt.
+                    ! window.confirm(
+                        sprintf(
+                            /* translators: %s: platform names */
+                            __(
+                                '%s changed since you opened the wizard, maybe in another tab. Save your version anyway?',
+                                'woocommerce-conversion-tracking'
+                            ),
+                            listOf( stale )
+                        )
+                    )
+                ) {
+                    return;
+                }
+
+                save();
+            } )
+            // Can't tell; the save reports its own errors.
+            .catch( () => save() );
+    };
+
+    const skipLabel = draft
+        ? __( 'Close without saving', 'woocommerce-conversion-tracking' )
+        : undefined;
 
     const back = () => show( Math.max( 1, current - 1 ) );
 
@@ -430,6 +555,7 @@ const Wizard = ( { data, query }: { data: AppData; query: string } ) => {
                               )
                     }
                     onSkip={ skip }
+                    skipLabel={ skipLabel }
                     action={ continueButton( () => go( 3 ), ! picked.length ) }
                 >
                     <PickTiles
@@ -479,11 +605,13 @@ const Wizard = ( { data, query }: { data: AppData; query: string } ) => {
                     onBack={ back }
                     note={ note }
                     onSkip={ skip }
+                    skipLabel={ skipLabel }
                     action={ continueButton(
                         () => {
                             const changed = changes();
 
-                            if ( Object.keys( changed ).length ) {
+                            // A re-run keeps the IDs in the draft until finish.
+                            if ( ! draft && Object.keys( changed ).length ) {
                                 commit( { platforms: changed }, () => go( 4 ) );
                             } else {
                                 go( 4 );
@@ -535,11 +663,14 @@ const Wizard = ( { data, query }: { data: AppData; query: string } ) => {
                     ) }
                     onBack={ back }
                     onSkip={ skip }
+                    skipLabel={ skipLabel }
                     action={ continueButton(
                         () =>
-                            commit( { consent_mode: eu === 'yes' }, () =>
-                                go( 5 )
-                            ),
+                            draft
+                                ? go( 5 )
+                                : commit( { consent_mode: eu === 'yes' }, () =>
+                                      go( 5 )
+                                  ),
                         ! eu
                     ) }
                 >
@@ -614,15 +745,31 @@ const Wizard = ( { data, query }: { data: AppData; query: string } ) => {
                 </StepLayout>
             );
 
-        case 5:
+        case 5: {
+            const rows: VerifyRow[] = ready.map( ( panel ) => ( {
+                platform: panel.platform,
+                integrations:
+                    registered.get( panel.platform.id )?.integrations ?? [],
+                paused: panel.platform.paused,
+                pending: panelChanged(
+                    panel.fields,
+                    panel.typed,
+                    committed.values[ panel.platform.id ] ?? {}
+                ),
+            } ) );
+
             return (
                 <VerifyStep
-                    connected={ ready.map( ( panel ) => panel.platform ) }
+                    rows={ rows }
+                    consent={ committed.eu === 'yes' }
+                    draft={ draft }
                     onBack={ back }
                     onSkip={ skip }
+                    skipLabel={ skipLabel }
                     onNext={ () => go( 6 ) }
                 />
             );
+        }
 
         case 6: {
             const summary: string[] = ready.map( ( panel ) =>
@@ -655,6 +802,15 @@ const Wizard = ( { data, query }: { data: AppData; query: string } ) => {
                 )
             );
 
+            if ( draft ) {
+                summary.push(
+                    __(
+                        'Other connected platforms keep their settings.',
+                        'woocommerce-conversion-tracking'
+                    )
+                );
+            }
+
             return (
                 <StepLayout
                     step={ 6 }
@@ -676,10 +832,15 @@ const Wizard = ( { data, query }: { data: AppData; query: string } ) => {
                     ) }
                     action={
                         <Button size="lg" onClick={ finish } disabled={ busy }>
-                            { __(
-                                'Go to dashboard',
-                                'woocommerce-conversion-tracking'
-                            ) }
+                            { draft
+                                ? __(
+                                      'Save and go to Settings',
+                                      'woocommerce-conversion-tracking'
+                                  )
+                                : __(
+                                      'Go to dashboard',
+                                      'woocommerce-conversion-tracking'
+                                  ) }
                         </Button>
                     }
                 >
@@ -718,6 +879,7 @@ const Wizard = ( { data, query }: { data: AppData; query: string } ) => {
                         'woocommerce-conversion-tracking'
                     ) }
                     onSkip={ skip }
+                    skipLabel={ skipLabel }
                 >
                     <ul className="m-0 flex list-none flex-col gap-2 p-0 text-sm">
                         { [
@@ -757,7 +919,55 @@ const Wizard = ( { data, query }: { data: AppData; query: string } ) => {
 };
 
 /**
- * The setup wizard (#/onboarding). A finished wizard opens again from Settings > Setup (#120).
+ * A finished setup opened without ?rerun=1: the top bar shows Done, and "Run setup wizard again" opens the draft.
+ */
+const Finished = () => {
+    useEffect( () => {
+        replaceHash( stepHash( STEP_COUNT, false ) );
+    }, [] );
+
+    return (
+        <StepLayout
+            step={ STEP_COUNT }
+            title={ __(
+                'Setup is finished',
+                'woocommerce-conversion-tracking'
+            ) }
+            lead={ __(
+                'Run it again to review your platforms and the Europe answer. Your current settings are filled in, and nothing changes unless you finish.',
+                'woocommerce-conversion-tracking'
+            ) }
+            action={
+                <div className="flex flex-wrap gap-3">
+                    <Button
+                        variant="ghost"
+                        nativeButton={ false }
+                        // eslint-disable-next-line jsx-a11y/anchor-has-content -- the button renders the label inside.
+                        render={ <a href="#/dashboard" /> }
+                    >
+                        { __(
+                            'Go to dashboard',
+                            'woocommerce-conversion-tracking'
+                        ) }
+                    </Button>
+                    <Button
+                        nativeButton={ false }
+                        // eslint-disable-next-line jsx-a11y/anchor-has-content -- the button renders the label inside.
+                        render={ <a href={ stepHash( 1, true ) } /> }
+                    >
+                        { __(
+                            'Run setup wizard again',
+                            'woocommerce-conversion-tracking'
+                        ) }
+                    </Button>
+                </div>
+            }
+        />
+    );
+};
+
+/**
+ * The setup wizard (#/onboarding); ?rerun=1 (Settings > Setup) opens it on a draft of the current settings.
  *
  * @param {Object} props       Component props.
  * @param {string} props.query Route query.
@@ -769,35 +979,22 @@ const Onboarding = ( { query }: { query: string } ) => {
         return null;
     }
 
-    if ( data.onboarding.status === 'done' ) {
-        return (
-            <StepLayout
-                step={ STEP_COUNT }
-                title={ __(
-                    'Setup is finished',
-                    'woocommerce-conversion-tracking'
-                ) }
-                lead={ __(
-                    'Change your platforms on the Platforms page.',
-                    'woocommerce-conversion-tracking'
-                ) }
-                action={
-                    <Button
-                        nativeButton={ false }
-                        // eslint-disable-next-line jsx-a11y/anchor-has-content -- the button renders the label inside.
-                        render={ <a href="#/dashboard" /> }
-                    >
-                        { __(
-                            'Go to dashboard',
-                            'woocommerce-conversion-tracking'
-                        ) }
-                    </Button>
-                }
-            />
-        );
+    const draft =
+        new URLSearchParams( query ).get( 'rerun' ) === '1' && canRerun( data );
+
+    if ( ! draft && data.onboarding.status === 'done' ) {
+        return <Finished />;
     }
 
-    return <Wizard data={ data } query={ query } />;
+    // A new key starts a fresh wizard when the mode changes.
+    return (
+        <Wizard
+            key={ draft ? 'draft' : 'setup' }
+            data={ data }
+            query={ query }
+            draft={ draft }
+        />
+    );
 };
 
 export default Onboarding;

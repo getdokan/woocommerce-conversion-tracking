@@ -21,6 +21,7 @@ import { pageInfo } from '../titles';
 import { AccessSection } from './AccessSection';
 import { PlanSection } from './PlanSection';
 import { SectionCard } from './SectionCard';
+import { SetupSection } from './SetupSection';
 
 type SectionId = 'alerts' | 'access' | 'setup' | 'plan';
 
@@ -103,6 +104,8 @@ const SectionPanel = ( { section }: { section: SectionInfo } ) => {
             return <AccessSection />;
         case 'plan':
             return <PlanSection />;
+        case 'setup':
+            return <SetupSection />;
         default:
             return <ComingSection section={ section } />;
     }
