@@ -6,7 +6,6 @@ use StorePulse\ConversionTracking\Migration\LegacyPause;
 use StorePulse\ConversionTracking\Migration\SettingsMigration;
 use StorePulse\ConversionTracking\Platforms\Pause;
 use StorePulse\ConversionTracking\Settings\Google;
-use StorePulse\ConversionTracking\Settings\LegacySync;
 
 /**
  * Tests for reading 2.x switched-off integrations as pauses once the 3.0 settings exist (#122)
@@ -85,7 +84,7 @@ class LegacyPauseTest extends TestCase {
         }
     }
 
-    public function test_migrate_resume_and_an_unrelated_2x_save_keep_the_platform_printing() {
+    public function test_migrate_then_resume_keeps_the_platform_printing() {
         $fixtures = require dirname( __DIR__, 2 ) . '/fixtures/settings-2x.php';
         $v1       = $fixtures['off-with-ids'] + array( 'twitter' => self::entry( true, array( 'pixel_id' => 'o8x2k' ) ) );
         $GLOBALS['wcct_test_options'] = array(
@@ -111,17 +110,6 @@ class LegacyPauseTest extends TestCase {
         $meta->settings_value = $saved['facebook'];
 
         $this->assertSame( '1', $saved['facebook']['enabled'] );
-        $this->assertTrue( $meta->is_active() );
-
-        // A 2.x save of an unrelated field keeps it resumed, and Google paused.
-        $new                         = $saved;
-        $new['twitter'][0]['pixel_id'] = 'o9x3k';
-        $GLOBALS['wcct_test_options']['wcct_settings'] = $new;
-
-        LegacySync::sync( $new, array(), true, $saved );
-        Pause::reset();
-
-        $this->assertSame( array( 'google', 'custom' ), $GLOBALS['wcct_test_options']['wcct_paused_platforms'] );
         $this->assertTrue( $meta->is_active() );
     }
 

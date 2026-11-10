@@ -21,7 +21,7 @@ class LegacyPause {
     );
 
     /**
-     * 2.x groups a settings save decides, each with its integrations.
+     * 2.x integrations behind each pause entry.
      */
     const GROUPS = array(
         'facebook' => array( 'facebook' ),
@@ -77,47 +77,6 @@ class LegacyPause {
     }
 
     /**
-     * The pause entries of each 2.x group: the platform and, for Google, each integration alone.
-     *
-     * @param string $group Group key from GROUPS.
-     *
-     * @return string[]
-     */
-    private static function entries( string $group ): array {
-        return array_values( array_unique( array_merge( array( $group ), self::GROUPS[ $group ] ) ) );
-    }
-
-    /**
-     * Groups a 2.x save changed: an integration's switch or ID (Custom: scripts) differs, or there was no earlier save.
-     *
-     * @param mixed      $v1  The saved wcct_settings option.
-     * @param mixed|null $old The option before the save, null when it was just created.
-     *
-     * @return string[]
-     */
-    public static function changed( $v1, $old = null ): array {
-        $v1      = is_array( $v1 ) ? $v1 : array();
-        $old     = is_array( $old ) ? $old : null;
-        $changed = array();
-
-        foreach ( self::GROUPS as $group => $integrations ) {
-            $held = false;
-            $diff = null === $old;
-
-            foreach ( $integrations as $id ) {
-                $held = $held || ( isset( $v1[ $id ] ) && is_array( $v1[ $id ] ) );
-                $diff = $diff || self::signature( $v1, $id ) !== self::signature( $old, $id );
-            }
-
-            if ( $held && $diff ) {
-                $changed[] = $group;
-            }
-        }
-
-        return $changed;
-    }
-
-    /**
      * The 3.0 settings read from 2.x with "off" as a pause: Google's mode follows its saved IDs and Custom's placements its saved scripts.
      *
      * @param array $settings 3.0 settings from LegacyView::from_v1().
@@ -169,38 +128,6 @@ class LegacyPause {
             if ( ! in_array( $id, (array) Pause::stored(), true ) ) {
                 throw new \RuntimeException( 'The paused platforms could not be saved.' );
             }
-        }
-    }
-
-    /**
-     * After a 2.x settings save, re-read the entries of the integrations whose switch or ID changed; every other entry stays.
-     *
-     * @param mixed      $v1  The saved wcct_settings option.
-     * @param mixed|null $old The option before the save, null when it was just created.
-     *
-     * @return void
-     */
-    public static function sync( $v1, $old = null ) {
-        $drop = array();
-
-        foreach ( self::changed( $v1, $old ) as $group ) {
-            $drop = array_merge( $drop, self::entries( $group ) );
-        }
-
-        if ( ! $drop ) {
-            return;
-        }
-
-        $want    = array_intersect( self::ids( $v1, false ), $drop );
-        $current = Pause::ids();
-
-        // Resume first: resuming google also clears ga4 or adwords alone, which a pause below may set again.
-        foreach ( array_diff( array_intersect( $current, $drop ), $want ) as $id ) {
-            Pause::set( $id, false );
-        }
-
-        foreach ( array_diff( $want, Pause::ids() ) as $id ) {
-            Pause::set( $id, true );
         }
     }
 
@@ -264,26 +191,6 @@ class LegacyPause {
      */
     private static function google_on( array $v1, string $id ): bool {
         return isset( $v1[ $id ] ) && is_array( $v1[ $id ] ) && Google::enabled( $v1[ $id ] );
-    }
-
-    /**
-     * What a 2.x save can change about an integration: held, switch, ID (Custom: scripts).
-     *
-     * @param array|null $v1 The wcct_settings option.
-     * @param string     $id Integration ID.
-     *
-     * @return array
-     */
-    private static function signature( $v1, string $id ): array {
-        if ( ! is_array( $v1 ) || ! isset( $v1[ $id ] ) || ! is_array( $v1[ $id ] ) ) {
-            return array();
-        }
-
-        if ( 'custom' === $id ) {
-            return array( Google::enabled( $v1[ $id ] ), self::has_script( $v1[ $id ] ) );
-        }
-
-        return array( Google::enabled( $v1[ $id ] ), self::id( $v1, $id ) );
     }
 
     /**

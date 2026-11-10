@@ -182,6 +182,11 @@ if ( is_plugin_active( 'wc-conversion-tracking-pro/woocommerce-conversion-tracki
     );
 }
 
+// A 2.x store: the next request migrates it to 3.0. Seeding again starts over, as no 2.x write reaches the 3.0 settings.
+foreach ( array( 'wcct_settings_v3', 'wcct_migration_done', 'wcct_migration_lock', 'wcct_migration_error', 'wcct_pro_migration_done', 'wcct_pro_migration_lock', 'wcct_migration_flags', 'wcct_pre3_snapshot', 'wcct_paused_platforms', 'wcct_paused_since' ) as $ct_e2e_option ) {
+    delete_option( $ct_e2e_option );
+}
+
 update_option( 'wcct_settings', $ct_e2e_settings );
 
 // A shop manager for the Integration access specs; only administrators have access until a spec grants it.

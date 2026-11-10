@@ -2,6 +2,8 @@
 
 namespace StorePulse\ConversionTracking\REST;
 
+use StorePulse\ConversionTracking\Consent\ConsentMode;
+use StorePulse\ConversionTracking\Log\LastPurchase;
 use StorePulse\ConversionTracking\Platforms\Pause;
 use StorePulse\ConversionTracking\Settings\Schema;
 use StorePulse\ConversionTracking\Settings\Store;
@@ -92,7 +94,9 @@ class SettingsController extends Controller {
      * @return WP_REST_Response
      */
     public function get_item( $request ) {
-        return rest_ensure_response( Values::get( Schema::get(), Store::load() ) );
+        $schema = Schema::get();
+
+        return rest_ensure_response( self::values( $schema, Store::load() ) );
     }
 
     /**
@@ -150,7 +154,7 @@ class SettingsController extends Controller {
          */
         do_action( 'wcct_settings_saved', $result['doc'], $old );
 
-        return rest_ensure_response( Values::get( $schema, $result['doc'] ) );
+        return rest_ensure_response( self::values( $schema, $result['doc'] ) );
     }
 
     /**
@@ -174,7 +178,49 @@ class SettingsController extends Controller {
 
         Pause::set( $platform, (bool) $request->get_param( 'paused' ) );
 
-        return rest_ensure_response( Values::get( $schema, Store::load() ) );
+        return rest_ensure_response( self::values( $schema, Store::load() ) );
+    }
+
+    /**
+     * Every platform's values, plus its last checked-in purchase (read-only, for the events table's Last seen).
+     *
+     * @param array $schema Normalized schema.
+     * @param array $doc    Stored settings.
+     *
+     * @return array
+     */
+    public static function values( array $schema, array $doc ): array {
+        $values = Values::get( $schema, $doc );
+
+        foreach ( $schema['platforms'] as $id => $platform ) {
+            $values['platforms'][ $id ]['last_purchase'] = self::last_purchase( array_merge( array( (string) $id ), (array) $platform['integrations'] ) );
+        }
+
+        return $values;
+    }
+
+    /**
+     * The latest purchase any of these IDs checked in: { at (Unix time), order_number }, or null.
+     *
+     * @param string[] $ids Platform and integration IDs.
+     *
+     * @return array|null
+     */
+    private static function last_purchase( array $ids ) {
+        $last = null;
+
+        foreach ( array_unique( $ids ) as $id ) {
+            $purchase = LastPurchase::get( $id );
+
+            if ( $purchase && ( null === $last || $purchase['last_purchase_at'] > $last['at'] ) ) {
+                $last = array(
+                    'at'           => $purchase['last_purchase_at'],
+                    'order_number' => $purchase['order_number'],
+                );
+            }
+        }
+
+        return $last;
     }
 
     /**
@@ -185,7 +231,17 @@ class SettingsController extends Controller {
      * @return WP_REST_Response
      */
     public function get_settings_schema( $request ) {
-        return rest_ensure_response( Schema::for_output( Schema::get(), 'current_user_can' ) );
+        $output = Schema::for_output( Schema::get(), 'current_user_can' );
+        $notice = ConsentMode::status()['message'];
+
+        // "Consent signals are handled by <tool>" beside the Respect cookie choices switch.
+        foreach ( $output['global'] as $index => $element ) {
+            if ( isset( $element['id'] ) && 'consent_mode' === $element['id'] ) {
+                $output['global'][ $index ]['notice'] = $notice;
+            }
+        }
+
+        return rest_ensure_response( $output );
     }
 
     /**

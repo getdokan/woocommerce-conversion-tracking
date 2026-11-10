@@ -2,6 +2,7 @@
 
 namespace StorePulse\ConversionTracking\Settings;
 
+use InvalidArgumentException;
 use StorePulse\ConversionTracking\Access\CustomScripts;
 use StorePulse\ConversionTracking\Alerts\Alerts;
 use StorePulse\ConversionTracking\Events\SkipRoles;
@@ -499,7 +500,7 @@ class Schema {
                 10,
                 array( 'case' => 'upper' )
             ),
-            self::value_mode_field( 'google_advanced', 'adwords', $ads ),
+            self::value_mode_field( 'google_advanced', 'adwords', $ads, __( 'Sent with the Ads conversion. Analytics always gets the item total, as Google recommends. Fees count as items; tax is never part of items.', 'woocommerce-conversion-tracking' ) ),
             self::product_id_field( 'google_advanced' ),
             self::skip_roles_field( 'google_advanced' ),
         );
@@ -750,18 +751,20 @@ class Schema {
      * @param string $section      Section ID.
      * @param string $integration  Integration ID the mode is for.
      * @param array  $dependencies Field dependencies.
+     * @param string $description  Help text; the Purchase one by default.
      *
      * @return array
      */
-    public static function value_mode_field( string $section, string $integration, array $dependencies = array() ): array {
-        $field = array(
+    public static function value_mode_field( string $section, string $integration, array $dependencies = array(), string $description = '' ): array {
+        $default = ValueMode::default_for( $integration, Install::is_upgrade() );
+        $field   = array(
             'id'          => 'value_mode',
             'type'        => 'field',
             'variant'     => 'select',
             'section_id'  => $section,
             'label'       => __( 'Order value includes', 'woocommerce-conversion-tracking' ),
-            'description' => __( 'Sent with Purchase. Items only keeps ad results in line with product revenue. Fees count as items; tax is never part of items.', 'woocommerce-conversion-tracking' ),
-            'default'     => ValueMode::default_for( $integration, Install::is_upgrade() ),
+            'description' => '' !== $description ? $description : __( 'Sent with Purchase. Items only keeps ad results in line with product revenue. Fees count as items; tax is never part of items.', 'woocommerce-conversion-tracking' ),
+            'default'     => $default,
             'priority'    => 50,
             'options'     => array(
                 array(
@@ -779,6 +782,11 @@ class Schema {
             ),
         );
 
+        // Upgraders keep the order total they sent in 2.x; the page says why while it is selected.
+        if ( ValueMode::ALL === $default ) {
+            $field['kept_note'] = __( 'Set to Items, tax and shipping because that is what you sent before the update, so your reported values don\'t change.', 'woocommerce-conversion-tracking' );
+        }
+
         if ( $dependencies ) {
             $field['dependencies'] = $dependencies;
         }
@@ -795,15 +803,18 @@ class Schema {
      */
     public static function skip_roles_field( string $section ): array {
         return array(
-            'id'          => 'skip_roles',
-            'type'        => 'field',
-            'variant'     => 'select',
-            'section_id'  => $section,
-            'label'       => __( 'Skip these roles', 'woocommerce-conversion-tracking' ),
-            'description' => __( 'Your own visits won\'t count as shoppers.', 'woocommerce-conversion-tracking' ),
-            'default'     => SkipRoles::default_preset( Install::is_upgrade() ),
-            'priority'    => 60,
-            'options'     => array(
+            'id'                => 'skip_roles',
+            'type'              => 'field',
+            'variant'           => 'select',
+            'section_id'        => $section,
+            'label'             => __( 'Skip these roles', 'woocommerce-conversion-tracking' ),
+            'description'       => __( 'Your own visits won\'t count as shoppers.', 'woocommerce-conversion-tracking' ),
+            'default'           => SkipRoles::default_preset( Install::is_upgrade() ),
+            'priority'          => 60,
+            // A preset, or a list of the site's roles picked one by one.
+            'roles'             => self::site_roles(),
+            'sanitize_callback' => array( self::class, 'sanitize_skip_roles' ),
+            'options'           => array(
                 array(
                     'value' => 'admin-shop',
                     'label' => __( 'Administrator, Shop manager', 'woocommerce-conversion-tracking' ),
@@ -818,6 +829,85 @@ class Schema {
                 ),
             ),
         );
+    }
+
+    /**
+     * The site's roles for "Skip these roles": value (slug) and translated label.
+     *
+     * @return array
+     */
+    public static function site_roles(): array {
+        if ( ! function_exists( 'wp_roles' ) ) {
+            return array();
+        }
+
+        $roles = array();
+
+        foreach ( wp_roles()->get_names() as $slug => $name ) {
+            $roles[] = array(
+                'value' => (string) $slug,
+                'label' => function_exists( 'translate_user_role' ) ? translate_user_role( $name ) : (string) $name,
+            );
+        }
+
+        return $roles;
+    }
+
+    /**
+     * Clean "Skip these roles": a preset name, or role slugs that are one of the site's roles.
+     *
+     * @param mixed $value   Posted value.
+     * @param array $field   Field with options (presets) and roles.
+     * @param mixed $current Stored value.
+     *
+     * @throws InvalidArgumentException When it is neither.
+     *
+     * @return string|string[] A preset when the roles match one, else the role slugs.
+     */
+    public static function sanitize_skip_roles( $value, $field, $current ) {
+        $presets = array_column( isset( $field['options'] ) ? (array) $field['options'] : array(), 'value' );
+
+        if ( is_string( $value ) && in_array( $value, $presets, true ) ) {
+            return $value;
+        }
+
+        if ( ! is_array( $value ) ) {
+            throw new InvalidArgumentException( __( 'Not one of the choices.', 'woocommerce-conversion-tracking' ) );
+        }
+
+        $known  = array_column( isset( $field['roles'] ) ? (array) $field['roles'] : array(), 'value' );
+        $stored = is_array( $current ) ? $current : array();
+        $roles  = array();
+
+        foreach ( $value as $role ) {
+            if ( ! is_string( $role ) || ! preg_match( '/^[a-z0-9_\-]+$/', $role ) ) {
+                throw new InvalidArgumentException( __( 'Not one of the site\'s roles.', 'woocommerce-conversion-tracking' ) );
+            }
+
+            if ( $known && ! in_array( $role, $known, true ) ) {
+                // A saved role the site no longer has is dropped; a new unknown one is refused.
+                if ( in_array( $role, $stored, true ) ) {
+                    continue;
+                }
+
+                throw new InvalidArgumentException( __( 'Not one of the site\'s roles.', 'woocommerce-conversion-tracking' ) );
+            }
+
+            $roles[] = $role;
+        }
+
+        $roles = array_values( array_unique( $roles ) );
+
+        // A pick that matches a preset is saved as that preset.
+        foreach ( $presets as $preset ) {
+            $preset_roles = SkipRoles::normalise( $preset );
+
+            if ( null !== $preset_roles && ! array_diff( $roles, $preset_roles ) && ! array_diff( $preset_roles, $roles ) ) {
+                return $preset;
+            }
+        }
+
+        return $roles;
     }
 
     /**

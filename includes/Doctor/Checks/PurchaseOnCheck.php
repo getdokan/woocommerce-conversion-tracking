@@ -76,7 +76,7 @@ class PurchaseOnCheck extends AbstractCheck {
                     'action'     => array(
                         /* translators: %s: platform name */
                         'label' => sprintf( __( 'Open %s', 'woocommerce-conversion-tracking' ), $platform ),
-                        'url'   => '#/platforms/' . $state['id'],
+                        'url'   => '#/platforms/' . $state['id'] . '?field=events',
                     ),
                     'evidence'   => array(
                         'platform' => $state['id'],

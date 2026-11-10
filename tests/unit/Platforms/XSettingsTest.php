@@ -142,13 +142,4 @@ class XSettingsTest extends TestCase {
         $this->assertSame( array( 'purchase', 'sign_up' ), $values['needs_resetup'] );
     }
 
-    public function test_a_save_keeps_the_2_x_keys_the_form_no_longer_posts() {
-        $stored = array( 'enabled' => true, array( 'events' => array( 'universal_tag_id' => 'ct0x1', 'AddtoCart-label' => 'ctadd01', 'Purchase' => 'on' ) ) );
-        $posted = array( 'enabled' => true, array( 'pixel_id' => 'ct0x1', 'events' => array( 'Purchase' => 'on' ) ) );
-        $kept   = XSettings::keep_legacy( $posted, $stored );
-
-        $this->assertSame( array( 'Purchase' => 'on', 'universal_tag_id' => 'ct0x1', 'AddtoCart-label' => 'ctadd01' ), $kept[0]['events'] );
-        $this->assertSame( array( 'purchase', 'add_to_cart' ), XSettings::from_v1( $kept )['needs_resetup'] );
-        $this->assertSame( $posted, XSettings::keep_legacy( $posted, false ) );
-    }
 }

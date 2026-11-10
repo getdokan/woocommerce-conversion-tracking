@@ -239,9 +239,20 @@ test.describe('admin app shell', () => {
         ).toHaveAttribute('href', /^https:\/\/woocommerce\.com\//);
     });
 
-    test('the classic screens stay reachable with ?tab=', async ({ page }) => {
-        await page.goto(`${APP_PATH}&tab=integrations`);
-        await expect(page.locator('.nav-tab-wrapper')).toBeVisible();
-        await expect(page.locator('#wcct-topbar-root')).toHaveCount(0);
+    test('the 2.x ?tab= links open the app page that replaced them', async ({ page }) => {
+        for (const [tab, hash] of [
+            ['integrations', '#/platforms/facebook'],
+            ['product-catalog', '#/catalog'],
+            ['settings', '#/settings/access'],
+            ['something-else', '#/dashboard'],
+        ]) {
+            await page.goto(`${APP_PATH}&tab=${tab}`);
+            await expect(page).toHaveURL(new RegExp(`page=conversion-tracking${hash.replace(/\//g, '\\/')}$`));
+            await expect(page.locator('#wcct-app-root h1')).toBeVisible();
+        }
+
+        // The 2.x screen's assets are gone.
+        await expect(page.locator('script[src*="assets/js/admin.js"], link[href*="assets/css/style.css"]')).toHaveCount(0);
+        await expect(page.locator('.nav-tab-wrapper')).toHaveCount(0);
     });
 });

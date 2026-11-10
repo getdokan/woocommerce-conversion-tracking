@@ -6,11 +6,9 @@
     "license": "GPL",
     "private": true,
     "scripts": {
-        "build": "npm run build:less && npm run build:js",
-        "build:less": "lessc assets/less/style.less assets/css/style.css",
+        "build": "npm run build:js",
         "build:js": "wp-scripts build --progress",
         "start": "wp-scripts start --progress",
-        "start:less": "node --watch-path=assets/less node_modules/less/bin/lessc assets/less/style.less assets/css/style.css",
         "typecheck": "tsc --noEmit",
         "test:js": "node --test \"tests/js/**/*.test.js\"",
         "lint": "npm run lint:js",

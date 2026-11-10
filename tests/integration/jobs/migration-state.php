@@ -57,7 +57,7 @@ $wcct_handle = function ( $user_id, $nonce ) {
 
 $wcct_out = array( 'after_request' => $wcct_state() );
 
-// Resume a platform, then save an unrelated field on the 2.x settings page.
+// Resume a platform, then write an unrelated field to the 2.x option.
 if ( ! empty( $wcct_args['resume'] ) ) {
     \StorePulse\ConversionTracking\Platforms\Pause::set( $wcct_args['resume'], false );
     $wcct_out['after_resume'] = $wcct_state();
@@ -72,11 +72,10 @@ if ( ! empty( $wcct_args['resume'] ) ) {
     return $wcct_out;
 }
 
-// The 2.x settings page, as an administrator opens it.
+// The settings page, as an administrator opens it.
 if ( ! empty( $wcct_args['classic'] ) ) {
     require_once ABSPATH . 'wp-admin/includes/admin.php';
     wp_set_current_user( 1 );
-    $_GET['tab'] = 'integrations';
 
     ob_start();
     wcct_init()->admin->conversion_tracking_template();

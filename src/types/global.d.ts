@@ -31,7 +31,6 @@ type WcctAdminData = {
         manage: string;
     };
     logosUrl: string;
-    classicUrl: string;
     // The storefront, opened from the wizard's Verify step.
     homeUrl: string;
     // Upgraded from 2.x and migrated: What's new and its dashboard banner exist ('1' or '').

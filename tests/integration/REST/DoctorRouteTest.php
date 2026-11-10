@@ -67,7 +67,7 @@ class DoctorRouteTest extends WCCT_Test_Rest_Case {
         $this->assertSame( 'Each sale can reach Meta twice.', $plugin['why'] );
         $this->assertSame( array( 'type' => 'recheck', 'label' => 'Check again', 'url' => '', 'external' => false, 'confirm' => '' ), $plugin['action'] );
         $this->assertSame( array( 'sure', 'warning', false, false ), array( $plugin['confidence'], $plugin['severity'], $plugin['dismissed'], $plugin['new'] ) );
-        $this->assertSame( array( 'info', '#/platforms' ), array( $report['findings'][1]['severity'], $report['findings'][1]['action']['url'] ) );
+        $this->assertSame( array( 'info', '#/platforms/facebook?field=consent_mode' ), array( $report['findings'][1]['severity'], $report['findings'][1]['action']['url'] ) );
         $this->assertArrayNotHasKey( 'evidence', $plugin );
         $this->assertArrayHasKey( 'test-plugin', $results[3]['results'] );
 

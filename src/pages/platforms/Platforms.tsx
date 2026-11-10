@@ -1,13 +1,13 @@
 /**
  * External dependencies
  */
-import { Button, Card, cn } from '@wedevs/plugin-ui';
+import { Card, cn } from '@wedevs/plugin-ui';
 import { Page, PlatformLogo, ProBadge, StatusPill } from '@wcct/components';
 
 /**
  * WordPress dependencies
  */
-import { __ } from '@wordpress/i18n';
+import { __, sprintf } from '@wordpress/i18n';
 
 /**
  * Internal dependencies
@@ -18,9 +18,11 @@ import {
     platformLogoUrl,
     type PlatformCardInfo,
 } from '../../data/platforms';
+import { upgradeUrl } from '../../data/plan';
+import { NewTabNote } from '../../shell/NewTabNote';
 import { pageInfo } from '../titles';
 import CustomScript from './custom/CustomScript';
-import { PauseTracking } from './PauseTracking';
+import { PlatformDetail } from './detail/PlatformDetail';
 
 /**
  * The status dot of a platform in the list.
@@ -94,6 +96,17 @@ const PlatformList = ( {
                                 className="size-7 rounded-md [&>img]:size-4"
                             />
                             { platform.name }
+                            { platform.customised && (
+                                <StatusPill
+                                    tone="off"
+                                    className="px-1.5 text-[11px] before:hidden"
+                                >
+                                    { __(
+                                        'Customised',
+                                        'woocommerce-conversion-tracking'
+                                    ) }
+                                </StatusPill>
+                            ) }
                             <StatusDot platform={ platform } />
                         </a>
                     </li>
@@ -104,88 +117,59 @@ const PlatformList = ( {
 );
 
 /**
- * A platform whose page a later task builds; its settings stay on the classic screen, Pause tracking is here once it is connected.
+ * A Pro platform on Free: what it does and where to get it.
  *
  * @param {Object}           props          Component props.
  * @param {PlatformCardInfo} props.platform Platform.
  */
-const ComingDetail = ( { platform }: { platform: PlatformCardInfo } ) => {
-    const classicUrl = window.wcctAdmin?.classicUrl ?? '';
-    const pausable = platform.connected && ! platform.locked;
-
-    return (
-        <div
-            className="flex flex-col"
-            data-testid={ pausable ? 'wcct-platform-status' : undefined }
-        >
-            <section
-                aria-labelledby="wcct-platform-title"
-                className="flex flex-col gap-4 p-6"
-                data-testid="wcct-placeholder"
+const LockedDetail = ( { platform }: { platform: PlatformCardInfo } ) => (
+    <section
+        aria-labelledby="wcct-platform-title"
+        className="flex flex-col gap-4 p-6"
+        data-testid={ `wcct-platform-${ platform.id }` }
+    >
+        <div className="flex items-center gap-3.5">
+            <PlatformLogo src={ platformLogoUrl( platform.logo ) } />
+            <h2
+                id="wcct-platform-title"
+                className="m-0 p-0 text-base font-semibold text-foreground"
             >
-                <div className="flex items-center gap-3.5">
-                    <PlatformLogo src={ platformLogoUrl( platform.logo ) } />
-                    <h2
-                        id="wcct-platform-title"
-                        className="m-0 p-0 text-base font-semibold text-foreground"
-                    >
-                        { platform.name }
-                    </h2>
-                    { pausable && (
-                        <StatusPill tone="off" className="ml-auto">
-                            { platform.paused
-                                ? __(
-                                      'Paused',
-                                      'woocommerce-conversion-tracking'
-                                  )
-                                : __(
-                                      'Waiting for first event',
-                                      'woocommerce-conversion-tracking'
-                                  ) }
-                        </StatusPill>
-                    ) }
-                </div>
-                <p className="m-0 text-sm text-muted-foreground">
-                    { __(
-                        'This page is coming with the new admin. Until then, change your settings on the classic screen.',
-                        'woocommerce-conversion-tracking'
-                    ) }
-                </p>
-                { classicUrl && ! platform.locked && (
-                    <Button
-                        variant="outline"
-                        className="self-start"
-                        nativeButton={ false }
-                        // eslint-disable-next-line jsx-a11y/anchor-has-content -- the button renders the label inside.
-                        render={ <a href={ classicUrl } /> }
-                    >
-                        { __(
-                            'Open the classic settings',
-                            'woocommerce-conversion-tracking'
-                        ) }
-                    </Button>
-                ) }
-            </section>
-            { pausable && (
-                <div className="flex flex-wrap items-center gap-3 border-t border-border px-6 py-4">
-                    <PauseTracking
-                        id={ platform.id }
-                        name={ platform.name }
-                        paused={ platform.paused }
-                    />
-                </div>
-            ) }
+                { platform.name }
+            </h2>
+            <ProBadge />
         </div>
-    );
-};
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-dashed border-input bg-muted/50 px-4 py-3 text-[13px]">
+            <span>
+                { sprintf(
+                    /* translators: %s: platform name, e.g. Microsoft Advertising */
+                    __(
+                        '%s is part of Pro.',
+                        'woocommerce-conversion-tracking'
+                    ),
+                    platform.name
+                ) }
+            </span>
+            <a
+                href={ upgradeUrl() }
+                target="_blank"
+                rel="noreferrer"
+                className="shrink-0 font-medium text-primary underline underline-offset-3"
+            >
+                { __( 'Compare plans', 'woocommerce-conversion-tracking' ) }
+                <NewTabNote />
+            </a>
+        </div>
+    </section>
+);
 
 /**
  * Platforms: the list of platforms and the open one's page (#/platforms/:id).
  *
- * @param {Object} props    Component props.
- * @param {string} props.id Platform ID from the route.
+ * @param {Object} props       Component props.
+ * @param {string} props.id    Platform ID from the route.
+ * @param          props.query
  */
-const Platforms = ( { id }: { id: string } ) => {
+const Platforms = ( { id, query }: { id: string; query: string } ) => {
     const { data } = useAppData();
     const { title, description } = pageInfo( {
         name: 'platforms',
@@ -194,6 +178,9 @@ const Platforms = ( { id }: { id: string } ) => {
     } );
     const platforms = data ? platformCards( data ) : [];
     const current = platforms.find( ( platform ) => platform.id === id );
+    const schema = current?.locked
+        ? undefined
+        : data?.schema.platforms.find( ( platform ) => platform.id === id );
 
     return (
         <Page title={ title } description={ description }>
@@ -204,8 +191,14 @@ const Platforms = ( { id }: { id: string } ) => {
                 <PlatformList platforms={ platforms } current={ id } />
                 <div className="min-w-0">
                     { current && id === 'custom' && <CustomScript /> }
-                    { current && id !== 'custom' && (
-                        <ComingDetail key={ current.id } platform={ current } />
+                    { current?.locked && <LockedDetail platform={ current } /> }
+                    { current && schema && id !== 'custom' && (
+                        <PlatformDetail
+                            key={ current.id }
+                            card={ current }
+                            platform={ schema }
+                            query={ query }
+                        />
                     ) }
                 </div>
             </Card>

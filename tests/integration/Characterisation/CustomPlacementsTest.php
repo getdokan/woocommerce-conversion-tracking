@@ -185,44 +185,24 @@ class CustomPlacementsTest extends WCCT_Test_Page_Case {
         $this->assertStringContainsString( "ctCustom('purchase', { id: '', email: '', first: '', last: '', number: '3001',", $result['html'] );
     }
 
-    /**
-     * Order 3001's thank-you page after a 3.0 save and then a 2.x settings page save
-     *
-     * @param array $classic The Custom integration the 2.x page posts.
-     *
-     * @return string
-     */
-    private function after_rest_and_classic_save( array $classic ) {
+    public function test_a_2_x_option_write_after_a_3_0_save_changes_nothing() {
         $result = WCCT_Test_WP::run(
             array(
                 'type'        => 'request',
                 'rollback'    => true,
                 'request'     => array( 'path' => '/checkout/order-received/3001/?key=wc_order_ctguest0001' ),
                 'options'     => array( 'wcct_settings' => WCCT_Test_Settings::only( WCCT_Test_Settings::lite_all(), 'custom' ) ),
-                'before'      => dirname( __DIR__ ) . '/jobs/custom-classic-save.php',
+                'before'      => dirname( __DIR__ ) . '/jobs/custom-v1-write.php',
                 'before_args' => array(
-                    'rest'    => array( 'platforms' => array( 'custom' => array( 'header_enabled' => true, 'header_script' => self::HEADER ) ) ),
-                    'classic' => array( 'custom' => $classic ),
+                    'rest' => array( 'platforms' => array( 'custom' => array( 'header_enabled' => true, 'header_script' => self::HEADER ) ) ),
+                    'v1'   => array( 'custom' => array( 'enabled' => '1', 'checkout' => "<script>ctCustom('classic', '{order_number}');</script>", 'registration' => '' ) ),
                 ),
             )
         );
 
         $this->assertNull( $result['error'] );
-
-        return $result['html'];
-    }
-
-    public function test_switching_custom_off_on_the_2_x_page_after_a_3_0_save_stops_its_scripts() {
-        $html = $this->after_rest_and_classic_save( array( 'checkout' => WCCT_Test_Settings::CUSTOM_CHECKOUT, 'registration' => '' ) );
-
-        $this->assertStringNotContainsString( "ctCustom('purchase'", $html );
-        $this->assertStringContainsString( "ctCustom('header'", $html );
-    }
-
-    public function test_editing_the_script_on_the_2_x_page_after_a_3_0_save_prints_the_new_one() {
-        $html = $this->after_rest_and_classic_save( array( 'enabled' => '1', 'checkout' => "<script>ctCustom('classic', '{order_number}');</script>", 'registration' => '' ) );
-
-        $this->assertStringContainsString( "ctCustom('classic', '3001');", $html );
-        $this->assertStringNotContainsString( "ctCustom('purchase'", $html );
+        $this->assertStringContainsString( "ctCustom('purchase'", $result['html'], 'the script the 3.0 save kept' );
+        $this->assertStringNotContainsString( "ctCustom('classic'", $result['html'] );
+        $this->assertStringContainsString( "ctCustom('header'", $result['html'] );
     }
 }

@@ -6,12 +6,8 @@ import { __, sprintf } from '@wordpress/i18n';
 /**
  * Internal dependencies
  */
-import type {
-    AppData,
-    PlatformValues,
-    SchemaElement,
-    SchemaPlatform,
-} from './types';
+import { applies, isCustomised } from './platformForm';
+import type { AppData, PlatformValues, SchemaPlatform } from './types';
 
 export type PlatformCardInfo = {
     // Settings platform ID, also the #/platforms/:id route.
@@ -25,6 +21,8 @@ export type PlatformCardInfo = {
     locked: boolean;
     connected: boolean;
     paused: boolean;
+    // An Advanced setting differs from its default.
+    customised: boolean;
     connectLabel: string;
 };
 
@@ -99,19 +97,6 @@ const filled = ( value: unknown ): boolean =>
     typeof value === 'string' && value.trim() !== '';
 
 /**
- * Whether a field applies, given the other values (schema `dependencies`).
- *
- * @param {SchemaElement} field  Field.
- * @param {Object}        values Platform values.
- */
-const applies = ( field: SchemaElement, values: PlatformValues ): boolean =>
-    ( field.dependencies ?? [] ).every(
-        ( dependency ) =>
-            ! Array.isArray( dependency.value ) ||
-            dependency.value.includes( values[ dependency.key ] )
-    );
-
-/**
  * Whether a platform has what it needs to send: the server's `connected` (PlatformSettings::connected()), else an ID or an enabled custom script.
  *
  * @param {SchemaPlatform} platform Platform schema.
@@ -124,7 +109,12 @@ export const isConnected = (
     typeof values.connected === 'boolean'
         ? values.connected
         : platform.schema.some( ( field ) => {
-              if ( field.type !== 'field' || ! applies( field, values ) ) {
+              // Advanced IDs (Google's GT- tag) only add to a connection.
+              if (
+                  field.type !== 'field' ||
+                  field.section_id === `${ platform.id }_advanced` ||
+                  ! applies( field, values )
+              ) {
                   return false;
               }
 
@@ -228,6 +218,7 @@ export const platformCards = ( data: AppData ): PlatformCardInfo[] => {
             locked: ! platform,
             connected,
             paused: connected && values.paused === true,
+            customised: platform ? isCustomised( platform, values ) : false,
             connectLabel:
                 meta?.connectLabel ??
                 __( 'Connect', 'woocommerce-conversion-tracking' ),

@@ -78,11 +78,11 @@ class MigrationTest extends WCCT_Test_Page_Case {
         $this->assertSame( array( 'twitter', 'facebook', 'google', 'custom' ), $listed['paused'] );
     }
 
-    public function test_the_2x_settings_page_opens_after_migrating_malformed_settings() {
+    public function test_the_settings_page_opens_after_migrating_malformed_settings() {
         $out = $this->state( array( 'wcct_settings' => self::v1( 'malformed' ) ), array( 'classic' => true ) );
 
         $this->assertNotNull( $out['after_request']['v3'] );
-        $this->assertStringContainsString( 'integration-facebook', $out['classic'] );
+        $this->assertMatchesRegularExpression( '/wcct-app-root|settings app is missing/', $out['classic'] );
     }
 
     public function test_a_clean_install_writes_no_settings_snapshot_flags_marker_or_lock() {
@@ -132,13 +132,13 @@ class MigrationTest extends WCCT_Test_Page_Case {
         $this->assertSame( '', $out['notice_after'] );
     }
 
-    public function test_a_platform_resumed_after_the_migration_prints_again_after_an_unrelated_2x_save() {
+    public function test_a_platform_resumed_after_the_migration_prints_again_after_a_2x_option_write() {
         $v1 = self::v1( 'off-with-ids' );
 
         // Migrated: the switched-off integrations are paused, so nothing prints.
         $paused = $this->output_of( $this->request_page( 'product-simple', $v1 ) );
 
-        // Resume Meta (Pause::set), then save an unrelated field on the 2.x page.
+        // Resume Meta (Pause::set), then write an unrelated field to the 2.x option.
         $out   = $this->state( array( 'wcct_settings' => $v1 ), array( 'resume' => 'facebook' ) );
         $saved = $out['after_save'];
 

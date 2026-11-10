@@ -144,8 +144,6 @@ class WeDevs_WC_Conversion_Tracking {
         require_once WCCT_INCLUDES . '/class-abstract-integration.php';
         require_once WCCT_INCLUDES . '/class-integration-manager.php';
         require_once WCCT_INCLUDES . '/class-event-dispatcher.php';
-        require_once WCCT_INCLUDES . '/class-integration-pro-features.php';
-        require_once WCCT_INCLUDES . '/class-ajax.php';
         require_once WCCT_INCLUDES . '/class-admin.php';
         require_once WCCT_INCLUDES . '/consent-functions.php';
     }
@@ -204,9 +202,6 @@ class WeDevs_WC_Conversion_Tracking {
         $this->container['rest'] = new \StorePulse\ConversionTracking\REST\Routes();
         $this->container['rest']->register();
 
-        // Until the 2.x settings page is removed, its saves write through to the 3.0 settings.
-        \StorePulse\ConversionTracking\Settings\LegacySync::register();
-
         \StorePulse\ConversionTracking\Privacy\PolicyText::register();
 
         $this->container['doctor_recheck'] = new \StorePulse\ConversionTracking\Doctor\Recheck();
@@ -234,7 +229,6 @@ class WeDevs_WC_Conversion_Tracking {
 
         add_action( 'admin_notices', array( $this, 'check_woocommerce_exist' ) );
         add_filter( 'plugin_action_links_' . plugin_basename( __FILE__ ), array( $this, 'plugin_action_links' ) );
-        add_action( 'admin_notices', array( $this, 'happy_addons_ads_banner' ) );
     }
 
     /**
@@ -245,16 +239,11 @@ class WeDevs_WC_Conversion_Tracking {
     public function init_classes() {
         // Manager must exist before the dispatcher, which reads active integrations on construct.
         $this->container['manager']             = new WCCT_Integration_Manager();
-        $this->container['ajax']                = new WCCT_Ajax();
         $this->container['event_dispatcher']    = new WCCT_Event_Dispatcher();
         $this->container['admin']               = new WCCT_Admin();
         $this->container['admin_assets']        = new \StorePulse\ConversionTracking\Admin\Assets();
         $this->container['consent']             = new \StorePulse\ConversionTracking\Consent\ConsentMode();
         $this->container['consent']->register();
-
-        if ( ! $this->is_pro() ) {
-            $this->container['pro_feature'] = new WCCT_Pro_Features();
-        }
     }
 
     /**
@@ -356,45 +345,6 @@ class WeDevs_WC_Conversion_Tracking {
                 </div>
             <?php
         }
-    }
-
-    /**
-     * Add happy addons ads banner
-     *
-     * @return void
-     */
-    public function happy_addons_ads_banner() {
-        if ( ! class_exists( '\Elementor\Plugin' ) ) {
-            return;
-        }
-
-        if ( class_exists( '\Happy_Addons\Elementor\Base' ) ) {
-            return;
-        }
-        $dismissable = get_option( 'wcct_dismissable_notice' );
-
-        if ( $dismissable == 'closed' ) {
-            return;
-        }
-
-        ?>
-            <div id="wcct_remote_notice" class="notice notice-success">
-            </div>
-            <div class="notice is-dismissible wcct-notice-wrap">
-                <div class="wcct-message-icon">
-                    <img src="<?php echo esc_attr( WCCT_ASSETS . '/images/happy-addons.png' )?>" alt="">
-                </div>
-                <div class="wcct-message-content">
-                    <p><?php echo wp_kses_post( __( 'Reach beyond your imagination in creating web pages. <strong> Try Happy Addons for Elementor to shape your dream.</strong> 😊', 'woocommerce-conversion-tracking' ) ); ?></p>
-                </div>
-                <div class="wcct-message-action">
-                    <a href="" id="wcct-install-happ-addons" class="button button-primary"> <i class="dashicons dashicons-update wcct-update-icon"></i> Install Now For FREE</a>
-                    <p><a target="_blank" href="https://wordpress.org/plugins/happy-elementor-addons/">Read more details ➔</a>
-                    </p>
-                </div>
-            </div>
-
-        <?php
     }
 }
 

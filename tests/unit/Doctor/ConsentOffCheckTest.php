@@ -27,7 +27,7 @@ class ConsentOffCheckTest extends TestCase {
         $this->assertSame( 'Consent mode is off', $finding['found'] );
         $this->assertSame( 'info', $finding['severity'] );
         $this->assertSame( 'sure', $finding['confidence'] );
-        $this->assertSame( array( 'link', '#/platforms', '' ), array( $finding['action']['type'], $finding['action']['url'], $finding['action']['confirm'] ) );
+        $this->assertSame( array( 'link', '#/platforms/facebook?field=consent_mode', '' ), array( $finding['action']['type'], $finding['action']['url'], $finding['action']['confirm'] ) );
         $this->assertFalse( $findings[0]->is_warning() );
     }
 

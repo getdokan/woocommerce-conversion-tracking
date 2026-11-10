@@ -119,7 +119,6 @@ class Assets {
                 'help'       => Docs::help_links(),
                 'upgrade'    => Upgrade::links(),
                 'logosUrl'   => WCCT_ASSETS . '/images/platforms/',
-                'classicUrl' => admin_url( 'admin.php?page=conversion-tracking&tab=integrations' ),
                 'homeUrl'    => home_url( '/' ),
                 // Upgraded from 2.x: What's new and its dashboard banner exist.
                 'whatsNew'   => WhatsNew::is_available(),
@@ -128,13 +127,12 @@ class Assets {
     }
 
     /**
-     * Whether this request shows the React app; any ?tab= still opens the classic screens
+     * Whether the React app is built and registered
      *
      * @return bool
      */
     public function is_app_view() {
-        // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only view switch.
-        return ! isset( $_GET['tab'] ) && wp_script_is( 'wcct-admin-app', 'registered' );
+        return wp_script_is( 'wcct-admin-app', 'registered' );
     }
 
     /**

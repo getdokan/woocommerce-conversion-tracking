@@ -53,7 +53,7 @@ class ConsentOffCheck extends AbstractCheck {
                     'confidence' => Finding::SURE,
                     'action'     => array(
                         'label' => __( 'Open the setting', 'woocommerce-conversion-tracking' ),
-                        'url'   => '#/platforms',
+                        'url'   => '#/platforms/facebook?field=consent_mode',
                     ),
                     'evidence'   => array( 'consent_mode' => 'off' ),
                 )

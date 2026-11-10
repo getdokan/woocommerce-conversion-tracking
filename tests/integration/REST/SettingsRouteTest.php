@@ -243,6 +243,64 @@ class SettingsRouteTest extends TestCase {
         $this->assertNull( $result['responses'][2]['purged'] );
     }
 
+    public function test_the_advanced_settings_round_trip_and_skip_roles_take_presets_or_site_roles() {
+        $result = $this->run_job(
+            array(
+                array( 'as' => 'admin', 'method' => 'POST', 'path' => '/wcct/v1/settings', 'body' => array( 'platforms' => array( 'facebook' => array( 'value_mode' => 'shipping', 'product_id_mode' => 'sku', 'skip_roles' => array( 'editor', 'administrator' ) ), 'google' => array( 'tag_id' => 'gt-ab12', 'skip_roles' => 'admin' ) ) ) ),
+                array( 'as' => 'admin', 'method' => 'POST', 'path' => '/wcct/v1/settings', 'body' => array( 'platforms' => array( 'facebook' => array( 'skip_roles' => array( 'shop_manager', 'administrator' ) ) ) ) ),
+                array( 'as' => 'admin', 'method' => 'POST', 'path' => '/wcct/v1/settings', 'body' => array( 'platforms' => array( 'facebook' => array( 'skip_roles' => array( 'no_such_role' ) ) ) ) ),
+                array( 'as' => 'admin', 'method' => 'GET', 'path' => '/wcct/v1/settings/schema' ),
+            )
+        );
+
+        $saved = $result['responses'][0]['data']['platforms'];
+
+        $this->assertSame( 200, $result['responses'][0]['status'] );
+        $this->assertSame( array( 'shipping', 'sku', array( 'editor', 'administrator' ) ), array( $saved['facebook']['value_mode'], $saved['facebook']['product_id_mode'], $saved['facebook']['skip_roles'] ) );
+        $this->assertSame( array( 'GT-AB12', 'admin' ), array( $saved['google']['tag_id'], $saved['google']['skip_roles'] ) );
+        $this->assertSame( 'admin-shop', $result['responses'][1]['data']['platforms']['facebook']['skip_roles'], 'a pick that is a preset' );
+        $this->assertSame( array( 'platforms.facebook.skip_roles' ), array_keys( $result['responses'][2]['data']['data']['errors'] ) );
+
+        $fields = array_column( $result['responses'][3]['data']['platforms'], 'schema', 'id' )['facebook'];
+        $roles  = array_column( array_values( array_filter( $fields, function ( $element ) {
+            return isset( $element['id'] ) && 'skip_roles' === $element['id'];
+        } ) )[0]['roles'], 'value' );
+
+        $this->assertContains( 'editor', $roles );
+        $this->assertContains( 'shop_manager', $roles );
+        $this->assertArrayNotHasKey( 'sanitize_callback', array_values( array_filter( $fields, function ( $element ) {
+            return isset( $element['id'] ) && 'skip_roles' === $element['id'];
+        } ) )[0] );
+    }
+
+    public function test_values_carry_the_last_checked_in_purchase_and_the_schema_the_consent_tool_line() {
+        $now    = time();
+        $result = $this->run_job(
+            array(
+                array( 'as' => 'admin', 'method' => 'GET', 'path' => '/wcct/v1/settings' ),
+                array( 'as' => 'admin', 'method' => 'GET', 'path' => '/wcct/v1/settings/schema' ),
+            ),
+            array(
+                'wcct_last_purchase_ga4'      => array( 'last_purchase_at' => $now - 600, 'order_id' => 3001, 'order_number' => '3001' ),
+                'wcct_last_purchase_adwords'  => array( 'last_purchase_at' => $now - 60, 'order_id' => 3002, 'order_number' => '3002' ),
+                'wcct_last_purchase_facebook' => array( 'last_purchase_at' => $now - 30, 'order_id' => 3003, 'order_number' => '3003' ),
+            )
+        );
+
+        $platforms = $result['responses'][0]['data']['platforms'];
+
+        $this->assertSame( array( 'at' => $now - 60, 'order_number' => '3002' ), $platforms['google']['last_purchase'], 'the latest of ga4 and adwords' );
+        $this->assertSame( '3003', $platforms['facebook']['last_purchase']['order_number'] );
+        $this->assertNull( $platforms['twitter']['last_purchase'] );
+
+        $consent = array_values( array_filter( $result['responses'][1]['data']['global'], function ( $element ) {
+            return isset( $element['id'] ) && 'consent_mode' === $element['id'];
+        } ) )[0];
+
+        // No consent tool owns Google consent on the test store.
+        $this->assertSame( '', $consent['notice'] );
+    }
+
     private function run_job( array $requests, array $options = array(), string $grant = '' ): array {
         $result = WCCT_Test_WP::run(
             array(

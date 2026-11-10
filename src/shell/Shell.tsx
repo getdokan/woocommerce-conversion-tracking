@@ -48,7 +48,7 @@ const RoutePage = ( { route }: { route: Route } ) => {
     }
 
     if ( route.name === 'platforms' ) {
-        return <Platforms id={ route.id } />;
+        return <Platforms id={ route.id } query={ route.query } />;
     }
 
     if ( route.name === 'settings' ) {

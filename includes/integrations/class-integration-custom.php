@@ -195,7 +195,9 @@ class WCCT_Integration_Custom extends WCCT_Integration {
     }
 
     /**
-     * The settings page switch as stored, also with no script yet
+     * The 2.x settings page switch as stored, also with no script yet
+     *
+     * @deprecated 3.0.0 The 2.x settings page is gone; kept for code that still calls it.
      *
      * @return boolean
      */

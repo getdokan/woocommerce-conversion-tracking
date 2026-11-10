@@ -128,6 +128,8 @@ abstract class WCCT_Integration {
     /**
      * Whether the 2.x settings page switch is on
      *
+     * @deprecated 3.0.0 The 2.x settings page is gone; Pause is the off switch. Kept for code that still calls it.
+     *
      * @return boolean
      */
     public function is_switched_on() {

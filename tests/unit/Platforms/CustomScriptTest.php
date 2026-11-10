@@ -5,10 +5,6 @@ require_once dirname( __DIR__, 3 ) . '/includes/integrations/class-integration-c
 
 use PHPUnit\Framework\TestCase;
 use StorePulse\ConversionTracking\Platforms\CustomScript;
-use StorePulse\ConversionTracking\Settings\LegacySync;
-use StorePulse\ConversionTracking\Settings\Schema;
-use StorePulse\ConversionTracking\Settings\Store;
-use StorePulse\ConversionTracking\Settings\Values;
 
 /**
  * Order with the getters the Custom script's placeholders read, like order 3001 of the test store.
@@ -155,59 +151,6 @@ class CustomScriptTest extends TestCase {
         $GLOBALS['wcct_test_options']['wcct_settings'] = array( 'custom' => array( 'enabled' => '1', 'header' => '<script>hd()</script>' ) );
 
         $this->assertSame( '', CustomScript::script( CustomScript::current(), CustomScript::HEADER ) );
-    }
-
-    /**
-     * A 3.0 save of another setting, while the 2.x settings are read as 3.0, and then the 2.x settings page save.
-     *
-     * @param array $classic The custom integration the 2.x page saves.
-     *
-     * @return array CustomScript::current() after both saves.
-     */
-    private function rest_then_classic_save( array $classic ) {
-        $GLOBALS['wcct_test_options']['wcct_settings'] = array( 'custom' => array( 'enabled' => true, 'checkout' => '<script>old()</script>', 'registration' => '<script>su()</script>' ) );
-
-        $result = Values::apply( Schema::get(), Store::load(), array( 'platforms' => array( 'custom' => array( 'header_enabled' => true, 'header_script' => '<script>hd()</script>' ) ) ), function () {
-            return true;
-        } );
-
-        $this->assertSame( array(), $result['errors'] );
-        Store::save( $result['doc'] );
-        $this->assertSame( '<script>old()</script>', $GLOBALS['wcct_test_options']['wcct_settings_v3']['platforms']['custom']['thankyou_script'], 'the first 3.0 save keeps the 2.x script' );
-
-        $GLOBALS['wcct_test_options']['wcct_settings'] = array( 'custom' => $classic );
-        LegacySync::sync( $GLOBALS['wcct_test_options']['wcct_settings'], array(), true );
-
-        return CustomScript::current();
-    }
-
-    public function test_switching_custom_off_on_the_2_x_page_after_a_3_0_save_stops_the_scripts() {
-        $settings = $this->rest_then_classic_save( array( 'enabled' => false, 'checkout' => '<script>old()</script>', 'registration' => '<script>su()</script>' ) );
-
-        $this->assertSame( '', CustomScript::script( $settings, CustomScript::THANKYOU ) );
-        $this->assertSame( '', CustomScript::script( $settings, CustomScript::SIGNUP ) );
-        $this->assertSame( '<script>hd()</script>', CustomScript::script( $settings, CustomScript::HEADER ), 'the 3.0 header script stays' );
-    }
-
-    public function test_editing_the_script_on_the_2_x_page_after_a_3_0_save_prints_the_new_one() {
-        $settings = $this->rest_then_classic_save( array( 'enabled' => true, 'checkout' => '<script>new()</script>', 'registration' => '' ) );
-
-        $this->assertSame( '<script>new()</script>', CustomScript::script( $settings, CustomScript::THANKYOU ) );
-        $this->assertSame( '', CustomScript::script( $settings, CustomScript::SIGNUP ) );
-        $this->assertEquals(
-            array(
-                'header_enabled'   => true,
-                'header_script'    => '<script>hd()</script>',
-                'thankyou_enabled' => true,
-                'thankyou_script'  => '<script>new()</script>',
-                'signup_enabled'   => false,
-                'signup_script'    => '',
-            ),
-            array_intersect_key(
-                $GLOBALS['wcct_test_options']['wcct_settings_v3']['platforms']['custom'],
-                array_flip( array( 'header_enabled', 'header_script', 'thankyou_enabled', 'thankyou_script', 'signup_enabled', 'signup_script' ) )
-            )
-        );
     }
 
     public function test_the_2_x_page_switch_shows_what_was_saved_even_without_a_script() {

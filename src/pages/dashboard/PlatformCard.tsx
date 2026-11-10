@@ -46,6 +46,17 @@ const Identity = ( {
             <span className="flex items-center gap-2 font-semibold text-foreground">
                 { platform.name }
                 { platform.locked && <ProBadge /> }
+                { platform.customised && (
+                    <StatusPill
+                        tone="off"
+                        className="px-1.5 text-[11px] font-medium before:hidden"
+                    >
+                        { __(
+                            'Customised',
+                            'woocommerce-conversion-tracking'
+                        ) }
+                    </StatusPill>
+                ) }
             </span>
             <span className="block text-xs text-muted-foreground">
                 { platform.meta }

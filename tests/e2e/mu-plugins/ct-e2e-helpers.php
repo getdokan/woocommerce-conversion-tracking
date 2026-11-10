@@ -429,3 +429,42 @@ add_filter(
     },
     99
 );
+
+// The ct_e2e_readonly_platforms cookie puts Meta's fields and Respect cookie choices behind a capability nobody has (the platform pages' read-only state).
+add_filter(
+    'wcct_settings_schema',
+    static function ( $schema ) {
+        if ( ! isset( $_COOKIE['ct_e2e_readonly_platforms'] ) || ! is_array( $schema ) ) {
+            return $schema;
+        }
+
+        foreach ( array( 'global', 'platforms' ) as $part ) {
+            $lists = 'global' === $part ? array( 'global' => isset( $schema['global'] ) ? $schema['global'] : array() ) : array( 'facebook' => isset( $schema['platforms']['facebook']['schema'] ) ? $schema['platforms']['facebook']['schema'] : array() );
+
+            foreach ( $lists as $key => $elements ) {
+                foreach ( (array) $elements as $index => $element ) {
+                    if ( is_array( $element ) && isset( $element['type'] ) && 'field' === $element['type'] ) {
+                        $elements[ $index ]['capability'] = 'ct_e2e_nobody';
+                    }
+                }
+
+                if ( 'global' === $key ) {
+                    $schema['global'] = $elements;
+                } else {
+                    $schema['platforms']['facebook']['schema'] = $elements;
+                }
+            }
+        }
+
+        return $schema;
+    },
+    99
+);
+
+// The ct_e2e_consent_source cookie reports a consent tool that owns Google consent mode (the "handled by" line).
+add_filter(
+    'wcct_consent_mode_external_source',
+    static function ( $source ) {
+        return isset( $_COOKIE['ct_e2e_consent_source'] ) ? sanitize_key( wp_unslash( $_COOKIE['ct_e2e_consent_source'] ) ) : $source;
+    }
+);

@@ -10,7 +10,7 @@ use StorePulse\ConversionTracking\Settings\Sanitizer;
 
 /**
  * Saved IDs that don't match their format, and IDs a Purchase needs that are missing.
- * New saves are checked already; old settings, the classic page and imports are not.
+ * New saves are checked already; settings saved before 3.0 and imports are not.
  */
 class IdFormatsCheck extends AbstractCheck {
 

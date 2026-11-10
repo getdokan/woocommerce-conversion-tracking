@@ -131,26 +131,6 @@ test.describe('Settings', () => {
             await expect(getPro).toHaveAttribute('href', PRODUCT_URL);
             await expect(page.locator('a[href*="wedevs.com/woocommerce-conversion-tracking"]')).toHaveCount(0);
         });
-
-        test('the classic screen has no SweetAlert or Premium Features box', async ({ page }) => {
-            await page.goto(`${APP_PATH}&tab=integrations`);
-            await expect(page.locator('.nav-tab-wrapper')).toBeVisible();
-            await expect(page.locator('.premium-box.box-blue')).toHaveCount(0);
-            expect(await page.evaluate(() => typeof (window as unknown as { swal?: unknown }).swal)).toBe('undefined');
-
-            const proFeature = page.locator('.disabled-class a', { hasText: '(Pro feature)' }).first();
-
-            await expect(proFeature).toHaveAttribute('href', PRODUCT_URL);
-            await expect(proFeature).toContainText('(opens in a new tab)');
-
-            // The Pro tabs open the upgrade page instead of "#".
-            for (const name of ['Facebook Product Catalog (Pro)', 'Settings (Pro)']) {
-                const tab = page.locator('.nav-tab-wrapper a', { hasText: name });
-
-                await expect(tab).toHaveAttribute('href', PRODUCT_URL);
-                await expect(tab).toHaveAttribute('rel', 'noopener noreferrer');
-            }
-        });
     });
 
     test.describe('on Pro', () => {

@@ -27,7 +27,6 @@ npm-debug.log
 phpunit.xml
 *~
 /bin
-/assets/less
 /README.md
 /src
 .eslintrc

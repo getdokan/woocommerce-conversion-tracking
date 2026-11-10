@@ -101,32 +101,6 @@ class XSettings {
     }
 
     /**
-     * Carry the 2.x keys the settings form no longer posts, so needs_resetup survives a save.
-     *
-     * @param mixed $posted Posted twitter entry, after cleaning.
-     * @param mixed $stored Stored twitter entry.
-     *
-     * @return mixed
-     */
-    public static function keep_legacy( $posted, $stored ) {
-        if ( ! is_array( $posted ) || ! isset( $posted[0] ) || ! is_array( $posted[0] ) || ! is_array( $stored ) || empty( $stored[0]['events'] ) || ! is_array( $stored[0]['events'] ) ) {
-            return $posted;
-        }
-
-        $events = isset( $posted[0]['events'] ) && is_array( $posted[0]['events'] ) ? $posted[0]['events'] : array();
-
-        foreach ( array_merge( array( self::LEGACY_PIXEL_KEY ), array_values( self::LEGACY_LABELS ) ) as $key ) {
-            if ( ! isset( $events[ $key ] ) && isset( $stored[0]['events'][ $key ] ) && is_scalar( $stored[0]['events'][ $key ] ) ) {
-                $events[ $key ] = (string) $stored[0]['events'][ $key ];
-            }
-        }
-
-        $posted[0]['events'] = $events;
-
-        return $posted;
-    }
-
-    /**
      * The X event ID to send for a pipeline event, or an empty string when the row is off.
      *
      * @param array  $values Settings from from_v1() or from_v3().

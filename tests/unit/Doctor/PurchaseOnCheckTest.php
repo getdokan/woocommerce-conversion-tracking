@@ -21,7 +21,7 @@ class PurchaseOnCheckTest extends DoctorCheckTestCase {
 
         $this->assertCount( 1, $findings );
         $this->assertSame( 'Purchase is off for Meta', $findings[0]['found'] );
-        $this->assertSame( array( 'link', 'Open Meta', '#/platforms/facebook' ), array( $findings[0]['action']['type'], $findings[0]['action']['label'], $findings[0]['action']['url'] ) );
+        $this->assertSame( array( 'link', 'Open Meta', '#/platforms/facebook?field=events' ), array( $findings[0]['action']['type'], $findings[0]['action']['label'], $findings[0]['action']['url'] ) );
         $this->assertSame( array( 'sure', 'warning', array( 'Meta' ) ), array( $findings[0]['confidence'], $findings[0]['severity'], $findings[0]['tags'] ) );
     }
 

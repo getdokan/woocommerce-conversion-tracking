@@ -68,8 +68,6 @@ class WCCT_Integration_GA4 extends WCCT_Integration {
 
         // Google consent mode covers GA4; this is the category for wcct_consent_allows().
         $this->consent_category = 'statistics';
-
-        add_filter( 'wcct_save_integrations_settings', array( $this, 'sanitize_settings' ) );
     }
 
     /**
@@ -117,48 +115,6 @@ class WCCT_Integration_GA4 extends WCCT_Integration {
         );
 
         return apply_filters( 'wcct_settings_ga4', $settings );
-    }
-
-    /**
-     * Validate the measurement ID before the settings are saved
-     *
-     * When GA4 is enabled, an invalid ID stops the save with an error, so the
-     * admin sees why instead of the field coming back empty. When GA4 is
-     * disabled the text is kept as typed, so saving other integrations is
-     * never blocked. The ID is validated again whenever it is read.
-     *
-     * @param  array $settings
-     *
-     * @return array
-     */
-    public function sanitize_settings( $settings ) {
-        if ( isset( $settings[ $this->id ][0] ) && is_array( $settings[ $this->id ][0] ) ) {
-            $raw_id         = isset( $settings[ $this->id ][0]['measurement_id'] ) ? $settings[ $this->id ][0]['measurement_id'] : '';
-            $raw_id         = is_string( $raw_id ) ? $raw_id : '';
-            $measurement_id = WCCT_GA4_Data::sanitize_measurement_id( $raw_id );
-
-            if ( '' === $measurement_id && empty( $settings[ $this->id ]['enabled'] ) ) {
-                $settings[ $this->id ][0]['measurement_id'] = sanitize_text_field( $raw_id );
-
-                return $settings;
-            }
-
-            if ( '' === $measurement_id && '' !== trim( $raw_id ) ) {
-                wp_send_json_error(
-                    array(
-                        'message' => sprintf(
-                            /* translators: %s: the rejected measurement ID */
-                            __( 'Google Analytics 4: "%s" is not a valid Measurement ID. Use the ID that starts with G- or GT-, for example G-XXXXXXXXXX. Settings were not saved.', 'woocommerce-conversion-tracking' ),
-                            sanitize_text_field( wp_unslash( $raw_id ) )
-                        ),
-                    )
-                );
-            }
-
-            $settings[ $this->id ][0]['measurement_id'] = $measurement_id;
-        }
-
-        return $settings;
     }
 
     /**

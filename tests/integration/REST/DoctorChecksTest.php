@@ -142,7 +142,7 @@ class DoctorChecksTest extends WCCT_Test_Rest_Case {
         $purchase = self::of( $results[1], 'purchase-on' );
 
         $this->assertSame( array( 'Purchase is off for Meta' ), array_keys( $purchase ) );
-        $this->assertSame( array( 'Open Meta', '#/platforms/facebook' ), array( $purchase['Purchase is off for Meta']['action']['label'], $purchase['Purchase is off for Meta']['action']['url'] ) );
+        $this->assertSame( array( 'Open Meta', '#/platforms/facebook?field=events' ), array( $purchase['Purchase is off for Meta']['action']['label'], $purchase['Purchase is off for Meta']['action']['url'] ) );
     }
 
     public function test_cookie_choices_without_a_consent_plugin() {

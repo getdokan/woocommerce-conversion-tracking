@@ -86,7 +86,7 @@ test.describe('Tracking Doctor', () => {
         await expect(duplicate).toContainText('If its pixel is on, each sale reaches Meta twice.');
         await expect(duplicate.getByRole('listitem')).toHaveText(['Pick one plugin to send to Meta.', 'Then check again.']);
         await expect(finding(page, 'An e2e tag manager is active')).toContainText('Not sure');
-        await expect(finding(page, 'Consent mode is off').getByRole('link', { name: 'Open the setting' })).toHaveAttribute('href', '#/platforms');
+        await expect(finding(page, 'Consent mode is off').getByRole('link', { name: 'Open the setting' })).toHaveAttribute('href', '#/platforms/facebook?field=consent_mode');
 
         await duplicate.getByRole('button', { name: 'Dismiss' }).click();
         await expect(page.getByText('Dismissed. It won’t show again unless something changes.')).toBeVisible();

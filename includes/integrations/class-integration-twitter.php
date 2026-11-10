@@ -18,23 +18,6 @@ class WCCT_Integration_Twitter extends WCCT_Integration {
         $this->supports = array(
             'checkout',
         );
-
-        add_filter( 'wcct_save_integrations_settings', array( $this, 'keep_legacy_settings' ) );
-    }
-
-    /**
-     * Keep the 2.x X keys through a settings save, so the re-setup flags survive
-     *
-     * @param array $settings Posted settings, slashed.
-     *
-     * @return array
-     */
-    public function keep_legacy_settings( $settings ) {
-        if ( is_array( $settings ) && isset( $settings[ $this->id ] ) ) {
-            $settings[ $this->id ] = XSettings::keep_legacy( $settings[ $this->id ], parent::get_integration_settings() );
-        }
-
-        return $settings;
     }
 
     /**

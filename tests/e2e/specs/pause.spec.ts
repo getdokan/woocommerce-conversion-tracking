@@ -84,7 +84,7 @@ for (const platform of CASES) {
             const pauseButton = card.getByRole('button', { name: 'Pause tracking' });
             const dialog = page.getByRole('alertdialog');
 
-            await expect(card).toContainText('Waiting for first event');
+            await expect(card.getByTestId('wcct-platform-pill')).toHaveText(/Waiting for first event|Working/);
 
             // Keep tracking and Escape leave it on.
             await pauseButton.click();
@@ -96,7 +96,7 @@ for (const platform of CASES) {
             await pauseButton.click();
             await page.keyboard.press('Escape');
             await expect(dialog).toBeHidden();
-            await expect(card).toContainText('Waiting for first event');
+            await expect(card.getByTestId('wcct-platform-pill')).toHaveText(/Waiting for first event|Working/);
 
             await pauseButton.click();
             await dialog.getByRole('button', { name: 'Pause tracking' }).click();
@@ -123,7 +123,7 @@ for (const platform of CASES) {
 
             await openApp(page, `#/platforms/${platform.id}`);
             await card.getByRole('button', { name: 'Resume tracking' }).click();
-            await expect(card).toContainText('Waiting for first event');
+            await expect(card.getByTestId('wcct-platform-pill')).toHaveText(/Waiting for first event|Working/);
             await expect(pauseButton).toBeFocused();
             await expect(page.getByTestId(`wcct-pause-${platform.id}-status`)).toHaveText(`Tracking resumed on ${platform.name}.`);
             await expect(listItem(page, platform.id)).toContainText('On');

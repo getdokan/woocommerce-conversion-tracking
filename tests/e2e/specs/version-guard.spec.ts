@@ -40,17 +40,13 @@ test.describe('Version guard', () => {
         await expect(page.locator('#wcct-pro-update-notice')).toContainText(NOTICE);
     });
 
-    test('Free offers Pro (Get PRO, classic Pro tabs) unless Pro 3.0 is running', async ({ page }) => {
+    test('Free offers Pro (Get PRO) unless Pro 3.0 is running', async ({ page }) => {
         await openApp(page);
 
         const proActive = !!(await wcctAdminData(page)).proActive;
 
         await page.goto('/wp-admin/plugins.php');
         await expect(page.locator('tr[data-plugin="woocommerce-conversion-tracking/conversion-tracking.php"]').getByRole('link', { name: 'Get PRO' })).toHaveCount(proActive ? 0 : 1);
-
-        // WCCT_Pro_Features adds the locked Pro tabs to the classic screen.
-        await page.goto(`${APP_PATH}&tab=integrations`);
-        await expect(page.locator('.nav-tab-wrapper .nav-tab', { hasText: 'Facebook Product Catalog (Pro)' })).toHaveCount(proActive ? 0 : 1);
     });
 
     test('a Pro older than 3.0 keeps serving its catalog feed', async ({ page }) => {

@@ -80,7 +80,7 @@ test.describe('Tracking Doctor checks', () => {
         const purchase = finding(page, 'Purchase is off for X');
 
         await expect(purchase).toContainText('X doesn\'t hear about your sales, so it can\'t count conversions or optimize your ads for purchases.');
-        await expect(purchase.getByRole('link', { name: 'Open X' })).toHaveAttribute('href', '#/platforms/twitter');
+        await expect(purchase.getByRole('link', { name: 'Open X' })).toHaveAttribute('href', '#/platforms/twitter?field=events');
 
         // The last 24 hours: a purchase sent twice.
         const twice = finding(page, '1 purchase was sent twice in the last 24 hours');
