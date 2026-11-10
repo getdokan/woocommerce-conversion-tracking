@@ -137,7 +137,7 @@ class SettingsRouteTest extends TestCase {
             array( 'wcct_settings' => self::V1 )
         );
 
-        // Read from the 2.x option until the first save.
+        // Migrated from the 2.x option on this request (#122).
         $this->assertSame( '111111111111111', $result['responses'][0]['data']['platforms']['facebook']['pixel_id'] );
         $this->assertSame( 200, $result['responses'][1]['status'] );
         $this->assertSame( '333333333333333', $result['responses'][2]['data']['platforms']['facebook']['pixel_id'] );
@@ -147,8 +147,8 @@ class SettingsRouteTest extends TestCase {
 
         $this->assertSame( serialize( self::V1 ), $result['before']['v1'] );
         $this->assertSame( $result['before']['v1'], $result['after']['v1'] );
-        $this->assertNull( $result['before']['v3'] );
-        $this->assertNotNull( $result['after']['v3'] );
+        $this->assertSame( '111111111111111', unserialize( $result['before']['v3'] )['platforms']['facebook']['pixel_id'] );
+        $this->assertSame( '333333333333333', unserialize( $result['after']['v3'] )['platforms']['facebook']['pixel_id'] );
     }
 
     public function test_a_save_waits_while_the_migration_is_due() {
@@ -205,9 +205,10 @@ class SettingsRouteTest extends TestCase {
         $this->assertNotNull( $result['responses'][2]['purged'] );
         $this->assertNull( $result['responses'][3]['purged'] );
 
-        // The settings stay as they were.
+        // The settings stay as the migration (#122) wrote them on this request.
         $this->assertSame( $result['before']['v1'], $result['after']['v1'] );
-        $this->assertNull( $result['after']['v3'] );
+        $this->assertNotNull( $result['before']['v3'] );
+        $this->assertSame( $result['before']['v3'], $result['after']['v3'] );
     }
 
     public function test_pause_needs_a_known_platform_and_the_manage_capability() {

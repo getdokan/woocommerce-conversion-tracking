@@ -3,6 +3,8 @@
 namespace StorePulse\ConversionTracking\Settings;
 
 use StorePulse\ConversionTracking\Access\CustomScripts;
+use StorePulse\ConversionTracking\Migration\LegacyPause;
+use StorePulse\ConversionTracking\Migration\Lock;
 use StorePulse\ConversionTracking\Migration\SettingsMigration;
 use StorePulse\ConversionTracking\Platforms\XSettings;
 
@@ -65,7 +67,7 @@ class LegacySync {
      * @return void
      */
     public static function updated( $old, $value ) {
-        self::sync( $value );
+        self::sync( $value, null, null, $old );
     }
 
     /**
@@ -74,10 +76,11 @@ class LegacySync {
      * @param mixed      $v1      The saved wcct_settings option.
      * @param array|null $shown   2.x integration => event keys its settings page shows; read from the integrations by default.
      * @param bool|null  $scripts Whether the user may change custom scripts; the current user's capability by default.
+     * @param mixed      $old     The option before the save; pauses follow only the integrations whose switch or ID changed. Null re-reads all.
      *
      * @return void
      */
-    public static function sync( $v1, ?array $shown = null, ?bool $scripts = null ) {
+    public static function sync( $v1, ?array $shown = null, ?bool $scripts = null, $old = null ) {
         if ( self::$running ) {
             return;
         }
@@ -85,7 +88,7 @@ class LegacySync {
         $doc = get_option( Store::OPTION, null );
 
         // Before the first 3.0 write the storefront reads the 2.x option itself; the migration writes its own result.
-        if ( ! is_array( $doc ) || null !== get_option( SettingsMigration::LOCK, null ) ) {
+        if ( ! is_array( $doc ) || self::migration_running() ) {
             return;
         }
 
@@ -96,9 +99,23 @@ class LegacySync {
             $scripts = null === $scripts ? current_user_can( CustomScripts::CAPABILITY ) : $scripts;
 
             Store::save( self::apply( $doc, $v1, $shown, $scripts ) );
+
+            // The 2.x switches are pauses once the 3.0 settings exist.
+            LegacyPause::sync( $v1, $old );
         } finally {
             self::$running = false;
         }
+    }
+
+    /**
+     * Whether a migration holds a live lock; one older than its timeout was abandoned.
+     *
+     * @return bool
+     */
+    private static function migration_running(): bool {
+        $lock = get_option( SettingsMigration::LOCK, null );
+
+        return null !== $lock && time() - (int) $lock < Lock::DEFAULT_TIMEOUT;
     }
 
     /**
@@ -113,7 +130,7 @@ class LegacySync {
      */
     public static function apply( array $doc, $v1, array $shown, bool $scripts ): array {
         $v1   = is_array( $v1 ) ? $v1 : array();
-        $view = LegacyView::from_v1( $v1 );
+        $view = LegacyPause::apply( LegacyView::from_v1( $v1 ), $v1, false );
 
         if ( empty( $view['platforms'] ) || ! is_array( $view['platforms'] ) ) {
             return $doc;

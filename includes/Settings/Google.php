@@ -92,15 +92,20 @@ class Google {
         $ads       = isset( $adwords[0] ) && is_array( $adwords[0] ) ? $adwords[0] : array();
         $ads_keys  = isset( $ads['events'] ) && is_array( $ads['events'] ) ? $ads['events'] : array();
 
+        $ads_id = self::text( $ads, 'account_id' );
+        $split  = self::split_ads_id( $ads_id );
+        $label  = self::label( self::text( $ads_keys, 'Purchase-label' ) );
+
+        // 2.x stores often pasted "AW-123/label" into the ID field; the label field wins when it has one.
         $google = array(
             'measurement_id' => self::text( $analytics, 'measurement_id' ),
-            'ads_id'         => self::text( $ads, 'account_id' ),
-            'purchase_label' => self::text( $ads_keys, 'Purchase-label' ),
+            'ads_id'         => $split ? $split[0] : $ads_id,
+            'purchase_label' => '' === $label && $split ? $split[1] : $label,
         );
 
         // Pro 1.x saved it lower-case and read it capitalised.
-        $registration_label = self::text( $ads_keys, 'registration-label' );
-        $registration_label = '' !== $registration_label ? $registration_label : self::text( $ads_keys, 'Registration-label' );
+        $registration_label = self::label( self::text( $ads_keys, 'registration-label' ) );
+        $registration_label = '' !== $registration_label ? $registration_label : self::label( self::text( $ads_keys, 'Registration-label' ) );
 
         if ( '' !== $registration_label ) {
             $google['registration_label'] = $registration_label;
@@ -118,6 +123,34 @@ class Google {
         );
 
         return $google;
+    }
+
+    /**
+     * An Ads ID saved with a conversion label ("AW-123/label") as [ ID, label ]; null for anything else.
+     *
+     * @param string $value Saved value.
+     *
+     * @return array|null
+     */
+    public static function split_ads_id( string $value ): ?array {
+        if ( ! preg_match( '#^(AW-[0-9]+)\s*/\s*([A-Za-z0-9_-]+)$#i', trim( $value ), $match ) ) {
+            return null;
+        }
+
+        return array( strtoupper( $match[1] ), $match[2] );
+    }
+
+    /**
+     * A saved conversion label, without an "AW-123/" prefix pasted in front of it.
+     *
+     * @param string $value Saved value.
+     *
+     * @return string
+     */
+    private static function label( string $value ): string {
+        $split = self::split_ads_id( $value );
+
+        return $split ? $split[1] : $value;
     }
 
     /**
@@ -162,14 +195,17 @@ class Google {
     }
 
     /**
-     * Whether a 2.x integration was switched on.
+     * Whether a 2.x integration was switched on, as the 2.x storefront read it.
      *
      * @param array $integration 2.x settings.
      *
      * @return bool
      */
     public static function enabled( array $integration ): bool {
-        return isset( $integration['enabled'] ) && in_array( $integration['enabled'], array( true, 1, '1', 'true', 'yes', 'on' ), true );
+        $enabled = isset( $integration['enabled'] ) ? $integration['enabled'] : false;
+
+        // As 2.x read it (wc_string_to_bool()), so 'on' is off.
+        return true === $enabled || 1 === $enabled || ( is_string( $enabled ) && in_array( strtolower( $enabled ), array( 'yes', 'true', '1' ), true ) );
     }
 
     /**

@@ -96,6 +96,36 @@ class GoogleTest extends TestCase {
         $this->assertSame( 'both', Google::from_v1( array( 'enabled' => false, 0 => array( 'measurement_id' => 'G-1' ) ), $adwords )['mode'] );
     }
 
+    public function test_an_ads_id_saved_with_its_label_is_split() {
+        $this->assertSame( array( 'AW-123', 'AbC-d_1' ), Google::split_ads_id( ' aw-123 / AbC-d_1 ' ) );
+
+        foreach ( array( 'AW-123', 'AW-123/', 'AW-123/a/b', 'G-123/abc', 'AW-12x/abc', '' ) as $value ) {
+            $this->assertNull( Google::split_ads_id( $value ), $value );
+        }
+
+        $read = function ( $account_id, $label ) {
+            $google = Google::from_v1( null, array( 'enabled' => true, 0 => array( 'account_id' => $account_id, 'events' => array( 'Purchase' => 'on', 'Purchase-label' => $label ) ) ) );
+
+            return array( $google['ads_id'], $google['purchase_label'] );
+        };
+
+        $this->assertSame( array( 'AW-123', 'fromId' ), $read( 'AW-123/fromId', '' ) );
+        // The label field wins over the one in the ID.
+        $this->assertSame( array( 'AW-123', 'typed' ), $read( 'AW-123/fromId', 'typed' ) );
+        $this->assertSame( array( 'AW-123', 'lbl' ), $read( 'AW-123', 'AW-123/lbl' ) );
+        $this->assertSame( array( 'AW-123', 'lbl' ), $read( 'AW-123', 'lbl' ) );
+    }
+
+    public function test_the_2x_switch_reads_as_2x_read_it() {
+        foreach ( array( true, 1, '1', 'true', 'TRUE', 'yes' ) as $on ) {
+            $this->assertTrue( Google::enabled( array( 'enabled' => $on ) ), var_export( $on, true ) );
+        }
+
+        foreach ( array( 'on', false, 0, '0', 'false', '', array(), null ) as $off ) {
+            $this->assertFalse( Google::enabled( array( 'enabled' => $off ) ), var_export( $off, true ) );
+        }
+    }
+
     public function test_no_2x_google_settings_map_to_nothing() {
         $this->assertSame( array(), Google::from_v1( null, 'junk' ) );
     }

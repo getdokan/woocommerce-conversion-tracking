@@ -73,12 +73,12 @@ class PageOutputTest extends WCCT_Test_Page_Case {
     }
 
     protected function captured_page_differences() {
-        $customer_details = '#78 renders the Custom script\'s customer placeholders empty while "Include customer details in scripts" is off';
+        // The verified customer's own order fills them again, as 2.1.6 did: the setting is on for a 2.x checkout script that uses them (#106, #122).
+        $customer_details = '#78 renders the Custom script\'s customer placeholders empty on guest orders (2.1.6 left them as literal placeholders)';
 
         return array(
             'order-received-classic'  => $customer_details,
             'order-received-block'    => $customer_details,
-            'order-received-customer' => $customer_details,
         );
     }
 

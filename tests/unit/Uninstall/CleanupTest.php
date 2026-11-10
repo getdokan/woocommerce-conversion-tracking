@@ -24,6 +24,8 @@ class CleanupTest extends TestCase {
         'wcct_install_type',
         'wcct_migration_done',
         'wcct_migration_lock',
+        'wcct_migration_flags',
+        'wcct_migration_error',
         'wcct_pre3_snapshot',
         'wcct_onboarding',
         'wcct_count_once_since',

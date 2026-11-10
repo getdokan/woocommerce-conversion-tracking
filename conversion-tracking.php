@@ -220,6 +220,9 @@ class WeDevs_WC_Conversion_Tracking {
         $this->container['onboarding_redirect'] = new \StorePulse\ConversionTracking\Onboarding\Redirect();
         $this->container['onboarding_redirect']->register();
 
+        // After a failed settings migration, admins get "Retry migration".
+        \StorePulse\ConversionTracking\Migration\RetryNotice::register();
+
         add_action( 'plugins_loaded', array( $this, 'plugin_upgrades' ) );
         add_action( 'init', array( $this, 'localization_setup' ) );
         add_action( 'init', array( $this, 'init_classes' ) );

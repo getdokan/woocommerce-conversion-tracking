@@ -99,7 +99,7 @@ class CustomScriptTest extends TestCase {
     public function test_the_2_x_checkout_and_registration_scripts_read_as_thank_you_and_sign_up() {
         $GLOBALS['wcct_test_options']['wcct_settings'] = array(
             'custom' => array(
-                'enabled'      => 'on',
+                'enabled'      => '1',
                 'checkout'     => '<script>ty()</script>',
                 'registration' => '<script>su()</script>',
             ),
@@ -120,7 +120,7 @@ class CustomScriptTest extends TestCase {
 
     public function test_3_0_settings_without_scripts_still_read_the_2_x_scripts() {
         // A 3.0 save of another setting doesn't drop the scripts the 2.x settings page saved.
-        $GLOBALS['wcct_test_options']['wcct_settings']    = array( 'custom' => array( 'enabled' => 'on', 'checkout' => '<script>ty()</script>' ) );
+        $GLOBALS['wcct_test_options']['wcct_settings']    = array( 'custom' => array( 'enabled' => '1', 'checkout' => '<script>ty()</script>' ) );
         $GLOBALS['wcct_test_options']['wcct_settings_v3'] = $this->v3( array( 'customer_details' => true ) );
 
         $this->assertSame( '<script>ty()</script>', CustomScript::script( CustomScript::current(), CustomScript::THANKYOU ) );
@@ -131,7 +131,7 @@ class CustomScriptTest extends TestCase {
         $v1   = function () use ( &$read ) {
             $read = true;
 
-            return array( 'custom' => array( 'enabled' => 'on', 'checkout' => '<script>old()</script>', 'registration' => '<script>old()</script>' ) );
+            return array( 'custom' => array( 'enabled' => '1', 'checkout' => '<script>old()</script>', 'registration' => '<script>old()</script>' ) );
         };
 
         $settings = CustomScript::settings( $this->v3( array( 'thankyou_enabled' => false, 'signup_script' => '' ) ), $v1 );
@@ -141,7 +141,7 @@ class CustomScriptTest extends TestCase {
     }
 
     public function test_each_placement_falls_back_to_the_2_x_script_on_its_own() {
-        $GLOBALS['wcct_test_options']['wcct_settings']    = array( 'custom' => array( 'enabled' => 'on', 'checkout' => '<script>ty()</script>', 'registration' => '<script>su()</script>' ) );
+        $GLOBALS['wcct_test_options']['wcct_settings']    = array( 'custom' => array( 'enabled' => '1', 'checkout' => '<script>ty()</script>', 'registration' => '<script>su()</script>' ) );
         $GLOBALS['wcct_test_options']['wcct_settings_v3'] = $this->v3( array( 'header_enabled' => true, 'header_script' => '<script>hd()</script>', 'signup_enabled' => false ) );
 
         $settings = CustomScript::current();
@@ -152,7 +152,7 @@ class CustomScriptTest extends TestCase {
     }
 
     public function test_the_header_never_reads_the_2_x_settings() {
-        $GLOBALS['wcct_test_options']['wcct_settings'] = array( 'custom' => array( 'enabled' => 'on', 'header' => '<script>hd()</script>' ) );
+        $GLOBALS['wcct_test_options']['wcct_settings'] = array( 'custom' => array( 'enabled' => '1', 'header' => '<script>hd()</script>' ) );
 
         $this->assertSame( '', CustomScript::script( CustomScript::current(), CustomScript::HEADER ) );
     }

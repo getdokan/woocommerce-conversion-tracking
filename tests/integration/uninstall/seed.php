@@ -15,6 +15,8 @@ $free_options = array(
     'wcct_consent_mode'           => 'on',
     'wcct_install_type'           => 'upgrade',
     'wcct_migration_done'         => '3.0.0',
+    'wcct_migration_flags'        => array( 'twitter_event_ids' => array( 'platform' => 'twitter' ) ),
+    'wcct_migration_error'        => array( 'message' => 'x', 'time' => 1 ),
     'wcct_pre3_snapshot'          => array( 'wcct_settings' => array() ),
     'wcct_onboarding'             => array( 'status' => 'done' ),
     'wcct_count_once_since'       => 1,

@@ -6,7 +6,7 @@ use StorePulse\ConversionTracking\Platforms\XSettings;
 use StorePulse\ConversionTracking\Privacy\CustomerDetails;
 
 /**
- * Reads the 2.x wcct_settings option as 3.0 settings, until the migration (#122) has written them.
+ * Reads the 2.x wcct_settings option as 3.0 settings: the storefront's view until the migration has run, and the migration's input.
  */
 class LegacyView {
 

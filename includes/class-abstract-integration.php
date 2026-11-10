@@ -125,7 +125,7 @@ abstract class WCCT_Integration {
     }
 
     /**
-     * Whether the settings page switch is on
+     * Whether the 2.x settings page switch is on
      *
      * @return boolean
      */
@@ -134,18 +134,15 @@ abstract class WCCT_Integration {
     }
 
     /**
-     * Check the integration enable or not
+     * Whether the integration is on (its pause is checked apart, see is_active())
      *
      * @return boolean
      */
     public function is_enabled() {
         $settings = $this->get_integration_settings();
 
-        if ( $settings && wc_string_to_bool($settings[ 'enabled' ]) ) {
-            return true;
-        }
-
-        return false;
+        // A malformed option (say, a string, or an array as the switch) reads as off instead of a fatal.
+        return is_array( $settings ) && isset( $settings['enabled'] ) && is_scalar( $settings['enabled'] ) && wc_string_to_bool( $settings['enabled'] );
     }
 
     /**

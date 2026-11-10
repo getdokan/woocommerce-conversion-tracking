@@ -111,7 +111,9 @@ class LegacySyncTest extends TestCase {
         $this->assertSame( 'G-NEW', $google['measurement_id'] );
         $this->assertSame( 'AW-222', $google['ads_id'] );
         $this->assertSame( 'NewLabel', $google['purchase_label'] );
-        $this->assertSame( 'analytics', $google['mode'], 'Ads switched off on the 2.x page' );
+        // Ads switched off on the 2.x page with its ID kept is a pause of Ads alone (#122); the mode follows the saved IDs.
+        $this->assertSame( 'both', $google['mode'] );
+        $this->assertSame( array( 'adwords' ), $GLOBALS['wcct_test_options']['wcct_paused_platforms'] );
         // Purchase unticked turns it off; Search has no 2.x checkbox and stays.
         $this->assertSame( array( 'search', 'view_product', 'add_to_cart' ), $google['events'] );
         $this->assertSame( 'GT-KEEP', $google['tag_id'] );
@@ -166,10 +168,66 @@ class LegacySyncTest extends TestCase {
         LegacySync::sync( array( 'custom' => array( 'enabled' => true, 'checkout' => '<script>ty()</script>' ) ), self::LITE_PAGE, true );
         $this->assertArrayNotHasKey( 'wcct_settings_v3', $GLOBALS['wcct_test_options'] );
 
-        $GLOBALS['wcct_test_options']['wcct_migration_lock'] = '1|abc';
+        $GLOBALS['wcct_test_options']['wcct_migration_lock'] = time() . '|abc';
         $v3 = array( 'platforms' => array( 'custom' => array( 'thankyou_script' => '<script>keep()</script>' ) ) );
 
         $this->assertSame( $v3, $this->sync( $v3, array( 'custom' => array( 'enabled' => true, 'checkout' => '<script>ty()</script>' ) ) ) );
+    }
+
+    public function test_a_lock_older_than_its_timeout_no_longer_stops_the_write_through() {
+        // A run that died after writing the 3.0 settings left its lock behind.
+        $GLOBALS['wcct_test_options']['wcct_migration_lock'] = ( time() - 601 ) . '|abc';
+        $v3 = array( 'platforms' => array( 'custom' => array( 'thankyou_script' => '<script>keep()</script>' ) ) );
+
+        $this->assertSame( '<script>ty()</script>', $this->sync( $v3, array( 'custom' => array( 'enabled' => true, 'checkout' => '<script>ty()</script>' ) ) )['platforms']['custom']['thankyou_script'] );
+    }
+
+    public function test_a_2_x_save_keeps_a_3_0_pause_of_an_integration_it_did_not_change() {
+        $GLOBALS['wcct_test_options']['wcct_settings_v3']      = array( 'platforms' => array() );
+        $GLOBALS['wcct_test_options']['wcct_paused_platforms'] = array( 'facebook' );
+
+        $old = array(
+            'facebook' => array( 'enabled' => true, 0 => array( 'pixel_id' => '123456789012345' ) ),
+            'twitter'  => array( 'enabled' => true, 0 => array( 'pixel_id' => 'o8x2k' ) ),
+        );
+        $new = $old;
+
+        $new['twitter'][0]['pixel_id'] = 'o9x3k';
+
+        LegacySync::sync( $new, self::LITE_PAGE, true, $old );
+
+        $this->assertSame( array( 'facebook' ), $GLOBALS['wcct_test_options']['wcct_paused_platforms'] );
+
+        // Switching Meta off and on again on the 2.x page is a change: its pause follows the page.
+        $off                        = $new;
+        $off['facebook']['enabled'] = false;
+
+        LegacySync::sync( $off, self::LITE_PAGE, true, $new );
+        LegacySync::sync( $new, self::LITE_PAGE, true, $off );
+
+        $this->assertSame( array(), $GLOBALS['wcct_test_options']['wcct_paused_platforms'] );
+    }
+
+    public function test_the_2_x_switches_write_through_as_pauses_and_other_pauses_stay() {
+        $GLOBALS['wcct_test_options']['wcct_paused_platforms'] = array( 'bing_ads', 'facebook', 'ga4' );
+
+        $v1 = array(
+            'facebook' => array( 'enabled' => true, 0 => array( 'pixel_id' => '123456789012345' ) ),
+            'ga4'      => array( 'enabled' => false, 0 => array( 'measurement_id' => 'G-1' ) ),
+            'adwords'  => array( 'enabled' => false, 0 => array( 'account_id' => 'AW-1' ) ),
+            'twitter'  => array( 'enabled' => false, 0 => array( 'pixel_id' => 'o8x2k' ) ),
+            'custom'   => array( 'enabled' => false, 'checkout' => '<script>a()</script>' ),
+        );
+
+        $this->sync( array( 'platforms' => array() ), $v1 );
+
+        // Microsoft isn't on this page and stays paused; Custom's switch turns its placements off instead (#94).
+        $this->assertSame( array( 'bing_ads', 'google', 'twitter' ), $GLOBALS['wcct_test_options']['wcct_paused_platforms'] );
+
+        // Nothing paused and no list yet: none is written.
+        unset( $GLOBALS['wcct_test_options']['wcct_paused_platforms'] );
+        $this->sync( array( 'platforms' => array() ), array( 'facebook' => $v1['facebook'] ) );
+        $this->assertArrayNotHasKey( 'wcct_paused_platforms', $GLOBALS['wcct_test_options'] );
     }
 
     public function test_bad_data_never_fatals() {

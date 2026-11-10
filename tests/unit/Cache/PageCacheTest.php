@@ -190,4 +190,22 @@ class PageCacheTest extends TestCase {
 
         $this->assertSame( array(), PageCache::purge() );
     }
+
+    public function test_a_hold_turns_purges_into_one_at_release() {
+        PageCache::hold();
+        PageCache::hold();
+        PageCache::purge();
+        PageCache::purge();
+        PageCache::release();
+
+        $this->assertSame( array(), $GLOBALS['wcct_test_actions'], 'still held by the outer hold' );
+
+        PageCache::release();
+        $this->assertCount( 1, $GLOBALS['wcct_test_actions'] );
+
+        // Nothing asked for: no purge at release.
+        PageCache::hold();
+        PageCache::release();
+        $this->assertCount( 1, $GLOBALS['wcct_test_actions'] );
+    }
 }

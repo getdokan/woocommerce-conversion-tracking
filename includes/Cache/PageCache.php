@@ -87,6 +87,46 @@ class PageCache {
     }
 
     /**
+     * Depth of hold() calls not yet released.
+     *
+     * @var int
+     */
+    private static $held = 0;
+
+    /**
+     * Whether a purge was asked for while held.
+     *
+     * @var bool
+     */
+    private static $pending = false;
+
+    /**
+     * Hold purges, so a batch of changes (say, the migration's pauses) purges once at release().
+     *
+     * @return void
+     */
+    public static function hold() {
+        ++self::$held;
+    }
+
+    /**
+     * End a hold; purges once if any purge was asked for during it.
+     *
+     * @return string[] IDs of the caches purged.
+     */
+    public static function release(): array {
+        self::$held = max( 0, self::$held - 1 );
+
+        if ( self::$held > 0 || ! self::$pending ) {
+            return array();
+        }
+
+        self::$pending = false;
+
+        return self::purge();
+    }
+
+    /**
      * Purge every cache that is present; a missing or failing one is skipped.
      *
      * @param array|null $purgers Purgers; self::purgers() by default.
@@ -94,6 +134,13 @@ class PageCache {
      * @return string[] IDs of the caches purged.
      */
     public static function purge( ?array $purgers = null ): array {
+        // Held: one purge when the hold ends.
+        if ( self::$held > 0 ) {
+            self::$pending = true;
+
+            return array();
+        }
+
         $purged = array();
 
         foreach ( null === $purgers ? self::purgers() : $purgers as $id => $purger ) {

@@ -134,6 +134,11 @@ if ( ! function_exists( 'esc_html__' ) ) {
 
 if ( ! function_exists( 'update_option' ) ) {
     function update_option( $name, $value ) {
+        // A write the database refuses.
+        if ( ! empty( $GLOBALS['wcct_test_failing_options'][ $name ] ) ) {
+            return false;
+        }
+
         $changed = ! isset( $GLOBALS['wcct_test_options'] ) || ! array_key_exists( $name, $GLOBALS['wcct_test_options'] ) || $GLOBALS['wcct_test_options'][ $name ] !== $value;
 
         $GLOBALS['wcct_test_options'][ $name ] = $value;
@@ -167,5 +172,17 @@ if ( ! function_exists( 'do_action' ) ) {
         foreach ( isset( $GLOBALS['wcct_test_hooks'][ $hook ] ) ? (array) $GLOBALS['wcct_test_hooks'][ $hook ] : array() as $callback ) {
             call_user_func_array( $callback, $args );
         }
+    }
+}
+
+if ( ! function_exists( 'delete_option' ) ) {
+    function delete_option( $name ) {
+        if ( ! isset( $GLOBALS['wcct_test_options'] ) || ! array_key_exists( $name, $GLOBALS['wcct_test_options'] ) ) {
+            return false;
+        }
+
+        unset( $GLOBALS['wcct_test_options'][ $name ] );
+
+        return true;
     }
 }

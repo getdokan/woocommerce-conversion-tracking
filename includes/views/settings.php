@@ -49,12 +49,12 @@
 
                                             switch ( $field['type'] ) {
                                                 case 'text':
-                                                    $value = isset( $settings[0][ $field['name'] ] ) ? $settings[0][ $field['name'] ] : '';
+                                                    $value = isset( $settings[0][ $field['name'] ] ) && is_scalar( $settings[0][ $field['name'] ] ) ? $settings[0][ $field['name'] ] : '';
                                                     printf( '<input type="text" name="settings[%s][%d][%s]" placeholder="%s" value="%s" id="%s" required >', esc_attr( $id ),0, esc_attr( $field['name'] ), esc_attr( $placeholder ), esc_attr( $value ), esc_attr( $id ) . '-' . esc_attr( $field['name'] ) );
                                                     break;
 
                                                 case 'textarea':
-                                                    $value = isset( $settings[ $field['name'] ] ) ? $settings[ $field['name'] ] : '';
+                                                    $value = isset( $settings[ $field['name'] ] ) && is_scalar( $settings[ $field['name'] ] ) ? $settings[ $field['name'] ] : '';
                                                     // Disabled fields aren't posted, so the save keeps the stored script.
                                                     $locked = \StorePulse\ConversionTracking\Access\CustomScripts::INTEGRATION === $id && ! current_user_can( \StorePulse\ConversionTracking\Access\CustomScripts::CAPABILITY );
                                                     printf( '<textarea type="text" name="settings[%s][%s]" placeholder="%s" id="%s" cols="30" rows="3"%s>%s</textarea>', esc_attr( $id ), esc_attr( $field['name'] ), esc_attr( $placeholder ), esc_attr( $id ) . '-' . esc_attr( $field['name'] ), $locked ? ' disabled' : '', esc_textarea( $value ) );
@@ -92,7 +92,7 @@
 
                                                                     $name  = isset( $option['label_name'] ) ? $option['label_name'] : '';
                                                                     $placeholder = isset( $option['placeholder'] ) ? $option['placeholder'] : '';
-                                                                    $value = isset( $settings[0][ $field_name ][ $name ] ) ? $settings[0][ $field_name ][ $name ] : '';
+                                                                    $value = isset( $settings[0][ $field_name ][ $name ] ) && is_scalar( $settings[0][ $field_name ][ $name ] ) ? $settings[0][ $field_name ][ $name ] : '';
 
                                                                     if ( $input_box ) {
                                                                        ?>
