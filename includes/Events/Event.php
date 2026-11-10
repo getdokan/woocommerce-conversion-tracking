@@ -108,7 +108,7 @@ class Event {
     private $data;
 
     /**
-     * Hashed customer data for server sends; empty in 3.0.
+     * Hashed customer data (UserData), for platforms that send it with the event.
      *
      * @var array
      */
@@ -314,7 +314,7 @@ class Event {
     }
 
     /**
-     * Hashed customer data slot for server sends.
+     * Hashed customer data, field => SHA-256 hex.
      *
      * @return array
      */

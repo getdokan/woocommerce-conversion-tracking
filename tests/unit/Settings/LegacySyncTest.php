@@ -241,6 +241,33 @@ class LegacySyncTest extends TestCase {
         $this->assertSame( $doc, $GLOBALS['wcct_test_options']['wcct_settings_v3'] );
     }
 
+    public function test_a_classic_meta_save_keeps_the_3_0_meta_keys_and_writes_view_product_and_search() {
+        $GLOBALS['wcct_test_options']['wcct_settings_v3'] = array(
+            'platforms' => array(
+                'facebook' => array(
+                    'pixel_id'        => '111111111111111',
+                    'events'          => array( 'purchase', 'view_category' ),
+                    'skip_roles'      => 'admin',
+                    'value_mode'      => 'all',
+                    'product_id_mode' => 'sku',
+                ),
+            ),
+        );
+        $page = array( 'facebook' => array( 'ViewContent', 'AddToCart', 'InitiateCheckout', 'Purchase', 'Search', 'Registration' ) );
+        $v1   = array( 'facebook' => array( 'enabled' => true, 0 => array( 'pixel_id' => '222222222222222', 'events' => array( 'ViewContent' => 'on', 'Purchase' => 'on', 'Search' => 'on' ) ) ) );
+
+        LegacySync::sync( $v1, $page, true );
+
+        $facebook = $GLOBALS['wcct_test_options']['wcct_settings_v3']['platforms']['facebook'];
+
+        $this->assertSame( '222222222222222', $facebook['pixel_id'] );
+        // The Free page's View product and Search write through; View category (Pro) is kept.
+        $this->assertEqualsCanonicalizing( array( 'view_product', 'purchase', 'search', 'view_category' ), $facebook['events'] );
+        $this->assertSame( 'admin', $facebook['skip_roles'] );
+        $this->assertSame( 'all', $facebook['value_mode'] );
+        $this->assertSame( 'sku', $facebook['product_id_mode'] );
+    }
+
     public function test_the_page_events_are_the_checkboxes_the_user_can_change() {
         $facebook = new class() extends WCCT_Test_Fake_Integration {
             public function __construct() {

@@ -65,7 +65,7 @@ class PauseTest extends WCCT_Test_Page_Case {
         }
 
         // The other platforms keep sending.
-        $this->assertStringContainsString( "fbq('track', 'Purchase'", $paused );
+        $this->assertStringContainsString( 'wcfbq("111111111111111", "Purchase"', $paused );
         $this->assertStringContainsString( 'twq(', $paused );
     }
 
@@ -73,7 +73,7 @@ class PauseTest extends WCCT_Test_Page_Case {
         $settings = WCCT_Test_Settings::lite_all();
         $on       = $this->all_pages( $settings, array() );
 
-        $this->assertStringContainsString( "fbq('track', 'Purchase'", $on );
+        $this->assertStringContainsString( 'wcfbq("111111111111111", "Purchase"', $on );
         $this->assertStringContainsString( '"facebook"', $on );
 
         $paused = $this->all_pages( $settings, array( 'wcct_paused_platforms' => array( 'facebook' ) ) );
@@ -117,7 +117,7 @@ class PauseTest extends WCCT_Test_Page_Case {
         $after = $this->all_pages( $result['value']['wcct_settings'], array( 'wcct_paused_platforms' => array() ) );
 
         $this->assertStringContainsString( "fbq('init', '111111111111111'", $after );
-        $this->assertStringContainsString( "fbq('track', 'Purchase'", $after );
+        $this->assertStringContainsString( 'wcfbq("111111111111111", "Purchase"', $after );
     }
 
     public function test_queued_add_to_cart_of_a_platform_paused_since_is_dropped() {

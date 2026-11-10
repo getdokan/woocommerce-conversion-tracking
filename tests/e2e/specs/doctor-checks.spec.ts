@@ -95,8 +95,8 @@ test.describe('Tracking Doctor checks', () => {
     test('a clean store passes the checks and lists them as Working', async ({ page, context }) => {
         await setCookies(context, {
             ct_e2e_doctor_checks: LITE_CHECKS.filter(check => check !== 'purchases-24h').join(','),
-            ct_e2e_consent: 'on',
-            ct_e2e_consent_api: 'optin',
+            // ct-e2e-consent.php: consent mode on with an opt-in WP Consent API.
+            ct_e2e_consent: 'optin',
         });
         await openApp(page, '#/doctor');
 

@@ -186,3 +186,20 @@ if ( ! function_exists( 'delete_option' ) ) {
         return true;
     }
 }
+
+if ( ! function_exists( 'is_user_logged_in' ) ) {
+    function is_user_logged_in() {
+        // Tests log a user in by setting $GLOBALS['wcct_test_user_roles'].
+        return isset( $GLOBALS['wcct_test_user_roles'] );
+    }
+}
+
+if ( ! function_exists( 'wp_get_current_user' ) ) {
+    function wp_get_current_user() {
+        $user        = new stdClass();
+        $user->ID    = isset( $GLOBALS['wcct_test_user_roles'] ) ? 7 : 0;
+        $user->roles = isset( $GLOBALS['wcct_test_user_roles'] ) ? $GLOBALS['wcct_test_user_roles'] : array();
+
+        return $user;
+    }
+}

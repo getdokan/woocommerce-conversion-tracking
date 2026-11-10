@@ -105,6 +105,7 @@ $ct_e2e_settings = array(
         array(
             'pixel_id' => $ct_e2e_ids['meta']['pixelId'],
             'events'   => array(
+                'ViewContent'      => 'on',
                 'AddToCart'        => 'on',
                 'InitiateCheckout' => 'on',
                 'Purchase'         => 'on',

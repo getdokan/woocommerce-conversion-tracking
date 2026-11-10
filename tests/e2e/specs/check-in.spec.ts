@@ -151,12 +151,12 @@ test('a host that blocks guest REST still gets the check-in through admin-ajax',
     expect(fallbacks.length).toBeGreaterThanOrEqual(expected.length);
 });
 
-// "Respect cookie choices" on, opt-in, marketing and statistics denied (mu-plugins/ct-e2e-helpers.php); records every check-in body.
+// "Respect cookie choices" on, opt-in, marketing and statistics denied (mu-plugins/ct-e2e-consent.php); records every check-in body.
 const denyConsent = async (page: Page, extra: string[] = []): Promise<string[]> => {
     const checkIns: string[] = [];
 
     await page.context().addCookies(
-        ['ct_e2e_consent=on', 'ct_e2e_consent_api=optin', 'wp_consent_marketing=deny', 'wp_consent_statistics=deny', ...extra].map(pair => {
+        ['ct_e2e_consent=optin', 'wp_consent_marketing=deny', 'wp_consent_statistics=deny', ...extra].map(pair => {
             const [name, value] = pair.split('=');
 
             return { name, value, url: BASE_URL };

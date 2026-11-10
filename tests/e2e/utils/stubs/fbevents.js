@@ -8,10 +8,12 @@
 
     var pixels = [];
 
-    var send = function ( pixelId, eventName, params ) {
+    var send = function ( pixelId, eventName, params, options ) {
         var query = [
             'id=' + encodeURIComponent( pixelId ),
             'ev=' + encodeURIComponent( eventName ),
+            // Like the real library, the eventID option is sent as eid.
+            'eid=' + encodeURIComponent( options && options.eventID ? options.eventID : '' ),
             // Like the real library, the page URL and referrer come from the browser.
             'dl=' + encodeURIComponent( document.location.href ),
             'rl=' + encodeURIComponent( document.referrer ),
@@ -40,10 +42,10 @@
             }
         } else if ( method === 'track' || method === 'trackCustom' ) {
             for ( var i = 0; i < pixels.length; i++ ) {
-                send( pixels[ i ], args[ 1 ], args[ 2 ] );
+                send( pixels[ i ], args[ 1 ], args[ 2 ], args[ 3 ] );
             }
         } else if ( method === 'trackSingle' || method === 'trackSingleCustom' ) {
-            send( String( args[ 1 ] ), args[ 2 ], args[ 3 ] );
+            send( String( args[ 1 ] ), args[ 2 ], args[ 3 ], args[ 4 ] );
         }
     };
 

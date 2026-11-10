@@ -165,6 +165,7 @@ class EventFactory {
                 'decimals'    => wc_get_price_decimals(),
                 'order'       => $order,
                 'product_ids' => $ids,
+                'user_data'   => UserData::from_order( $order ),
             )
         );
     }

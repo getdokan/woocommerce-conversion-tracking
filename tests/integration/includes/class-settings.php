@@ -25,9 +25,11 @@ class WCCT_Test_Settings {
                 array(
                     'pixel_id' => '111111111111111',
                     'events'   => array(
+                        'ViewContent'      => 'on',
                         'AddToCart'        => 'on',
                         'InitiateCheckout' => 'on',
                         'Purchase'         => 'on',
+                        'Search'           => 'on',
                         'Registration'     => 'on',
                     ),
                 ),

@@ -39,8 +39,12 @@ class PendingEventsTest extends TestCase {
     public function test_meta_sends_the_product_added_and_its_value() {
         $queued = $this->result()['queued'];
 
-        $this->assertStringContainsString( "fbq('track', 'AddToCart', {\n    \"content_ids\": \"[2001]\",\n    \"content_type\": \"product\",\n    \"value\": \"36.00\",", $queued[0]['scripts']['facebook'] );
-        $this->assertStringContainsString( '"content_ids": "[2003]"', $queued[1]['scripts']['facebook'] );
+        $this->assertStringContainsString( "wcfbq(\"111111111111111\", \"AddToCart\", {\n    \"content_ids\": [\n        \"2001\"\n    ],\n    \"content_type\": \"product\",\n    \"value\": \"36.00\",", $queued[0]['scripts']['facebook'] );
+        $this->assertMatchesRegularExpression( '/"content_ids": \[\s*"2003"\s*\]/', $queued[1]['scripts']['facebook'] );
+
+        // The Meta event ID is made when the queued script runs in the browser.
+        $this->assertStringEndsWith( '}, id);})(wcctMeta.eventId());', $queued[0]['scripts']['facebook'] );
+        $this->assertStringNotContainsString( 'wcct_', $queued[0]['scripts']['facebook'] );
         $this->assertStringContainsString( '"value": "42.00"', $queued[1]['scripts']['facebook'] );
     }
 

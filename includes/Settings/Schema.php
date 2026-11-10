@@ -3,6 +3,7 @@
 namespace StorePulse\ConversionTracking\Settings;
 
 use StorePulse\ConversionTracking\Access\CustomScripts;
+use StorePulse\ConversionTracking\Events\SkipRoles;
 use StorePulse\ConversionTracking\Events\ValueMode;
 use StorePulse\ConversionTracking\Install;
 use StorePulse\ConversionTracking\Events\ProductId;
@@ -364,6 +365,7 @@ class Schema {
             self::section( 'facebook', 'facebook_advanced', __( 'Advanced settings', 'woocommerce-conversion-tracking' ), array( 'collapsible' => true, 'collapsed' => true ) ),
             self::value_mode_field( 'facebook_advanced', 'facebook' ),
             self::product_id_field( 'facebook_advanced' ),
+            self::skip_roles_field( 'facebook_advanced' ),
         );
     }
 
@@ -480,6 +482,7 @@ class Schema {
             ),
             self::value_mode_field( 'google_advanced', 'adwords', $ads ),
             self::product_id_field( 'google_advanced' ),
+            self::skip_roles_field( 'google_advanced' ),
         );
     }
 
@@ -528,6 +531,7 @@ class Schema {
             self::section( 'twitter', 'twitter_advanced', __( 'Advanced settings', 'woocommerce-conversion-tracking' ), array( 'collapsible' => true, 'collapsed' => true ) ),
             self::value_mode_field( 'twitter_advanced', 'twitter' ),
             self::product_id_field( 'twitter_advanced' ),
+            self::skip_roles_field( 'twitter_advanced' ),
         );
     }
 
@@ -761,6 +765,40 @@ class Schema {
         }
 
         return $field;
+    }
+
+    /**
+     * "Skip these roles" (skip_roles): a preset, read by SkipRoles; the default follows the install type.
+     *
+     * @param string $section Section ID.
+     *
+     * @return array
+     */
+    public static function skip_roles_field( string $section ): array {
+        return array(
+            'id'          => 'skip_roles',
+            'type'        => 'field',
+            'variant'     => 'select',
+            'section_id'  => $section,
+            'label'       => __( 'Skip these roles', 'woocommerce-conversion-tracking' ),
+            'description' => __( 'Your own visits won\'t count as shoppers.', 'woocommerce-conversion-tracking' ),
+            'default'     => SkipRoles::default_preset( Install::is_upgrade() ),
+            'priority'    => 60,
+            'options'     => array(
+                array(
+                    'value' => 'admin-shop',
+                    'label' => __( 'Administrator, Shop manager', 'woocommerce-conversion-tracking' ),
+                ),
+                array(
+                    'value' => 'admin',
+                    'label' => __( 'Administrator only', 'woocommerce-conversion-tracking' ),
+                ),
+                array(
+                    'value' => 'none',
+                    'label' => __( 'Track everyone', 'woocommerce-conversion-tracking' ),
+                ),
+            ),
+        );
     }
 
     /**

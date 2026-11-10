@@ -48,18 +48,8 @@ class WCCT_Pro_Features {
      */
     public function facebook_pro_features( $settings ) {
 
-        $settings['events']['options']['ViewContent-pro'] = array(
-            'label'         => __( 'View Product', 'woocommerce-conversion-tracking' ),
-            'profeature'    => true,
-        );
-
         $settings['events']['options']['ViewCategory-pro'] = array(
             'label'         => __( 'View Product Category', 'woocommerce-conversion-tracking' ),
-            'profeature'    => true,
-        );
-
-        $settings['events']['options']['Search-pro'] = array(
-            'label'         => __( 'Search', 'woocommerce-conversion-tracking' ),
             'profeature'    => true,
         );
 

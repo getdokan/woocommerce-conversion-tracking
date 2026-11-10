@@ -154,13 +154,94 @@ class PageOutputTest extends WCCT_Test_Page_Case {
     }
 
     public function test_sign_up_is_sent_on_the_first_page_view_after_registering() {
-        $this->assertStringContainsString( "fbq('track', 'CompleteRegistration'", $this->output_of( $this->request( 'facebook', 'registration' ) ) );
-        $this->assertStringNotContainsString( "fbq('track', 'CompleteRegistration'", $this->output_of( $this->request( 'facebook', 'my-account' ) ) );
+        $this->assertStringContainsString( 'wcfbq("111111111111111", "CompleteRegistration"', $this->event_js( $this->request( 'facebook', 'registration' ) ) );
+        $this->assertStringNotContainsString( '"CompleteRegistration"', $this->event_js( $this->request( 'facebook', 'my-account' ) ) );
     }
 
     public function test_meta_purchase_is_queued_on_the_thank_you_page() {
-        $this->assertStringContainsString( "fbq('track', 'Purchase', {", $this->output_of( $this->request( 'facebook', 'order-received-classic' ) ) );
-        $this->assertStringNotContainsString( "fbq('track', 'Purchase'", $this->output_of( $this->request( 'facebook', 'order-received-no-key' ) ) );
+        $this->assertStringContainsString( 'wcfbq("111111111111111", "Purchase", {', $this->event_js( $this->request( 'facebook', 'order-received-classic' ) ) );
+        $this->assertStringNotContainsString( '"Purchase"', $this->event_js( $this->request( 'facebook', 'order-received-no-key' ) ) );
+    }
+
+    public function test_meta_purchase_event_id_comes_from_the_order() {
+        $this->assertStringContainsString( '"wcct_3001_purchase");', $this->event_js( $this->request( 'facebook', 'order-received-block' ) ) );
+        $this->assertStringContainsString( '"wcct_3002_purchase");', $this->event_js( $this->request( 'facebook', 'order-received-customer' ) ) );
+    }
+
+    public function test_meta_page_view_carries_an_event_id() {
+        $this->assertStringContainsString( "fbq('track', 'PageView', {}, { eventID: wcctMeta.eventId() });", $this->output_of( $this->request( 'facebook', 'home' ) ) );
+    }
+
+    // A cached page must not repeat an event ID, so only Purchase has one in the HTML.
+    public function test_only_purchase_event_ids_are_in_the_html() {
+        foreach ( array( 'home', 'product-simple', 'search', 'checkout-block', 'cart-after-add-to-cart', 'registration' ) as $page ) {
+            $this->assertStringNotContainsString( 'wcct_{uuid}', $this->output_of( $this->request( 'all', $page ) ), $page );
+        }
+
+        $this->assertStringContainsString( 'window.wcctMeta && (function (id) {wcfbq("111111111111111", "ViewContent", {', $this->event_js( $this->request( 'facebook', 'product-simple' ) ) );
+        $this->assertStringContainsString( '}, id);})(wcctMeta.eventId());', $this->event_js( $this->request( 'facebook', 'product-simple' ) ) );
+    }
+
+    public function test_meta_content_ids_are_an_array_of_strings() {
+        $js = $this->event_js( $this->request( 'facebook', 'order-received-block' ) );
+
+        $this->assertMatchesRegularExpression( '/"content_ids": \[\s*"2001",\s*"2003"\s*\]/', $js );
+        $this->assertStringNotContainsString( '"[', $js );
+    }
+
+    public function test_meta_view_product_and_search_are_sent_on_free() {
+        $view = $this->event_js( $this->request( 'facebook', 'product-simple' ) );
+
+        $this->assertStringContainsString( 'wcfbq("111111111111111", "ViewContent", {', $view );
+        $this->assertStringContainsString( '"content_name": "Beanie"', $view );
+        $this->assertMatchesRegularExpression( '/"content_ids": \[\s*"2001"\s*\]/', $view );
+        $this->assertSame( 1, substr_count( $view, '"ViewContent"' ) );
+
+        $search = $this->event_js( $this->request( 'facebook', 'search' ) );
+
+        $this->assertStringContainsString( 'wcfbq("111111111111111", "Search", {', $search );
+        $this->assertStringContainsString( '"search_string": "cotton"', $search );
+        $this->assertSame( 1, substr_count( $search, '"Search"' ) );
+    }
+
+    public function test_meta_matching_is_hashed_and_no_customer_data_is_in_plain_text() {
+        foreach ( array( 'registration', 'order-received-customer' ) as $page ) {
+            $output = $this->output_of( $this->request( 'facebook', $page ) );
+
+            $this->assertStringNotContainsString( 'customer@example.com', $output, $page );
+            $this->assertStringContainsString( '"em": "' . hash( 'sha256', 'customer@example.com' ) . '"', $output, $page );
+        }
+
+        $guest = $this->output_of( $this->request( 'facebook', 'order-received-block' ) );
+
+        foreach ( array( 'jane@example.com', '555-0100', 'Jane', 'San Francisco', '94105' ) as $plain ) {
+            $this->assertStringNotContainsString( $plain, $guest, $plain );
+        }
+
+        $this->assertStringContainsString( '"em": "' . hash( 'sha256', 'jane@example.com' ) . '"', $guest );
+        $this->assertStringContainsString( '"ph": "' . hash( 'sha256', '15550100' ) . '"', $guest );
+        $this->assertStringContainsString( '"zp": "' . hash( 'sha256', '94105' ) . '"', $guest );
+    }
+
+    public function test_meta_matching_is_empty_without_a_verified_order_or_login() {
+        foreach ( array( 'order-received-no-key', 'order-received-customer-logged-out', 'home' ) as $page ) {
+            $this->assertStringContainsString( "fbq('init', '111111111111111', {});", $this->output_of( $this->request( 'facebook', $page ) ), $page );
+        }
+    }
+
+    public function test_skipped_roles_get_no_tracking_on_any_platform() {
+        $skip_customers = array( 'wcct_settings_v3' => array( 'platforms' => array( 'facebook' => array( 'skip_roles' => array( 'customer' ) ), 'google' => array( 'skip_roles' => array( 'customer' ) ), 'twitter' => array( 'skip_roles' => array( 'customer' ) ) ) ) );
+        $result         = $this->request_page( 'order-received-customer', WCCT_Test_Settings::only( WCCT_Test_Settings::lite_all(), 'all' ), $skip_customers );
+        $output         = $this->output_of( $result );
+
+        foreach ( array( 'fbq(', 'wcfbq(', 'twq(', 'G-CTTEST1234', 'AW-123456789' ) as $needle ) {
+            $this->assertStringNotContainsString( $needle, $output, $needle );
+        }
+
+        // Custom scripts have no skip setting.
+        $this->assertStringContainsString( 'ctCustom(', $output );
+        // The default skips administrators and shop managers only.
+        $this->assertStringContainsString( 'wcfbq(', $this->output_of( $this->request( 'all', 'order-received-customer' ) ) );
     }
 
     public function test_x_base_code_is_config_only() {

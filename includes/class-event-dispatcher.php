@@ -7,6 +7,7 @@ use StorePulse\ConversionTracking\Log\AjaxCheckIn;
 use StorePulse\ConversionTracking\Log\ThankYouSeen;
 use StorePulse\ConversionTracking\Onboarding\Verify;
 use StorePulse\ConversionTracking\Privacy\OrderUrl;
+use StorePulse\ConversionTracking\Platforms\Registry;
 
 /**
  * Event Manager
@@ -226,7 +227,8 @@ class WCCT_Event_Dispatcher {
     public function enqueue_scripts() {
 
         echo '<!-- Starting: Conversion Tracking for WooCommerce (https://wordpress.org/plugins/woocommerce-conversion-tracking/) -->' . PHP_EOL;
-        foreach ( $this->integrations as $integration ) {
+        // Platforms that skip the visitor's role print nothing.
+        foreach ( Registry::for_visitor( $this->integrations ) as $integration ) {
             $integration->enqueue_script();
         }
         echo '<!-- End: Conversion Tracking for WooCommerce Codes -->' . PHP_EOL;

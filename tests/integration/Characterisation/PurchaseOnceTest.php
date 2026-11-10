@@ -14,7 +14,7 @@ class PurchaseOnceTest extends TestCase {
      * @var string[]
      */
     const MARKERS = array(
-        'facebook' => "fbq('track', 'Purchase'",
+        'facebook' => 'wcfbq("111111111111111", "Purchase"',
         'adwords'  => "})('event', 'conversion'",
         'ga4'      => '"purchase",{"send_to":"G-CTTEST1234"',
         'twitter'  => "twq('event', \"tw-ct0x1-ctpur\"",

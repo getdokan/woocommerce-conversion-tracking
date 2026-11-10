@@ -58,7 +58,7 @@ class SchemaTest extends TestCase {
         $google = Schema::get()['platforms']['google'];
 
         $this->assertSame( array( 'ga4', 'adwords' ), $google['integrations'] );
-        $this->assertSame( array( 'mode', 'measurement_id', 'ads_id', 'purchase_label', 'events', 'tag_id', 'value_mode', 'product_id_mode' ), array_keys( Schema::fields( $google['schema'] ) ) );
+        $this->assertSame( array( 'mode', 'measurement_id', 'ads_id', 'purchase_label', 'events', 'tag_id', 'value_mode', 'product_id_mode', 'skip_roles' ), array_keys( Schema::fields( $google['schema'] ) ) );
         $this->assertSame( array( 'analytics', 'ads', 'both' ), array_column( Schema::fields( $google['schema'] )['mode']['options'], 'value' ) );
     }
 
@@ -212,6 +212,29 @@ class SchemaTest extends TestCase {
         unset( $GLOBALS['wcct_test_options'] );
 
         $this->assertSame( 'all', $default );
+    }
+
+    public function test_skip_roles_on_meta_google_and_x_defaults_by_install_type() {
+        $platforms = Schema::get()['platforms'];
+
+        foreach ( array( 'facebook', 'google', 'twitter' ) as $platform ) {
+            $field = Schema::fields( $platforms[ $platform ]['schema'] )['skip_roles'];
+
+            $this->assertSame( 'select', $field['variant'], $platform );
+            $this->assertSame( array( 'admin-shop', 'admin', 'none' ), array_column( $field['options'], 'value' ), $platform );
+            $this->assertSame( 'admin-shop', $field['default'], $platform );
+            $this->assertSame( $platform . '_advanced', $field['section_id'], $platform );
+        }
+
+        $this->assertArrayNotHasKey( 'skip_roles', Schema::fields( $platforms['custom']['schema'] ) );
+
+        $GLOBALS['wcct_test_options']['wcct_install_type'] = 'upgrade';
+
+        $default = Schema::fields( Schema::get()['platforms']['facebook']['schema'] )['skip_roles']['default'];
+
+        unset( $GLOBALS['wcct_test_options'] );
+
+        $this->assertSame( 'none', $default );
     }
 }
 

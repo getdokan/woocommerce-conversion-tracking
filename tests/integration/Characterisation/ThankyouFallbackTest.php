@@ -32,7 +32,7 @@ class ThankyouFallbackTest extends TestCase {
     public function test_guest_order_sends_one_purchase_per_platform() {
         $value = $this->run_job( 3001, 0 );
 
-        $this->assertSame( 1, substr_count( $value['scripts']['facebook'], "fbq('track', 'Purchase'" ) );
+        $this->assertSame( 1, substr_count( $value['scripts']['facebook'], 'wcfbq("111111111111111", "Purchase"' ) );
         $this->assertSame( 1, substr_count( $value['scripts']['adwords'], "})('event', 'conversion'" ) );
         $this->assertSame( 1, substr_count( $value['scripts']['twitter'], "twq('event', \"tw-ct0x1-ctpur\"" ) );
         $this->assertSame( 1, substr_count( $value['scripts']['ga4'], '[["purchase",' ) );
@@ -48,7 +48,7 @@ class ThankyouFallbackTest extends TestCase {
 
         $value = $this->run_job( 3002, 501 );
 
-        $this->assertSame( 1, substr_count( $value['scripts']['facebook'], "fbq('track', 'Purchase'" ) );
+        $this->assertSame( 1, substr_count( $value['scripts']['facebook'], 'wcfbq("111111111111111", "Purchase"' ) );
     }
 
     public function test_sent_or_failed_orders_send_nothing() {

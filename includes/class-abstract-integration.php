@@ -164,6 +164,15 @@ abstract class WCCT_Integration {
     }
 
     /**
+     * Whether the logged-in visitor is in a role this integration skips
+     *
+     * @return boolean
+     */
+    public function skips_current_user() {
+        return \StorePulse\ConversionTracking\Events\SkipRoles::skips_current_user( $this->id );
+    }
+
+    /**
      * How the integration sends events
      *
      * @return array

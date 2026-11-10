@@ -63,4 +63,20 @@ class Registry {
             }
         );
     }
+
+    /**
+     * Platforms that track the current visitor: those that skip the visitor's role are left out.
+     *
+     * @param \WCCT_Integration[] $platforms Platforms.
+     *
+     * @return \WCCT_Integration[]
+     */
+    public static function for_visitor( array $platforms ) {
+        return array_filter(
+            $platforms,
+            function ( $platform ) {
+                return ! $platform->skips_current_user();
+            }
+        );
+    }
 }

@@ -93,6 +93,18 @@ class ConsentPageOutputTest extends WCCT_Test_Page_Case {
         $this->assertStringContainsString( 'window.wcctConsent.script("marketing", "https://static.ads-twitter.com/uwt.js");', $output );
     }
 
+    // The Meta image fallback only starts its clock once marketing is allowed, so no image goes out before consent (#86).
+    public function test_the_meta_fallback_starts_only_with_marketing_consent() {
+        $output = $this->output_of( $this->request( 'facebook', 'order-received-block' ) );
+
+        $this->assertStringContainsString( 'if (window.wcctConsent) { window.wcctConsent.when("marketing", function () { window.wcctMeta && wcctMeta.start(); }); }', $output );
+
+        $off = $this->output_of( $this->request_page( 'order-received-block', WCCT_Test_Settings::only( WCCT_Test_Settings::lite_all(), 'facebook' ) ) );
+
+        $this->assertStringContainsString( 'window.wcctMeta && wcctMeta.start();', $off );
+        $this->assertStringNotContainsString( 'wcctConsent.when', $off );
+    }
+
     public function test_custom_scripts_wait_for_marketing_consent() {
         $output = $this->output_of( $this->request( 'custom', 'order-received-block' ) );
 

@@ -120,13 +120,13 @@ class Pipeline {
     }
 
     /**
-     * Active platforms that send in the browser, keyed by ID, in registration order.
+     * Active platforms that send in the browser and track this visitor, keyed by ID, in registration order.
      *
      * @return \WCCT_Integration[]
      */
     public function get_platforms() {
         if ( null === $this->platforms ) {
-            $this->platforms = Registry::browser( Registry::normalise( call_user_func( $this->platform_source ) ) );
+            $this->platforms = Registry::for_visitor( Registry::browser( Registry::normalise( call_user_func( $this->platform_source ) ) ) );
         }
 
         return $this->platforms;

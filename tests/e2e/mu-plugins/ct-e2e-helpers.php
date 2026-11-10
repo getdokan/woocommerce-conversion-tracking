@@ -111,7 +111,10 @@ if ( isset( $_COOKIE['ct_e2e_doctor_checks'] ) || isset( $_COOKIE['ct_e2e_doctor
 add_filter(
     'wcct_consent_mode_enabled',
     static function ( $enabled ) {
-        return isset( $_COOKIE['ct_e2e_consent'] ) ? 'on' === $_COOKIE['ct_e2e_consent'] : $enabled;
+        // Only on/off belong to this switch; optin is ct-e2e-consent.php's (consent mode on plus a stub consent API).
+        $cookie = isset( $_COOKIE['ct_e2e_consent'] ) ? $_COOKIE['ct_e2e_consent'] : '';
+
+        return in_array( $cookie, array( 'on', 'off' ), true ) ? 'on' === $cookie : $enabled;
     }
 );
 
@@ -360,21 +363,6 @@ add_filter(
     10,
     3
 );
-
-// Check-in specs: the ct_e2e_consent_api=optin cookie adds a minimal opt-in WP Consent API (a category is allowed only when its wp_consent_<category> cookie is 'allow'). Pair it with ct_e2e_consent=on. To merge with the Meta branch's ct-e2e-consent.php stub, whichever lands second.
-if ( isset( $_COOKIE['ct_e2e_consent_api'] ) && 'optin' === $_COOKIE['ct_e2e_consent_api'] ) {
-    if ( ! function_exists( 'wp_has_consent' ) ) {
-        function wp_has_consent( $category ) {
-            return isset( $_COOKIE[ 'wp_consent_' . $category ] ) && 'allow' === $_COOKIE[ 'wp_consent_' . $category ];
-        }
-    }
-
-    if ( ! function_exists( 'wp_get_consent_type' ) ) {
-        function wp_get_consent_type() {
-            return 'optin';
-        }
-    }
-}
 
 // The ct_e2e_no_unfiltered_html cookie takes unfiltered_html away, as on a multisite site admin or with DISALLOW_UNFILTERED_HTML.
 add_filter(

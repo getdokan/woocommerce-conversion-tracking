@@ -76,8 +76,8 @@ class ProductIdTest extends TestCase {
 
         $queued = $result['value']['queued'];
 
-        $this->assertStringContainsString( '"content_ids": "[\"CT-BEANIE\"]"', $queued[0]['scripts']['facebook'] );
-        $this->assertStringContainsString( '"content_ids": "[\"CT-HOODIE-BLUE\"]"', $queued[1]['scripts']['facebook'] );
+        $this->assertMatchesRegularExpression( '/"content_ids": \[\s*"CT-BEANIE"\s*\]/', $queued[0]['scripts']['facebook'] );
+        $this->assertMatchesRegularExpression( '/"content_ids": \[\s*"CT-HOODIE-BLUE"\s*\]/', $queued[1]['scripts']['facebook'] );
         $this->assertStringContainsString( '"item_id":"CT-HOODIE-BLUE"', $queued[1]['scripts']['ga4'] );
     }
 
@@ -100,7 +100,7 @@ class ProductIdTest extends TestCase {
 
         $scripts = $result['value']['scripts'];
 
-        $this->assertStringContainsString( '"content_ids": "[\"CT-BEANIE\",\"CT-HOODIE-BLUE\"]",' . "\n" . '    "content_type": "product"', $scripts['facebook'] );
+        $this->assertMatchesRegularExpression( '/"content_ids": \[\s*"CT-BEANIE",\s*"CT-HOODIE-BLUE"\s*\],\s*"content_type": "product"/', $scripts['facebook'] );
         $this->assertStringContainsString( '"content_id":"CT-BEANIE"', $scripts['twitter'] );
         $this->assertStringContainsString( '"content_id":"CT-HOODIE-BLUE"', $scripts['twitter'] );
         $this->assertStringContainsString( '"item_id":"CT-BEANIE"', $scripts['ga4'] );

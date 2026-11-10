@@ -419,16 +419,25 @@ window.wcctConsentConfig = {"api":false,"bridge":false,"cookiePrefix":"wp_consen
 
 <!-- Starting: Conversion Tracking for WooCommerce (https://wordpress.org/plugins/woocommerce-conversion-tracking/) -->
         <script>
-            !function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?
-            n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;
-            n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;
-            t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,
-            document,'script','https://connect.facebook.net/en_US/fbevents.js');
-
-            if (window.wcctConsent) { window.wcctConsent.sync("marketing", function (granted, first) { fbq('consent', granted ? 'grant' : 'revoke'); }); }fbq('init', '111111111111111', {});fbq('track', 'PageView', {});        </script>
-                <script>
             (function (window, document) {
                 if (window.wcfbq) return;
+                var version = '2.9.435';
+                var standard = ['AddPaymentInfo', 'AddToCart', 'AddToWishlist', 'CompleteRegistration', 'Contact', 'CustomizeProduct', 'Donate', 'FindLocation', 'InitiateCheckout', 'Lead', 'PageView', 'Purchase', 'Schedule', 'Search', 'StartTrial', 'SubmitApplication', 'Subscribe', 'ViewContent'];
+                var pending = [];
+                var ready = document.readyState === 'complete';
+                // When the base code ran (wcctMeta.start()); no image goes out before that.
+                var started = 0;
+                var loaded = function () {
+                    return !!(window.fbq && window.fbq.callMethod);
+                };
+                // A consent revoke waiting in the queue of a library that never loaded also holds back the fallback.
+                var revoked = function () {
+                    var queue = window.fbq && window.fbq.queue, state = '';
+                    for (var i = 0; queue && i < queue.length; i++) {
+                        if (queue[i] && queue[i][0] === 'consent') state = queue[i][1];
+                    }
+                    return state === 'revoke';
+                };
                 var cleanUrl = function (url) {
                     var names = ["key","order","order_id","order-pay","order_key"], numeric = ["order"];
                     try {
@@ -452,65 +461,85 @@ window.wcctConsentConfig = {"api":false,"bridge":false,"cookiePrefix":"wp_consen
                         return String(url).split('?')[0];
                     }
                 };
-                window.wcfbq = (function () {
-                    if (arguments.length > 0) {
-                        var pixelId, trackType, contentObj;
-
-                        if (typeof arguments[0] == 'string') pixelId = arguments[0];
-                        if (typeof arguments[1] == 'string') trackType = arguments[1];
-                        if (typeof arguments[2] == 'object') contentObj = arguments[2];
-
-                        var params = [];
-                        if (typeof pixelId === 'string' && pixelId.replace(/\s+/gi, '') != '' &&
-                        typeof trackType === 'string' && trackType.replace(/\s+/gi, '')) {
-                            params.push('id=' + encodeURIComponent(pixelId));
-                            switch (trackType) {
-                                case 'PageView':
-                                case 'ViewContent':
-                                case 'Search':
-                                case 'AddToCart':
-                                case 'InitiateCheckout':
-                                case 'AddPaymentInfo':
-                                case 'Lead':
-                                case 'CompleteRegistration':
-                                case 'Purchase':
-                                case 'AddToWishlist':
-                                    params.push('ev=' + encodeURIComponent(trackType));
-                                    break;
-                                default:
-                                    return;
-                            }
-
-                            params.push('dl=' + encodeURIComponent(cleanUrl(document.location.href)));
-                            if (document.referrer) params.push('rl=' + encodeURIComponent(cleanUrl(document.referrer)));
-                            params.push('if=false');
-                            params.push('ts=' + new Date().getTime());
-
-                            if (typeof contentObj == 'object') {
-                                for (var u in contentObj) {
-                                    if (typeof contentObj[u] == 'object' && contentObj[u] instanceof Array) {
-                                        if (contentObj[u].length > 0) {
-                                            for (var y = 0; y < contentObj[u].length; y++) { contentObj[u][y] = (contentObj[u][y] + '').replace(/^\s+|\s+$/gi, '').replace(/\s+/gi, ' ').replace(/,/gi, '§'); }
-                                            params.push('cd[' + u + ']=' + encodeURIComponent(contentObj[u].join(',').replace(/^/gi, '[\'').replace(/$/gi, '\']').replace(/,/gi, '\',\'').replace(/§/gi, '\,')));
-                                        }
-                                    }
-                                    else if (typeof contentObj[u] == 'string')
-                                        params.push('cd[' + u + ']=' + encodeURIComponent(contentObj[u]));
-                                }
-                            }
-
-                            params.push('v=' + encodeURIComponent('2.7.19'));
-
-                            var imgId = new Date().getTime();
-                            var img = document.createElement('img');
-                            img.id = 'fb_' + imgId, img.src = 'https://www.facebook.com/tr/?' + params.join('&'), img.width = 1, img.height = 1, img.style = 'display:none;';
-                            document.body.appendChild(img);
-                            window.setTimeout(function () { var t = document.getElementById('fb_' + imgId); t.parentElement.removeChild(t); }, 1000);
+                var uuid = function () {
+                    if (window.crypto && window.crypto.randomUUID) return window.crypto.randomUUID();
+                    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+                        var r = Math.random() * 16 | 0;
+                        return (c == 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+                    });
+                };
+                // eid is the parameter Meta reads; event_id carries the same value.
+                var beacon = function (pixelId, eventName, params, eventId) {
+                    var query = [
+                        'id=' + encodeURIComponent(pixelId),
+                        'ev=' + encodeURIComponent(eventName),
+                        'eid=' + encodeURIComponent(eventId),
+                        'event_id=' + encodeURIComponent(eventId),
+                        'dl=' + encodeURIComponent(cleanUrl(document.location.href)),
+                        'if=false',
+                        'ts=' + new Date().getTime()
+                    ];
+                    if (document.referrer) query.push('rl=' + encodeURIComponent(cleanUrl(document.referrer)));
+                    for (var key in params) {
+                        if (Object.prototype.hasOwnProperty.call(params, key) && params[key] !== null && params[key] !== undefined) {
+                            query.push('cd[' + encodeURIComponent(key) + ']=' + encodeURIComponent(typeof params[key] == 'object' ? JSON.stringify(params[key]) : String(params[key])));
                         }
                     }
-                });
+                    query.push('v=' + encodeURIComponent(version));
+                    new Image(1, 1).src = 'https://www.facebook.com/tr/?' + query.join('&');
+                };
+                var flush = function () {
+                    var calls = pending;
+                    pending = [];
+                    if (loaded() || revoked()) return;
+                    for (var i = 0; i < calls.length; i++) beacon.apply(null, calls[i]);
+                };
+                // The library gets until the page has loaded and a second after the base code ran.
+                var schedule = function () {
+                    if (!started || !ready || !pending.length) return;
+                    window.setTimeout(flush, Math.max(0, started + 1000 - new Date().getTime()));
+                };
+                if (!ready) {
+                    window.addEventListener('load', function () {
+                        ready = true;
+                        schedule();
+                    });
+                }
+                window.wcfbq = function (pixelId, eventName, params, eventId) {
+                    if (typeof pixelId != 'string' || !pixelId.replace(/\s+/g, '') || typeof eventName != 'string' || !/^[A-Za-z0-9_]+$/.test(eventName)) return;
+                    params = params && typeof params == 'object' ? params : {};
+                    eventId = typeof eventId == 'string' && eventId ? eventId : window.wcctMeta.eventId();
+                    // Without the base code there is no Meta tag on the page, so nothing is sent.
+                    if (typeof window.fbq != 'function') return eventId;
+                    window.fbq(standard.indexOf(eventName) > -1 ? 'trackSingle' : 'trackSingleCustom', pixelId, eventName, params, { eventID: eventId });
+                    if (!loaded()) {
+                        pending.push([pixelId, eventName, params, eventId]);
+                        schedule();
+                    }
+                    return eventId;
+                };
+                // Outside wcfbq, which consent mode wraps.
+                window.wcctMeta = {
+                    eventId: function () {
+                        return 'wcct_' + uuid();
+                    },
+                    start: function () {
+                        if (started) return;
+                        started = new Date().getTime();
+                        schedule();
+                    }
+                };
+                window.wcfbq.eventId = window.wcctMeta.eventId;
             })(window, document);
         </script>
+                <script>
+            !function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+            n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;
+            n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;
+            t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,
+            document,'script','https://connect.facebook.net/en_US/fbevents.js');
+
+            if (window.wcctConsent) { window.wcctConsent.sync("marketing", function (granted, first) { fbq('consent', granted ? 'grant' : 'revoke'); }); }fbq('init', '111111111111111', {});fbq('track', 'PageView', {}, { eventID: wcctMeta.eventId() });if (window.wcctConsent) { window.wcctConsent.when("marketing", function () { window.wcctMeta && wcctMeta.start(); }); }        </script>
         <script data-no-optimize="1">if (window.wcctConsent) { window.wcctConsent.wrap("wcfbq", "marketing"); }</script>
 <!-- End: Conversion Tracking for WooCommerce Codes -->
 
