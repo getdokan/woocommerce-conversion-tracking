@@ -215,6 +215,10 @@ class WeDevs_WC_Conversion_Tracking {
         \StorePulse\ConversionTracking\Log\Prune::init_hooks();
         \StorePulse\ConversionTracking\Log\Activity::init_hooks();
 
+        // The menu badge and the alert switches (Settings > Alerts); the dashboard's "Connected 5 minutes ago".
+        \StorePulse\ConversionTracking\Alerts\Alerts::register();
+        \StorePulse\ConversionTracking\Dashboard\ConnectedAt::register();
+
         // Every settings save and pause purges the known page caches.
         \StorePulse\ConversionTracking\Cache\PageCache::register();
 

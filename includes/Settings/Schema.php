@@ -3,6 +3,7 @@
 namespace StorePulse\ConversionTracking\Settings;
 
 use StorePulse\ConversionTracking\Access\CustomScripts;
+use StorePulse\ConversionTracking\Alerts\Alerts;
 use StorePulse\ConversionTracking\Events\SkipRoles;
 use StorePulse\ConversionTracking\Events\ValueMode;
 use StorePulse\ConversionTracking\Install;
@@ -303,7 +304,7 @@ class Schema {
      * @return array
      */
     private static function global_elements(): array {
-        return array(
+        $elements = array(
             array(
                 'id'    => 'general',
                 'type'  => 'page',
@@ -320,6 +321,9 @@ class Schema {
                 'default'     => false,
             ),
         );
+
+        // Settings > Alerts: a switch per registered alert type.
+        return array_merge( $elements, Alerts::schema_elements() );
     }
 
     /**

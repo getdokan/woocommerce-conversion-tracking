@@ -34,6 +34,13 @@ class Activity {
     private static $memo = array();
 
     /**
+     * Whether the last evaluation stopped at the order limit.
+     *
+     * @var bool
+     */
+    private static $truncated = false;
+
+    /**
      * Drop the cached list when check-ins, pauses or settings change.
      *
      * @return void
@@ -99,6 +106,15 @@ class Activity {
     }
 
     /**
+     * Whether the last evaluation in this request stopped at the order limit, so its counts may be short.
+     *
+     * @return bool
+     */
+    public static function truncated() {
+        return self::$truncated;
+    }
+
+    /**
      * Orders a platform didn't confirm, for the dashboard badge and card.
      *
      * @param int|null $now Unix time, default now.
@@ -129,6 +145,13 @@ class Activity {
         if ( function_exists( 'delete_transient' ) ) {
             delete_transient( self::CACHE );
         }
+
+        /**
+         * Fires after the cached Activity list is dropped (a check-in, a pause or a settings save).
+         *
+         * @since 3.0.0
+         */
+        do_action( 'wcct_activity_flushed' );
     }
 
     /**
@@ -241,6 +264,9 @@ class Activity {
         $orders    = self::recent( $since );
         $orders   += self::checked_in_since( $since, $orders );
         $rows      = self::rows( array_keys( $orders ) );
+
+        self::$truncated = count( $orders ) >= self::limit();
+
         $platforms = self::platforms();
         $list      = array();
 
@@ -298,7 +324,7 @@ class Activity {
      *
      * @return int
      */
-    private static function limit() {
+    public static function limit() {
         /**
          * Most orders the Activity log reads per request, newest first.
          *

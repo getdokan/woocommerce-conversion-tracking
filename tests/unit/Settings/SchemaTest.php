@@ -45,7 +45,8 @@ class SchemaTest extends TestCase {
     public function test_consent_is_one_global_switch_off_by_default() {
         $global = Schema::fields( Schema::get()['global'] );
 
-        $this->assertSame( array( 'consent_mode' ), array_keys( $global ) );
+        // Consent is the only global setting besides the alert switches (#117).
+        $this->assertSame( array( 'consent_mode' ), array_keys( array_diff_key( $global, array_flip( array( 'alert_not_confirmed', 'alert_doctor_new' ) ) ) ) );
         $this->assertSame( 'switch', $global['consent_mode']['variant'] );
         $this->assertFalse( $global['consent_mode']['default'] );
 

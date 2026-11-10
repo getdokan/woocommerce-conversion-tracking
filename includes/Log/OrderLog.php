@@ -192,6 +192,24 @@ class OrderLog {
     }
 
     /**
+     * IDs of orders with a browser check-in at or after a Unix time that wasn't handed over (consent declined aside), newest check-in first; the only orders that can be not confirmed.
+     *
+     * @param int $since Unix time.
+     * @param int $limit Most IDs returned.
+     *
+     * @return int[]
+     */
+    public static function not_handed_over_since( $since, $limit = 100 ) {
+        global $wpdb;
+
+        $table = self::table();
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- own table.
+        $ids = $wpdb->get_col( $wpdb->prepare( "SELECT order_id FROM {$table} WHERE created_at >= %s AND source = %s AND library_loaded = 0 AND consent <> 'denied' GROUP BY order_id ORDER BY MAX(created_at) DESC, order_id DESC LIMIT %d", self::datetime( $since ), self::SOURCE_BROWSER, max( 1, (int) $limit ) ) );
+
+        return is_array( $ids ) ? array_map( 'intval', $ids ) : array();
+    }
+
+    /**
      * Insert the row, or update it when the order, platform and source already have one; a handed-over row never goes back.
      *
      * @param array $row Column => value; order_id, platform, source, library_loaded, created_at and updated_at are required.

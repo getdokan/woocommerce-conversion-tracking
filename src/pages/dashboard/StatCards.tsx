@@ -7,7 +7,12 @@ import { Check, ShoppingCart, Stethoscope, TriangleAlert } from 'lucide-react';
 /**
  * WordPress dependencies
  */
-import { __ } from '@wordpress/i18n';
+import { __, sprintf } from '@wordpress/i18n';
+
+/**
+ * Internal dependencies
+ */
+import type { Metrics } from '../../data/metrics';
 
 // MatricsCard's icon circle, toned per card; literal classes so Tailwind finds them.
 const TONES = {
@@ -18,17 +23,43 @@ const TONES = {
 };
 
 /**
- * The four 24-hour stat cards, empty until the metrics route fills them.
+ * "Not confirmed on Meta" when one platform didn't confirm, "Not confirmed" otherwise.
  *
- * @param {Object}  props               Component props.
- * @param {boolean} props.refreshing    Show skeletons.
- * @param {string}  props.lastDoctorRun When the Doctor last ran, for example "2 days ago"; empty before the first run.
+ * @param {Metrics|null} metrics Metrics.
+ */
+const notConfirmedLabel = ( metrics: Metrics | null ): string => {
+    const ids = Object.keys( metrics?.not_confirmed_by ?? {} );
+    const name =
+        ids.length === 1
+            ? metrics?.platforms.find(
+                  ( platform ) => platform.id === ids[ 0 ]
+              )?.name
+            : '';
+
+    return name
+        ? sprintf(
+              /* translators: %s: platform name, for example Meta */
+              __( 'Not confirmed on %s', 'woocommerce-conversion-tracking' ),
+              name
+          )
+        : __( 'Not confirmed', 'woocommerce-conversion-tracking' );
+};
+
+/**
+ * The four 24-hour stat cards, from the metrics route; a dash until it answers.
+ *
+ * @param {Object}       props               Component props.
+ * @param {boolean}      props.refreshing    Show skeletons.
+ * @param {Metrics|null} props.metrics       Metrics, null while they load or when they failed.
+ * @param {string}       props.lastDoctorRun When the Doctor last ran, for example "2 days ago"; empty before the first run.
  */
 export const StatCards = ( {
     refreshing,
+    metrics,
     lastDoctorRun,
 }: {
     refreshing: boolean;
+    metrics: Metrics | null;
     lastDoctorRun: string;
 } ) => {
     const empty = '–';
@@ -37,21 +68,28 @@ export const StatCards = ( {
             id: 'purchases',
             icon: ShoppingCart,
             tone: TONES.primary,
-            value: empty,
+            value: metrics ? String( metrics.purchases ) : empty,
             label: __( 'Purchases tracked', 'woocommerce-conversion-tracking' ),
         },
         {
             id: 'not-confirmed',
             icon: TriangleAlert,
             tone: TONES.warn,
-            value: empty,
-            label: __( 'Not confirmed', 'woocommerce-conversion-tracking' ),
+            value: metrics ? String( metrics.not_confirmed ) : empty,
+            label: notConfirmedLabel( metrics ),
         },
         {
             id: 'working',
             icon: Check,
             tone: TONES.ok,
-            value: empty,
+            value: metrics
+                ? sprintf(
+                      /* translators: 1: platforms working, 2: platforms connected */
+                      __( '%1$d of %2$d', 'woocommerce-conversion-tracking' ),
+                      metrics.platforms_working,
+                      metrics.platforms_connected
+                  )
+                : empty,
             label: __( 'Platforms working', 'woocommerce-conversion-tracking' ),
         },
         {
@@ -86,6 +124,7 @@ export const StatCards = ( {
                 ) : (
                     <MatricsCard
                         key={ card.id }
+                        data-testid={ `wcct-stat-${ card.id }` }
                         icon={ card.icon }
                         value={ card.value }
                         shortDescription={ card.label }

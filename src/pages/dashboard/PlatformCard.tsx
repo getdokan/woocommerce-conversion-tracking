@@ -12,6 +12,7 @@ import { __ } from '@wordpress/i18n';
 /**
  * Internal dependencies
  */
+import type { MetricsPlatform, PlatformState } from '../../data/metrics';
 import { upgradeUrl } from '../../data/plan';
 import type { PlatformCardInfo } from '../../data/platforms';
 import { NewTabNote } from '../../shell/NewTabNote';
@@ -54,58 +55,126 @@ const Identity = ( {
 );
 
 /**
+ * The state a connected platform's card shows: from the metrics route, or paused / waiting from the settings until it answers.
+ *
+ * @param {PlatformCardInfo} platform Platform.
+ * @param {MetricsPlatform=} metric   The platform's metrics.
+ */
+export const cardState = (
+    platform: PlatformCardInfo,
+    metric?: MetricsPlatform
+): PlatformState => {
+    if ( metric && metric.state !== 'not_set_up' ) {
+        return metric.state;
+    }
+
+    return platform.paused ? 'paused' : 'waiting';
+};
+
+const PILLS = (): Record<
+    PlatformState,
+    { tone: 'ok' | 'warn' | 'off'; label: string }
+> => ( {
+    working: {
+        tone: 'ok',
+        label: __( 'Working', 'woocommerce-conversion-tracking' ),
+    },
+    attention: {
+        tone: 'warn',
+        label: __( 'Needs attention', 'woocommerce-conversion-tracking' ),
+    },
+    waiting: {
+        tone: 'off',
+        label: __(
+            'Waiting for first event',
+            'woocommerce-conversion-tracking'
+        ),
+    },
+    paused: {
+        tone: 'off',
+        label: __( 'Paused', 'woocommerce-conversion-tracking' ),
+    },
+    not_set_up: {
+        tone: 'off',
+        label: __( 'Not set up', 'woocommerce-conversion-tracking' ),
+    },
+} );
+
+/**
+ * The card's line when the metrics route didn't answer.
+ *
+ * @param {PlatformState} state State.
+ */
+const fallbackNote = ( state: PlatformState ): string =>
+    state === 'paused'
+        ? __(
+              'Tracking is paused. Nothing is sent until you resume it.',
+              'woocommerce-conversion-tracking'
+          )
+        : __(
+              'This updates when the first purchase checks in. Place a test order to see it now.',
+              'woocommerce-conversion-tracking'
+          );
+
+/**
  * A connected platform: the whole card opens its page.
  *
- * @param {Props} props Component props.
+ * @param {Props}            props        Component props.
+ * @param {MetricsPlatform=} props.metric The platform's metrics; missing while they load or when they failed.
  */
-export const ConnectedPlatformCard = ( { platform, refreshing }: Props ) => (
-    <Card
-        size="sm"
-        className="relative gap-4 px-4 transition-shadow hover:shadow-md"
-        data-testid={ `wcct-platform-card-${ platform.id }` }
-    >
-        { refreshing ? (
-            <CardSkeleton lines={ 1 } />
-        ) : (
-            <>
-                <span className="flex items-center justify-between gap-2.5">
-                    <a
-                        href={ `#/platforms/${ platform.id }` }
-                        className="min-w-0 text-inherit no-underline after:absolute after:inset-0 after:content-[''] hover:text-inherit"
+export const ConnectedPlatformCard = ( {
+    platform,
+    refreshing,
+    metric,
+}: Props & { metric?: MetricsPlatform } ) => {
+    const state = cardState( platform, metric );
+    const pill = PILLS()[ state ];
+    const note = metric?.note ?? null;
+
+    return (
+        <Card
+            size="sm"
+            className="relative gap-4 px-4 transition-shadow hover:shadow-md"
+            data-testid={ `wcct-platform-card-${ platform.id }` }
+            data-state={ refreshing ? undefined : state }
+        >
+            { refreshing ? (
+                <CardSkeleton lines={ 1 } />
+            ) : (
+                <>
+                    <span className="flex items-center justify-between gap-2.5">
+                        <a
+                            href={ `#/platforms/${ platform.id }` }
+                            className="min-w-0 text-inherit no-underline after:absolute after:inset-0 after:content-[''] hover:text-inherit"
+                        >
+                            <Identity platform={ platform } off={ false } />
+                        </a>
+                        <StatusPill tone={ pill.tone }>
+                            { pill.label }
+                        </StatusPill>
+                    </span>
+                    <span
+                        className="block text-[13px] text-muted-foreground"
+                        data-testid={ `wcct-platform-note-${ platform.id }` }
                     >
-                        <Identity platform={ platform } off={ false } />
-                    </a>
-                    { platform.paused ? (
-                        <StatusPill tone="off">
-                            { __(
-                                'Paused',
-                                'woocommerce-conversion-tracking'
-                            ) }
-                        </StatusPill>
-                    ) : (
-                        <StatusPill tone="off">
-                            { __(
-                                'Waiting for first event',
-                                'woocommerce-conversion-tracking'
-                            ) }
-                        </StatusPill>
-                    ) }
-                </span>
-                <span className="block text-[13px] text-muted-foreground">
-                    { platform.paused
-                        ? __(
-                              'Tracking is paused. Nothing is sent until you resume it.',
-                              'woocommerce-conversion-tracking'
-                          )
-                        : __(
-                              'This updates when the first purchase checks in. Place a test order to see it now.',
-                              'woocommerce-conversion-tracking'
-                          ) }
-                </span>
-            </>
-        ) }
-    </Card>
-);
+                        { note ? note.text : fallbackNote( state ) }
+                        { note?.link && (
+                            <>
+                                { ' ' }
+                                <a
+                                    href={ note.link }
+                                    className="relative z-10 font-medium text-primary no-underline hover:underline"
+                                >
+                                    { note.link_label }
+                                </a>
+                            </>
+                        ) }
+                    </span>
+                </>
+            ) }
+        </Card>
+    );
+};
 
 /**
  * A platform that isn't set up: Connect, or the Pro upgrade line when it's locked.

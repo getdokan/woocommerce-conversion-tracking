@@ -223,6 +223,66 @@ function wcct_test_log_cached_count() {
     return count( \StorePulse\ConversionTracking\Log\Activity::orders() );
 }
 
+/**
+ * Write the 3.0 settings from the 2.x ones, as the migration does, for 'call' steps.
+ *
+ * @return null
+ */
+function wcct_test_v3_from_v1() {
+    update_option( 'wcct_settings_v3', \StorePulse\ConversionTracking\Settings\LegacyView::from_v1( get_option( 'wcct_settings', array() ) ) );
+
+    return null;
+}
+
+/**
+ * Forget every platform's last purchase, for 'call' steps.
+ *
+ * @return null
+ */
+function wcct_test_last_purchase_clear() {
+    foreach ( array( 'facebook', 'adwords', 'ga4', 'google', 'twitter', 'custom', 'bing_ads' ) as $platform ) {
+        delete_option( \StorePulse\ConversionTracking\Log\LastPurchase::option( $platform ) );
+    }
+
+    return null;
+}
+
+/**
+ * Orders the menu badge counts, read the badge's way, for 'call' steps.
+ *
+ * @return int[]
+ */
+function wcct_test_badge_orders() {
+    return \StorePulse\ConversionTracking\Alerts\Badge::not_confirmed_orders( time() );
+}
+
+/**
+ * The menu badge count, for 'call' steps.
+ *
+ * @return int
+ */
+function wcct_test_badge_count() {
+    return \StorePulse\ConversionTracking\Alerts\Badge::count();
+}
+
+/**
+ * The Conversion Tracking menu title after the badge is added, as an administrator, for 'call' steps.
+ *
+ * @return string
+ */
+function wcct_test_menu_title() {
+    global $submenu;
+
+    wp_set_current_user( get_user_by( 'login', 'wcct_rest_admin' )->ID );
+
+    // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited
+    $submenu = array( 'woocommerce' => array( array( 'Conversion Tracking', 'manage_woocommerce', 'conversion-tracking', 'Conversion Tracking' ) ) );
+
+    \StorePulse\ConversionTracking\Alerts\Badge::add_to_menu();
+
+    return $submenu['woocommerce'][0][0];
+}
+
 $wcct_results = array();
 
 foreach ( $GLOBALS['wcct_job']['steps'] as $wcct_step ) {

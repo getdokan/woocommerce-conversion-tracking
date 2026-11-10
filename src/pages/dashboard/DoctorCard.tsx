@@ -27,13 +27,16 @@ import { CardSkeleton } from '../../shell/PageSkeleton';
  * @param {Object}            props         Component props.
  * @param {DoctorReport|null} props.report  Last report, null while it loads or when it failed.
  * @param {boolean}           props.loading Show a skeleton.
+ * @param {boolean=}          props.showNew Show "Doctor found something new" (its switch under Settings > Alerts).
  */
 export const DoctorCard = ( {
     report,
     loading,
+    showNew = true,
 }: {
     report: DoctorReport | null;
     loading: boolean;
+    showNew?: boolean;
 } ) => {
     let body;
 
@@ -66,7 +69,7 @@ export const DoctorCard = ( {
         body = (
             <>
                 <div className="flex flex-wrap gap-2">
-                    { report.new > 0 && (
+                    { showNew && report.new > 0 && (
                         <span data-testid="wcct-doctor-new">
                             <StatusPill tone="warn">
                                 { __(

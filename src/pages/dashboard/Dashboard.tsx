@@ -3,10 +3,7 @@
  */
 import {
     Button,
-    Card,
-    CardContent,
-    CardHeader,
-    CardTitle,
+    Notice,
     ToggleGroup,
     ToggleGroupItem,
 } from '@wedevs/plugin-ui';
@@ -17,17 +14,25 @@ import { Stethoscope } from 'lucide-react';
  * WordPress dependencies
  */
 import { useEffect, useState } from '@wordpress/element';
-import { __ } from '@wordpress/i18n';
+import { __, _n, sprintf } from '@wordpress/i18n';
 
 /**
  * Internal dependencies
  */
 import { useAppData } from '../../data/AppData';
+import { errorMessage } from '../../data/api';
 import { fetchDoctor, type DoctorReport } from '../../data/doctor';
+import { fetchMetrics, type Metrics } from '../../data/metrics';
 import { platformCards } from '../../data/platforms';
-import { CardSkeleton } from '../../shell/PageSkeleton';
 import { DoctorCard } from './DoctorCard';
-import { ConnectedPlatformCard, SetupPlatformCard } from './PlatformCard';
+import { HourlyChart } from './HourlyChart';
+import { NextSteps } from './NextSteps';
+import { NotConfirmedCard } from './NotConfirmedCard';
+import {
+    ConnectedPlatformCard,
+    SetupPlatformCard,
+    cardState,
+} from './PlatformCard';
 import { StatCards } from './StatCards';
 import { UpdatedBanner } from './UpdatedBanner';
 import { WelcomeCard } from './WelcomeCard';
@@ -56,6 +61,9 @@ const Dashboard = () => {
     const [ filter, setFilter ] = useState< Filter >( 'all' );
     const [ doctor, setDoctor ] = useState< DoctorReport | null >( null );
     const [ doctorLoading, setDoctorLoading ] = useState( true );
+    const [ metrics, setMetrics ] = useState< Metrics | null >( null );
+    const [ metricsLoading, setMetricsLoading ] = useState( true );
+    const [ metricsError, setMetricsError ] = useState( '' );
 
     // The last Doctor run; a failed read shows the not-run card.
     useEffect( () => {
@@ -65,6 +73,23 @@ const Dashboard = () => {
             .then( ( report ) => live && setDoctor( report ) )
             .catch( () => {} )
             .finally( () => live && setDoctorLoading( false ) );
+
+        return () => {
+            live = false;
+        };
+    }, [] );
+
+    // The last 24 hours; cards keep their settings-only state when it fails.
+    useEffect( () => {
+        let live = true;
+
+        fetchMetrics()
+            .then( ( next ) => live && setMetrics( next ) )
+            .catch(
+                ( reason: unknown ) =>
+                    live && setMetricsError( errorMessage( reason ) )
+            )
+            .finally( () => live && setMetricsLoading( false ) );
 
         return () => {
             live = false;
@@ -122,8 +147,20 @@ const Dashboard = () => {
     }
 
     const notConnected = cards.filter( ( card ) => ! card.connected );
-    // Working and Needs attention come with the metrics route; until then every card waits.
-    const shown = filter === 'all' ? connected : [];
+    const loadingMetrics = refreshing || metricsLoading;
+    const metricOf = ( id: string ) =>
+        metrics?.platforms.find( ( platform ) => platform.id === id );
+    const shown = connected.filter( ( card ) => {
+        const state = cardState( card, metricOf( card.id ) );
+
+        return (
+            filter === 'all' ||
+            ( filter === 'working' && state === 'working' ) ||
+            ( filter === 'attention' && state === 'attention' )
+        );
+    } );
+    // "Doctor found something new" follows its switch under Settings > Alerts.
+    const doctorNewOn = data.settings.alert_doctor_new !== false;
 
     return (
         <Page
@@ -150,40 +187,67 @@ const Dashboard = () => {
             <div className="flex flex-col gap-5" data-testid="wcct-dashboard">
                 <UpdatedBanner />
                 { setupOpen && <WelcomeCard onboarding={ data.onboarding } /> }
-                <StatCards
-                    refreshing={ refreshing }
-                    lastDoctorRun={ doctor?.ran_ago ?? '' }
-                />
+                { metricsError && (
+                    <Notice variant="destructive" role="alert">
+                        <p className="m-0">
+                            { __(
+                                "The last 24 hours couldn't be loaded.",
+                                'woocommerce-conversion-tracking'
+                            ) }{ ' ' }
+                            { metricsError }
+                        </p>
+                    </Notice>
+                ) }
+                <div className="flex flex-col gap-2">
+                    <StatCards
+                        refreshing={ loadingMetrics }
+                        metrics={ metrics }
+                        lastDoctorRun={
+                            doctor?.ran_ago ?? metrics?.doctor.ran_ago ?? ''
+                        }
+                    />
+                    { ! loadingMetrics && !! metrics?.no_checkin && (
+                        <p
+                            className="m-0 text-[13px] text-page-muted-foreground"
+                            data-testid="wcct-no-checkin-note"
+                        >
+                            { sprintf(
+                                /* translators: %d: number of orders */
+                                _n(
+                                    "%d order couldn't be checked: no thank-you page visit, so it isn't counted as not confirmed.",
+                                    "%d orders couldn't be checked: no thank-you page visit, so they aren't counted as not confirmed.",
+                                    metrics.no_checkin,
+                                    'woocommerce-conversion-tracking'
+                                ),
+                                metrics.no_checkin
+                            ) }{ ' ' }
+                            <a
+                                href="#/log"
+                                className="font-medium text-primary underline underline-offset-3 hover:text-primary/80"
+                            >
+                                { __(
+                                    'See it in the Activity log',
+                                    'woocommerce-conversion-tracking'
+                                ) }
+                            </a>
+                        </p>
+                    ) }
+                </div>
+
+                { ! loadingMetrics && metrics && (
+                    <NotConfirmedCard metrics={ metrics } />
+                ) }
 
                 <div className="grid grid-cols-[2fr_1fr] items-start gap-4 max-[1100px]:grid-cols-1">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>
-                                <h2 className="m-0 text-base font-medium">
-                                    { __(
-                                        'Purchases in the last 24 hours',
-                                        'woocommerce-conversion-tracking'
-                                    ) }
-                                </h2>
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            { refreshing ? (
-                                <CardSkeleton lines={ 3 } />
-                            ) : (
-                                <div className="flex h-50 items-center justify-center rounded-lg border border-dashed border-border px-6 text-center text-sm text-muted-foreground">
-                                    { __(
-                                        'Purchases show here, hour by hour, once your store tracks them.',
-                                        'woocommerce-conversion-tracking'
-                                    ) }
-                                </div>
-                            ) }
-                        </CardContent>
-                    </Card>
+                    <HourlyChart
+                        metrics={ metrics }
+                        refreshing={ loadingMetrics }
+                    />
 
                     <DoctorCard
                         report={ doctor }
                         loading={ refreshing || doctorLoading }
+                        showNew={ doctorNewOn }
                     />
                 </div>
 
@@ -233,7 +297,8 @@ const Dashboard = () => {
                                 <ConnectedPlatformCard
                                     key={ card.id }
                                     platform={ card }
-                                    refreshing={ refreshing }
+                                    refreshing={ loadingMetrics }
+                                    metric={ metricOf( card.id ) }
                                 />
                             ) ) }
                         </div>
@@ -272,30 +337,10 @@ const Dashboard = () => {
                     </section>
                 ) }
 
-                <Card>
-                    <CardHeader>
-                        <CardTitle>
-                            <h2 className="m-0 text-base font-medium">
-                                { __(
-                                    'What to do next',
-                                    'woocommerce-conversion-tracking'
-                                ) }
-                            </h2>
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        { refreshing ? (
-                            <CardSkeleton lines={ 1 } />
-                        ) : (
-                            <p className="m-0 text-[13px] text-muted-foreground">
-                                { __(
-                                    'Nothing to do right now. Steps show here when a platform needs attention.',
-                                    'woocommerce-conversion-tracking'
-                                ) }
-                            </p>
-                        ) }
-                    </CardContent>
-                </Card>
+                <NextSteps
+                    steps={ metrics?.next_steps ?? [] }
+                    refreshing={ loadingMetrics }
+                />
             </div>
         </Page>
     );

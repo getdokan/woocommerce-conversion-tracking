@@ -224,4 +224,31 @@ class DoctorRouteTest extends WCCT_Test_Rest_Case {
         $this->assertSame( 0, $results[4] );
         $this->assertNull( $results[5] );
     }
+
+    public function test_the_alerts_switch_turns_the_recheck_off_and_on() {
+        $recheck = array(
+            array( 'action', 'activated_plugin', 'pixelyoursite/pixelyoursite.php' ),
+            array( 'shutdown', 'StorePulse\ConversionTracking\Doctor\Recheck' ),
+            array( 'option', 'wcct_doctor_new' ),
+        );
+        $results = $this->doctor(
+            array_merge(
+                array(
+                    array( 'set_option', 'wcct_settings_v3', array( 'alert_doctor_new' => false ) ),
+                    array( 'request', 'POST', '/wcct/v1/doctor', array(), 'admin' ),
+                    array( 'set_option', 'wcct_test_plugin_found', 'PixelYourSite' ),
+                ),
+                $recheck,
+                array( array( 'set_option', 'wcct_settings_v3', array( 'alert_doctor_new' => true ) ) ),
+                $recheck,
+                array( array( 'set_option', 'wcct_settings_v3', null ) )
+            )
+        );
+
+        // Off (Settings > Alerts > Doctor found something new): no re-check, no badge.
+        $this->assertSame( array( 0, null ), array( $results[4], $results[5] ) );
+        // On again: the next activation re-checks and lights the badge.
+        $this->assertSame( 1, $results[8] );
+        $this->assertCount( 1, $results[9] );
+    }
 }

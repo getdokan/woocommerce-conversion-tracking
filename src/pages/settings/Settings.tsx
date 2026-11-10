@@ -19,8 +19,8 @@ import { isPro } from '../../data/plan';
 import { replaceHash } from '../../router';
 import { pageInfo } from '../titles';
 import { AccessSection } from './AccessSection';
+import { AlertsSection } from './AlertsSection';
 import { PlanSection } from './PlanSection';
-import { SectionCard } from './SectionCard';
 import { SetupSection } from './SetupSection';
 
 type SectionId = 'alerts' | 'access' | 'setup' | 'plan';
@@ -68,31 +68,6 @@ const sections = (): SectionInfo[] => [
 ];
 
 /**
- * A section a later task builds.
- *
- * @param {Object}      props         Component props.
- * @param {SectionInfo} props.section Section.
- */
-const ComingSection = ( { section }: { section: SectionInfo } ) => (
-    <SectionCard
-        id={ section.id }
-        icon={ <section.Icon /> }
-        title={ section.label }
-        description={ section.description }
-    >
-        <p
-            className="m-0 px-6 py-5 text-sm text-muted-foreground"
-            data-testid="wcct-placeholder"
-        >
-            { __(
-                'This section is coming with the new admin.',
-                'woocommerce-conversion-tracking'
-            ) }
-        </p>
-    </SectionCard>
-);
-
-/**
  * The open section.
  *
  * @param {Object}      props         Component props.
@@ -107,7 +82,7 @@ const SectionPanel = ( { section }: { section: SectionInfo } ) => {
         case 'setup':
             return <SetupSection />;
         default:
-            return <ComingSection section={ section } />;
+            return <AlertsSection />;
     }
 };
 

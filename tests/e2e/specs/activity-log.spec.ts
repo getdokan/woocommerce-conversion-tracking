@@ -55,7 +55,12 @@ test.describe('Activity log', () => {
         // Counted once: every platform hands over on the thank-you page.
         const counted = await placeGuestOrder(page, 'block');
 
-        await expect.poll(async () => (await logRows(request, counted.id)).filter(r => r.library_loaded === '1').length, { timeout: 15_000 }).toBeGreaterThan(0);
+        // Stay on the thank-you page until every tag handed over (Pro's Microsoft tag too), or a slow one reads as hidden.
+        const tags = enabledTags().length + ((await page.evaluate(() => 'uetq' in window)) ? 1 : 0);
+
+        await expect
+            .poll(async () => (await logRows(request, counted.id)).filter(r => r.library_loaded === '1').length, { timeout: 20_000 })
+            .toBeGreaterThanOrEqual(tags);
 
         // Not confirmed on Meta: an ad blocker stops fbevents.js, so Meta's check-in says not handed over.
         await page.route(/connect\.facebook\.net|facebook\.com\/tr/, route => route.abort('blockedbyclient'));

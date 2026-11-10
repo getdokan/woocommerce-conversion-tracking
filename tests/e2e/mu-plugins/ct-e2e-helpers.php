@@ -373,6 +373,9 @@ add_action(
                         $wpdb->query( $wpdb->prepare( "UPDATE {$table} SET {$column} = DATE_SUB({$column}, INTERVAL %d SECOND) WHERE order_id = %d AND {$column} IS NOT NULL", $seconds, $order->get_id() ) );
                     }
 
+                    // The dashboard's cached list and the menu badge read the moved order at once.
+                    \StorePulse\ConversionTracking\Log\Activity::flush();
+
                     return array( 'id' => $order->get_id() );
                 },
             )

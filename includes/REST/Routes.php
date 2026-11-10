@@ -39,6 +39,7 @@ class Routes {
                 AccessController::class,
                 DoctorController::class,
                 LogController::class,
+                MetricsController::class,
                 EventsController::class,
                 VerifyController::class,
                 WhatsNewController::class,
