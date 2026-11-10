@@ -4,6 +4,8 @@ namespace StorePulse\ConversionTracking\REST;
 
 use StorePulse\ConversionTracking\Consent\ConsentMode;
 use StorePulse\ConversionTracking\Log\LastPurchase;
+use StorePulse\ConversionTracking\Migration\Flags;
+use StorePulse\ConversionTracking\Migration\WhatsNew;
 use StorePulse\ConversionTracking\Platforms\Pause;
 use StorePulse\ConversionTracking\Settings\Schema;
 use StorePulse\ConversionTracking\Settings\Store;
@@ -182,7 +184,7 @@ class SettingsController extends Controller {
     }
 
     /**
-     * Every platform's values, plus its last checked-in purchase (read-only, for the events table's Last seen).
+     * Every platform's values, plus (read-only) its last checked-in purchase for Last seen and Google's open Ads ID split.
      *
      * @param array $schema Normalized schema.
      * @param array $doc    Stored settings.
@@ -194,6 +196,14 @@ class SettingsController extends Controller {
 
         foreach ( $schema['platforms'] as $id => $platform ) {
             $values['platforms'][ $id ]['last_purchase'] = self::last_purchase( array_merge( array( (string) $id ), (array) $platform['integrations'] ) );
+        }
+
+        // "We split your Google Ads ID" on the Google page, until the merchant changes the split fields.
+        if ( isset( $values['platforms']['google'] ) ) {
+            $google = isset( $doc['platforms']['google'] ) && is_array( $doc['platforms']['google'] ) ? $doc['platforms']['google'] : array();
+
+            // "Looks right" on What's new closes it here too.
+            $values['platforms']['google']['ads_id_split'] = in_array( Flags::GOOGLE_ADS_ID_SPLIT, WhatsNew::confirmed(), true ) ? null : Flags::google_split( Flags::all(), $google );
         }
 
         return $values;

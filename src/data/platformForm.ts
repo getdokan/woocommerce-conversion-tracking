@@ -8,13 +8,15 @@ import { __, _n, sprintf } from '@wordpress/i18n';
  */
 import type { PlatformValues, SchemaElement, SchemaPlatform } from './types';
 
-// Variants the platform pages edit; others (Pro editors, display-only) are left to their owners.
+// Variants the platform pages edit, with Meta Pro's extra pixels and custom parameters; display-only ones are left out.
 export const EDITABLE_VARIANTS = [
     'text',
     'select',
     'switch',
     'radio_capsule',
     'multicheck',
+    'wcct_pixels',
+    'wcct_custom_parameters',
 ];
 
 // Advanced settings that put the "Customised" badge on a platform's card when they differ from the default.
@@ -327,6 +329,98 @@ export const switchEvent = (
         .map( ( option ) => option.value )
         .filter( ( value ) => next.includes( value ) );
 };
+
+/**
+ * Whether the field holds a valid ID by its format.
+ *
+ * @param {SchemaPlatform} platform Platform schema.
+ * @param {string}         id       Field ID.
+ * @param {Object}         values   Values.
+ */
+const hasValidId = (
+    platform: SchemaPlatform,
+    id: string,
+    values: PlatformValues
+): boolean => {
+    const field = platform.schema.find( ( element ) => element.id === id );
+
+    return !! field && checkId( field, text( values[ id ] ) ) === 'valid';
+};
+
+/**
+ * Events 2.x sent that need a new event ID (X's re-setup), switched on and still without a valid ID; locked ones are left out.
+ *
+ * @param {SchemaPlatform} platform Platform schema.
+ * @param {Object}         values   Draft or saved values.
+ * @param {unknown}        flagged  The saved needs_resetup list.
+ */
+export const resetupEvents = (
+    platform: SchemaPlatform,
+    values: PlatformValues,
+    flagged: unknown
+): EventOption[] => {
+    const events = asList( flagged );
+    const on = asList( values.events );
+
+    return eventOptions( platform ).filter(
+        ( event ) =>
+            events.includes( event.value ) &&
+            on.includes( event.value ) &&
+            ! event.locked &&
+            !! event.needs &&
+            ! hasValidId( platform, event.needs, values )
+    );
+};
+
+/**
+ * Events to switch on because an event ID that was empty when saved just became valid (typing a tw- ID turns the row on).
+ *
+ * @param {SchemaPlatform} platform Platform schema.
+ * @param {string}         field    Changed field.
+ * @param {Object}         saved    Saved values.
+ * @param {Object}         before   Draft before the change.
+ * @param {Object}         after    Draft after it.
+ */
+export const eventsTurnedOn = (
+    platform: SchemaPlatform,
+    field: string,
+    saved: PlatformValues,
+    before: PlatformValues,
+    after: PlatformValues
+): string[] => {
+    const schema = platform.schema.find( ( element ) => element.id === field );
+
+    if (
+        ! schema ||
+        checkId( schema, text( saved[ field ] ) ) !== 'empty' ||
+        checkId( schema, text( before[ field ] ) ) === 'valid' ||
+        checkId( schema, text( after[ field ] ) ) !== 'valid'
+    ) {
+        return [];
+    }
+
+    return eventOptions( platform )
+        .filter(
+            ( event ) =>
+                event.needs === field &&
+                ! event.locked &&
+                ! asList( after.events ).includes( event.value )
+        )
+        .map( ( event ) => event.value );
+};
+
+/**
+ * Whether a platform needs the merchant: X events waiting for a new event ID, or Google's split Ads ID to check.
+ *
+ * @param {SchemaPlatform} platform Platform schema.
+ * @param {Object}         values   Saved values.
+ */
+export const needsAttention = (
+    platform: SchemaPlatform,
+    values: PlatformValues
+): boolean =>
+    resetupEvents( platform, values, values.needs_resetup ).length > 0 ||
+    !! values.ads_id_split;
 
 /**
  * Whether any Advanced setting that marks a platform as customised differs from its default.

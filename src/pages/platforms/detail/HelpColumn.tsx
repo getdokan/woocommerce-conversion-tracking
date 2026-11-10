@@ -17,6 +17,8 @@ import { NewTabNote } from '../../../shell/NewTabNote';
 const EVENTS_MANAGER = 'https://business.facebook.com/events_manager2/';
 const GOOGLE_ADS = 'https://ads.google.com/aw/conversions';
 const GA_ADMIN = 'https://analytics.google.com/analytics/web/';
+const X_ADS = 'https://ads.x.com/';
+const MICROSOFT_ADS = 'https://ads.microsoft.com/';
 
 const external = ( href: string ) => (
     // eslint-disable-next-line jsx-a11y/anchor-has-content -- createInterpolateElement fills it.
@@ -197,9 +199,9 @@ const GoogleHelp = () => (
 );
 
 /**
- * Any other platform: what to do after saving.
+ * Any platform: what to do after saving.
  */
-const OtherHelp = () => (
+const AfterSave = () => (
     <Block title={ __( 'After you save', 'woocommerce-conversion-tracking' ) }>
         <p className="m-0 text-sm">
             { createInterpolateElement(
@@ -211,6 +213,107 @@ const OtherHelp = () => (
             ) }
         </p>
     </Block>
+);
+
+/**
+ * X: where each event ID is, and why upgraders set the events up again.
+ */
+const XHelp = () => (
+    <>
+        <Block
+            title={ __(
+                'Where to find the event ID',
+                'woocommerce-conversion-tracking'
+            ) }
+        >
+            <Steps>
+                <li>
+                    { createInterpolateElement(
+                        __(
+                            'In <a>X Ads Manager</a><n/>, open <b>Tools</b>, then <b>Events Manager</b>.',
+                            'woocommerce-conversion-tracking'
+                        ),
+                        { a: external( X_ADS ), n: <NewTabNote />, b: <b /> }
+                    ) }
+                </li>
+                <li>
+                    { createInterpolateElement(
+                        __(
+                            'Choose <b>Add event</b>, pick <b>Purchase</b> and the <b>Pixel</b> install method.',
+                            'woocommerce-conversion-tracking'
+                        ),
+                        { b: <b /> }
+                    ) }
+                </li>
+                <li>
+                    { createInterpolateElement(
+                        __(
+                            'Copy the ID that starts with <code>tw-</code> and paste it into the Purchase event ID field. Repeat for Add to cart, Start checkout or Registration if you want those too.',
+                            'woocommerce-conversion-tracking'
+                        ),
+                        { code: <code className="font-mono text-[12px]" /> }
+                    ) }
+                </li>
+            </Steps>
+        </Block>
+        <Block
+            title={ __( 'Why a re-setup', 'woocommerce-conversion-tracking' ) }
+        >
+            <p className="m-0 text-sm">
+                { __(
+                    'X moved from one code per event to one pixel with named events. Your old codes stopped counting, so we ask once instead of guessing.',
+                    'woocommerce-conversion-tracking'
+                ) }
+            </p>
+        </Block>
+        <AfterSave />
+    </>
+);
+
+/**
+ * Microsoft: where the UET tag ID is.
+ */
+const MicrosoftHelp = () => (
+    <>
+        <Block
+            title={ __(
+                'Where to find your UET tag ID',
+                'woocommerce-conversion-tracking'
+            ) }
+        >
+            <Steps>
+                <li>
+                    { createInterpolateElement(
+                        __(
+                            'In <a>Microsoft Advertising</a><n/>, open <b>Tools</b>, then <b>UET tag</b>.',
+                            'woocommerce-conversion-tracking'
+                        ),
+                        {
+                            a: external( MICROSOFT_ADS ),
+                            n: <NewTabNote />,
+                            b: <b />,
+                        }
+                    ) }
+                </li>
+                <li>
+                    { createInterpolateElement(
+                        __(
+                            'Find the tag for this store. The ID is the number in the <b>Tag ID</b> column.',
+                            'woocommerce-conversion-tracking'
+                        ),
+                        { b: <b /> }
+                    ) }
+                </li>
+                <li>
+                    { __(
+                        'Paste it into the UET tag ID field. We check the format as you type.',
+                        'woocommerce-conversion-tracking'
+                    ) }
+                </li>
+            </Steps>
+        </Block>
+        <AfterSave />
+    </>
 );
 
 /**
@@ -228,5 +331,13 @@ export const HelpContent = ( { id }: { id: string } ) => {
         return <GoogleHelp />;
     }
 
-    return <OtherHelp />;
+    if ( id === 'twitter' ) {
+        return <XHelp />;
+    }
+
+    if ( id === 'bing_ads' ) {
+        return <MicrosoftHelp />;
+    }
+
+    return <AfterSave />;
 };

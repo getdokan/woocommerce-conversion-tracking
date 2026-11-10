@@ -490,7 +490,7 @@ test.describe.serial('Platforms pages', () => {
         if (await isProActive(page)) {
             await expect(field(page, 'bing_ads', 'tag_id')).toBeVisible();
         } else {
-            await expect(page.getByTestId('wcct-platform-bing_ads')).toContainText('is part of Pro.');
+            await expect(page.getByTestId('wcct-platform-bing_ads')).toContainText('Microsoft Advertising is part of Pro');
         }
 
         await openApp(page, '#/platforms/twitter');

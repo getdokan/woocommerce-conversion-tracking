@@ -301,6 +301,39 @@ class SettingsRouteTest extends TestCase {
         $this->assertSame( '', $consent['notice'] );
     }
 
+    public function test_values_carry_the_google_ads_id_split_until_the_split_fields_change() {
+        $flag   = array( 'platform' => 'google', 'fields' => array( 'ads_id', 'purchase_label' ), 'saved' => 'AW-123456/AbCdEfGhIj', 'ads_id' => 'AW-123456', 'purchase_label' => 'AbCdEfGhIj' );
+        $result = $this->run_job(
+            array(
+                array( 'as' => 'admin', 'method' => 'GET', 'path' => '/wcct/v1/settings' ),
+                array( 'as' => 'admin', 'method' => 'POST', 'path' => '/wcct/v1/settings', 'body' => array( 'platforms' => array( 'google' => array( 'purchase_label' => 'NewLabel1234' ) ) ) ),
+            ),
+            array(
+                'wcct_settings_v3'      => array( 'platforms' => array( 'google' => array( 'mode' => 'ads', 'ads_id' => 'AW-123456', 'purchase_label' => 'AbCdEfGhIj' ) ) ),
+                'wcct_migration_done'   => '3.0.0',
+                'wcct_migration_flags'  => array( 'google_ads_id_split' => $flag ),
+            )
+        );
+
+        $this->assertSame( array( 'saved' => 'AW-123456/AbCdEfGhIj', 'ads_id' => 'AW-123456', 'purchase_label' => 'AbCdEfGhIj' ), $result['responses'][0]['data']['platforms']['google']['ads_id_split'] );
+        $this->assertArrayNotHasKey( 'ads_id_split', $result['responses'][0]['data']['platforms']['facebook'] );
+        $this->assertSame( 200, $result['responses'][1]['status'] );
+        $this->assertNull( $result['responses'][1]['data']['platforms']['google']['ads_id_split'], 'the merchant changed the label' );
+
+        // "Looks right" on What's new closes it on the Google page too.
+        $confirmed = $this->run_job(
+            array( array( 'as' => 'admin', 'method' => 'GET', 'path' => '/wcct/v1/settings' ) ),
+            array(
+                'wcct_settings_v3'     => array( 'platforms' => array( 'google' => array( 'mode' => 'ads', 'ads_id' => 'AW-123456', 'purchase_label' => 'AbCdEfGhIj' ) ) ),
+                'wcct_migration_done'  => '3.0.0',
+                'wcct_migration_flags' => array( 'google_ads_id_split' => $flag ),
+                'wcct_whats_new'       => array( 'confirmed' => array( 'google_ads_id_split' ) ),
+            )
+        );
+
+        $this->assertNull( $confirmed['responses'][0]['data']['platforms']['google']['ads_id_split'] );
+    }
+
     private function run_job( array $requests, array $options = array(), string $grant = '' ): array {
         $result = WCCT_Test_WP::run(
             array(

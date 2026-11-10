@@ -39,6 +39,58 @@ class Flags {
     }
 
     /**
+     * The Google Ads ID split while the Ads ID and label still hold what the split wrote, else null.
+     *
+     * @param array $flags  Flag ID => flag, from all().
+     * @param array $google Stored Google settings.
+     *
+     * @return array|null { saved, ads_id, purchase_label }
+     */
+    public static function google_split( array $flags, array $google ) {
+        $flag = isset( $flags[ self::GOOGLE_ADS_ID_SPLIT ] ) && is_array( $flags[ self::GOOGLE_ADS_ID_SPLIT ] ) ? $flags[ self::GOOGLE_ADS_ID_SPLIT ] : null;
+
+        if ( null === $flag || self::google_split_changed( $flag, $google ) ) {
+            return null;
+        }
+
+        return array(
+            'saved'          => self::text( $flag, 'saved' ),
+            'ads_id'         => self::text( $flag, 'ads_id' ),
+            'purchase_label' => self::text( $flag, 'purchase_label' ),
+        );
+    }
+
+    /**
+     * Whether the Ads ID or label no longer hold what the split wrote, so the merchant has been there.
+     *
+     * @param array $flag   The google_ads_id_split flag.
+     * @param array $google Stored Google settings.
+     *
+     * @return bool
+     */
+    public static function google_split_changed( array $flag, array $google ): bool {
+        foreach ( array( 'ads_id', 'purchase_label' ) as $key ) {
+            if ( self::text( $flag, $key ) !== self::text( $google, $key ) ) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * A string value, or an empty string.
+     *
+     * @param array  $values Values.
+     * @param string $key    Key.
+     *
+     * @return string
+     */
+    private static function text( array $values, string $key ): string {
+        return isset( $values[ $key ] ) && is_scalar( $values[ $key ] ) ? (string) $values[ $key ] : '';
+    }
+
+    /**
      * Store a migration's flags: the IDs it owns are replaced, other flags (say, Pro's) are kept.
      *
      * @param array    $flags Flag ID => flag.

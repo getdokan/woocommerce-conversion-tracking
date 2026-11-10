@@ -35,6 +35,8 @@ type EventsTableProps = {
     // Saved and connected: Purchase can have a last seen time.
     connected: boolean;
     readOnly: boolean;
+    // The Last seen column; extra Meta pixels leave it out, as check-ins are per platform.
+    showSeen?: boolean;
     onChange: ( events: string[] ) => void;
 };
 
@@ -56,6 +58,7 @@ export const EventsTable = ( {
     lastPurchase,
     connected,
     readOnly,
+    showSeen = true,
     onChange,
 }: EventsTableProps ) => {
     const group = useRef< HTMLDivElement >( null );
@@ -179,15 +182,17 @@ export const EventsTable = ( {
                                     'woocommerce-conversion-tracking'
                                 ) }
                             </th>
-                            <th
-                                scope="col"
-                                className="w-40 px-4 py-2.5 text-left text-[11px] font-medium tracking-[0.04em] whitespace-nowrap text-foreground uppercase"
-                            >
-                                { __(
-                                    'Last seen',
-                                    'woocommerce-conversion-tracking'
-                                ) }
-                            </th>
+                            { showSeen && (
+                                <th
+                                    scope="col"
+                                    className="w-40 px-4 py-2.5 text-left text-[11px] font-medium tracking-[0.04em] whitespace-nowrap text-foreground uppercase"
+                                >
+                                    { __(
+                                        'Last seen',
+                                        'woocommerce-conversion-tracking'
+                                    ) }
+                                </th>
+                            ) }
                         </tr>
                     </thead>
                     <tbody>
@@ -296,20 +301,22 @@ export const EventsTable = ( {
                                         ) }
                                     </th>
                                     <td className="px-4 py-3">{ cell }</td>
-                                    <td
-                                        className={ cn(
-                                            'px-4 py-3 text-[13px] whitespace-nowrap',
-                                            event.value === 'purchase' &&
-                                                on &&
-                                                connected &&
-                                                lastPurchase
-                                                ? 'text-foreground'
-                                                : 'text-muted-foreground'
-                                        ) }
-                                        data-testid={ `${ id }-seen` }
-                                    >
-                                        { seen( event ) }
-                                    </td>
+                                    { showSeen && (
+                                        <td
+                                            className={ cn(
+                                                'px-4 py-3 text-[13px] whitespace-nowrap',
+                                                event.value === 'purchase' &&
+                                                    on &&
+                                                    connected &&
+                                                    lastPurchase
+                                                    ? 'text-foreground'
+                                                    : 'text-muted-foreground'
+                                            ) }
+                                            data-testid={ `${ id }-seen` }
+                                        >
+                                            { seen( event ) }
+                                        </td>
+                                    ) }
                                 </tr>
                             );
                         } ) }

@@ -6,6 +6,7 @@ use PHPUnit\Framework\TestCase;
 use StorePulse\ConversionTracking\Migration\Flags;
 use StorePulse\ConversionTracking\Migration\SettingsMigration;
 use StorePulse\ConversionTracking\Migration\WhatsNew;
+use StorePulse\ConversionTracking\Settings\Schema;
 use StorePulse\ConversionTracking\Onboarding\Redirect;
 
 /**
@@ -39,13 +40,22 @@ class WhatsNewTest extends TestCase {
     }
 
     protected function tearDown(): void {
-        unset( $GLOBALS['wcct_test_options'] );
+        unset( $GLOBALS['wcct_test_options'], $GLOBALS['wcct_test_filters']['wcct_settings_schema'] );
     }
 
     private static function fixture( string $name ): array {
         $fixtures = require dirname( __DIR__, 2 ) . '/fixtures/settings-2x.php';
 
         return $fixtures[ $name ];
+    }
+
+    // Pro unlocks X's Add to cart, Start checkout and Registration.
+    private static function unlock_x() {
+        $GLOBALS['wcct_test_filters']['wcct_settings_schema'] = function ( $schema ) {
+            $schema['platforms']['twitter']['schema'] = Schema::unlock_options( $schema['platforms']['twitter']['schema'], 'events' );
+
+            return $schema;
+        };
     }
 
     private static function doc( array $platforms ): array {
@@ -87,6 +97,8 @@ class WhatsNewTest extends TestCase {
     }
 
     public function test_the_x_item_reads_the_live_settings_and_closes_once_every_event_has_an_id() {
+        self::unlock_x();
+
         $flags = array( Flags::X_EVENT_IDS => self::X_FLAG );
         $x     = array(
             'pixel_id'          => 'o8x2k',
@@ -118,7 +130,29 @@ class WhatsNewTest extends TestCase {
         $this->assertSame( array(), WhatsNew::attention( $flags, self::doc( array( 'twitter' => $x ) ) ) );
     }
 
+    public function test_free_leaves_out_the_x_events_it_locks_as_the_x_page_does() {
+        $x = array(
+            'pixel_id'          => 'o8x2k',
+            'events'            => array( 'page_view', 'purchase', 'add_to_cart' ),
+            'needs_resetup'     => array( 'purchase', 'add_to_cart' ),
+            'purchase_event_id' => '',
+            'cart_event_id'     => '',
+        );
+
+        $items = WhatsNew::attention( array( Flags::X_EVENT_IDS => self::X_FLAG ), self::doc( array( 'twitter' => $x ) ) );
+
+        $this->assertSame( array( 'purchase_event_id' ), $items[0]['fields'] );
+        $this->assertSame( 'Purchases need a new event ID.', $items[0]['text'] );
+
+        // Only a Pro event left: nothing Free can set up.
+        $x['purchase_event_id'] = 'tw-o8x2k-def34';
+
+        $this->assertSame( array(), WhatsNew::attention( array( Flags::X_EVENT_IDS => self::X_FLAG ), self::doc( array( 'twitter' => $x ) ) ) );
+    }
+
     public function test_an_x_event_switched_off_since_needs_no_id() {
+        self::unlock_x();
+
         $x = array(
             'pixel_id'          => 'o8x2k',
             'events'            => array( 'page_view', 'add_to_cart' ),

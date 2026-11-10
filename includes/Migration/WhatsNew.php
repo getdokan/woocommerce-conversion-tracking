@@ -233,7 +233,7 @@ class WhatsNew {
             );
 
             if ( Flags::GOOGLE_ADS_ID_SPLIT === $id ) {
-                if ( self::google_changed( $flag, $stored ) ) {
+                if ( Flags::google_split_changed( $flag, $stored ) ) {
                     continue;
                 }
 
@@ -245,9 +245,9 @@ class WhatsNew {
             }
 
             if ( Flags::X_EVENT_IDS === $id ) {
-                // The flag is written once; the live settings say which events, still switched on, lack an ID.
+                // The flag is written once; the live settings say which events, still switched on, lack an ID. Events the plan locks (Free) are left out, as on the X page.
                 $x      = XSettings::from_v3( $stored );
-                $events = array_values( array_intersect( $x['needs_resetup'], $x['events'] ) );
+                $events = array_values( array_diff( array_intersect( $x['needs_resetup'], $x['events'] ), self::locked_events( $platform ) ) );
 
                 if ( ! $events ) {
                     continue;
@@ -339,24 +339,24 @@ class WhatsNew {
     }
 
     /**
-     * Whether the Ads ID or label no longer hold what the split wrote, so the merchant has been there.
+     * Events a platform's plan locks (Pro events on Free), from the settings schema.
      *
-     * @param array $flag   The google_ads_id_split flag.
-     * @param array $stored Stored Google settings.
+     * @param string $platform Platform ID.
      *
-     * @return bool
+     * @return string[]
      */
-    private static function google_changed( array $flag, array $stored ): bool {
-        foreach ( array( 'ads_id', 'purchase_label' ) as $key ) {
-            $split = isset( $flag[ $key ] ) && is_scalar( $flag[ $key ] ) ? (string) $flag[ $key ] : '';
-            $now   = isset( $stored[ $key ] ) && is_scalar( $stored[ $key ] ) ? (string) $stored[ $key ] : '';
+    private static function locked_events( string $platform ): array {
+        $schema = Schema::get()['platforms'];
+        $fields = isset( $schema[ $platform ]['schema'] ) ? Schema::fields( $schema[ $platform ]['schema'] ) : array();
+        $locked = array();
 
-            if ( $split !== $now ) {
-                return true;
+        foreach ( isset( $fields['events']['options'] ) ? (array) $fields['events']['options'] : array() as $option ) {
+            if ( is_array( $option ) && ! empty( $option['locked'] ) && isset( $option['value'] ) ) {
+                $locked[] = (string) $option['value'];
             }
         }
 
-        return false;
+        return $locked;
     }
 
     /**

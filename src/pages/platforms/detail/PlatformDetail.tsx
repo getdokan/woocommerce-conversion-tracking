@@ -19,7 +19,7 @@ import { CircleHelp } from 'lucide-react';
  * WordPress dependencies
  */
 import { useEffect, useMemo, useRef, useState } from '@wordpress/element';
-import { __ } from '@wordpress/i18n';
+import { __, sprintf } from '@wordpress/i18n';
 
 /**
  * Internal dependencies
@@ -30,6 +30,14 @@ import {
     saveSettings,
     type SettingsUpdate,
 } from '../../../data/api';
+import {
+    PARAMETERS_VARIANT,
+    PIXELS_VARIANT,
+    asParameters,
+    asPixels,
+    parameterProblems,
+    pixelProblems,
+} from '../../../data/metaPro';
 import { isPro, upgradeUrl } from '../../../data/plan';
 import {
     applies,
@@ -39,9 +47,13 @@ import {
     draftFrom,
     editableFields,
     eventOptions,
+    eventsTurnedOn,
     focusField,
     focusSection,
+    needsAttention,
+    resetupEvents,
     sectionFields,
+    switchEvent,
     type LastPurchase,
 } from '../../../data/platformForm';
 import {
@@ -66,6 +78,8 @@ import { EventsTable } from './EventsTable';
 import { RadioField, SelectField, SkipRolesField, SwitchRow } from './Fields';
 import { HelpContent } from './HelpColumn';
 import { IdField } from './IdField';
+import { CustomParameters, ExtraPixels } from './MetaPro';
+import { GoogleSplitNotice, XResetupNotice } from './Notices';
 
 type Draft = { fields: PlatformValues; consent: boolean };
 
@@ -106,12 +120,12 @@ const intro = ( id: string ): string => {
             );
         case 'twitter':
             return __(
-                "Sends your store's events to the X Pixel.",
+                "Sends your store's events to the X Pixel for X ads.",
                 'woocommerce-conversion-tracking'
             );
         case 'bing_ads':
             return __(
-                "Sends your store's events to Microsoft Advertising through the UET tag.",
+                "Sends your store's events to the UET tag for Bing and Microsoft Start ads.",
                 'woocommerce-conversion-tracking'
             );
         default:
@@ -134,6 +148,16 @@ const advancedSubtitle = ( id: string ): string => {
         case 'google':
             return __(
                 'Order value, Google tag, who to track, developer details',
+                'woocommerce-conversion-tracking'
+            );
+        case 'twitter':
+            return __(
+                'Order value, product IDs, who to track, developer details',
+                'woocommerce-conversion-tracking'
+            );
+        case 'bing_ads':
+            return __(
+                'Order value, who to track, developer details',
                 'woocommerce-conversion-tracking'
             );
         default:
@@ -178,13 +202,16 @@ const responseErrors = (
  * @param {Object}           props              Component props.
  * @param {PlatformCardInfo} props.card         Platform.
  * @param {LastPurchase}     props.lastPurchase Last checked-in purchase.
+ * @param {boolean}          props.attention    X events need new IDs, or Google's split Ads ID is unchecked.
  */
 const Status = ( {
     card,
     lastPurchase,
+    attention,
 }: {
     card: PlatformCardInfo;
     lastPurchase: LastPurchase;
+    attention: boolean;
 } ) => {
     if ( ! card.connected ) {
         return (
@@ -198,6 +225,14 @@ const Status = ( {
         return (
             <StatusPill tone="off">
                 { __( 'Paused', 'woocommerce-conversion-tracking' ) }
+            </StatusPill>
+        );
+    }
+
+    if ( attention ) {
+        return (
+            <StatusPill tone="warn">
+                { __( 'Needs attention', 'woocommerce-conversion-tracking' ) }
             </StatusPill>
         );
     }
@@ -258,8 +293,12 @@ export const PlatformDetail = ( {
     const [ saving, setSaving ] = useState( false );
     const [ note, setNote ] = useState( '' );
     const [ advancedOpen, setAdvancedOpen ] = useState( false );
+    // A save stopped by Meta Pro's editors: their empty fields show as errors too.
+    const [ attempted, setAttempted ] = useState( false );
     const [ helpOpen, setHelpOpen ] = useState( false );
     const mounted = useRef( true );
+    // Event ID fields that already switched their row on since the last save.
+    const autoOn = useRef( new Set< string >() );
 
     const fields = editableFields( platform );
     const readOnlyAll =
@@ -344,15 +383,96 @@ export const PlatformDetail = ( {
     }, [ id, target ] );
 
     const setField = ( field: string, value: unknown ) => {
-        setDraft( ( prev ) => ( {
-            ...prev,
-            fields: { ...prev.fields, [ field ]: value },
-        } ) );
+        setDraft( ( prev ) => {
+            const next = { ...prev.fields, [ field ]: value };
+            // Once per field until the next save, so a row switched off by hand stays off while its ID is edited.
+            const turnOn = autoOn.current.has( field )
+                ? []
+                : eventsTurnedOn(
+                      platform,
+                      field,
+                      saved.fields,
+                      prev.fields,
+                      next
+                  );
+
+            if ( turnOn.length ) {
+                autoOn.current.add( field );
+            }
+
+            // A valid event ID turns its row on (X).
+            for ( const event of turnOn ) {
+                next.events = switchEvent(
+                    eventOptions( platform ),
+                    next.events,
+                    event,
+                    true
+                );
+            }
+
+            return { ...prev, fields: next };
+        } );
         setErrors( ( prev ) => ( { ...prev, [ field ]: '' } ) );
         setNote( '' );
     };
 
     const save = () => {
+        setSaveError( '' );
+        setPending( false );
+
+        // Meta Pro: rows the server would refuse, by their first control.
+        const blocked = fields.flatMap( ( field ) => {
+            if ( ! ( field.id in changes ) ) {
+                return [];
+            }
+
+            const base = controlId( id, field.id );
+
+            if ( field.variant === PIXELS_VARIANT ) {
+                const problems = pixelProblems(
+                    field,
+                    asPixels( draft.fields[ field.id ] ),
+                    text( draft.fields.pixel_id )
+                );
+
+                return Object.keys( problems )
+                    .filter( ( index ) => problems[ Number( index ) ].blocks )
+                    .map( ( index ) => `${ base }-${ index }-pixel_id` );
+            }
+
+            if ( field.variant === PARAMETERS_VARIANT ) {
+                const problems = parameterProblems(
+                    field,
+                    asParameters( draft.fields[ field.id ] )
+                );
+
+                return Object.keys( problems ).map( ( index ) => {
+                    const problem = problems[ Number( index ) ];
+
+                    if ( problem.name ) {
+                        return `${ base }-${ index }-name`;
+                    }
+
+                    return problem.event
+                        ? `${ base }-${ index }-event`
+                        : `${ base }-${ index }-token`;
+                } );
+            }
+
+            return [];
+        } );
+
+        if ( blocked.length ) {
+            setAttempted( true );
+            setAdvancedOpen( true );
+            window.setTimeout(
+                () => document.getElementById( blocked[ 0 ] )?.focus(),
+                0
+            );
+
+            return;
+        }
+
         const invalid = fields.filter(
             ( field ) =>
                 field.format === 'id' &&
@@ -360,9 +480,6 @@ export const PlatformDetail = ( {
                 applies( field, draft.fields ) &&
                 checkId( field, text( draft.fields[ field.id ] ) ) === 'invalid'
         );
-
-        setSaveError( '' );
-        setPending( false );
 
         if ( invalid.length ) {
             setErrors(
@@ -409,9 +526,11 @@ export const PlatformDetail = ( {
                 // Mark it clean first, so the refetch effect adopts the saved values.
                 dirtyRef.current = false;
                 setSaved( fresh );
+                autoOn.current.clear();
                 // Edits made while saving stay.
                 setDraft( ( prev ) => ( prev === sent ? fresh : prev ) );
                 setErrors( {} );
+                setAttempted( false );
                 replaceSettings( next );
 
                 const message = card.connected
@@ -467,7 +586,19 @@ export const PlatformDetail = ( {
         visible
     );
     const advanced = sectionFields( platform, 'advanced' ).filter( visible );
+    const pixelsField = advanced.find(
+        ( field ) => field.variant === PIXELS_VARIANT
+    );
+    const parametersField = advanced.find(
+        ( field ) => field.variant === PARAMETERS_VARIANT
+    );
     const consentNotice = text( consentField?.notice );
+    const resetup = resetupEvents(
+        platform,
+        draft.fields,
+        values.needs_resetup
+    );
+    const split = values.ads_id_split as Record< string, unknown > | null;
 
     // Renders one schema field with the control for its variant.
     const renderField = ( field: SchemaElement ) => {
@@ -621,6 +752,19 @@ export const PlatformDetail = ( {
                         className="m-0 p-0 text-base leading-snug font-semibold text-foreground"
                     >
                         { card.name }
+                        { id === 'twitter' && ' ' }
+                        { id === 'twitter' && (
+                            <span className="text-[13px] font-normal text-muted-foreground">
+                                { sprintf(
+                                    /* translators: %s: the platform's former name */
+                                    __(
+                                        '(formerly %s)',
+                                        'woocommerce-conversion-tracking'
+                                    ),
+                                    'Twitter'
+                                ) }
+                            </span>
+                        ) }
                     </h2>
                     <p className="m-0 mt-0.5 text-sm text-muted-foreground">
                         { intro( id ) }{ ' ' }
@@ -641,7 +785,11 @@ export const PlatformDetail = ( {
                     </p>
                 </div>
                 <span data-testid="wcct-platform-pill">
-                    <Status card={ card } lastPurchase={ lastPurchase } />
+                    <Status
+                        card={ card }
+                        lastPurchase={ lastPurchase }
+                        attention={ needsAttention( platform, values ) }
+                    />
                 </span>
                 <Button
                     variant="outline"
@@ -671,6 +819,14 @@ export const PlatformDetail = ( {
                                 ) }
                             </p>
                         </Notice>
+                    ) }
+
+                    { resetup.length > 0 && ! readOnlyAll && (
+                        <XResetupNotice platform={ id } events={ resetup } />
+                    ) }
+
+                    { split && id === 'google' && (
+                        <GoogleSplitNotice saved={ text( split.saved ) } />
                     ) }
 
                     { connection
@@ -784,6 +940,39 @@ export const PlatformDetail = ( {
                         subtitle={ advancedSubtitle( id ) }
                     >
                         { advanced.map( renderField ) }
+                        { parametersField && (
+                            <CustomParameters
+                                platform={ id }
+                                field={ parametersField }
+                                parameters={ asParameters(
+                                    draft.fields[ parametersField.id ]
+                                ) }
+                                events={ events }
+                                readOnly={ parametersField.readonly === true }
+                                attempted={ attempted }
+                                error={ errors[ parametersField.id ] }
+                                onChange={ ( next ) =>
+                                    setField( parametersField.id, next )
+                                }
+                            />
+                        ) }
+                        { pixelsField && (
+                            <ExtraPixels
+                                platform={ id }
+                                field={ pixelsField }
+                                pixels={ asPixels(
+                                    draft.fields[ pixelsField.id ]
+                                ) }
+                                main={ text( draft.fields.pixel_id ) }
+                                events={ events }
+                                readOnly={ pixelsField.readonly === true }
+                                attempted={ attempted }
+                                error={ errors[ pixelsField.id ] }
+                                onChange={ ( next ) =>
+                                    setField( pixelsField.id, next )
+                                }
+                            />
+                        ) }
                         { showsMetaPreview( id ) && <MetaProPreview /> }
                         <DeveloperBlock platform={ platform } />
                     </AdvancedSettings>

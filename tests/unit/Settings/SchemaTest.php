@@ -124,6 +124,20 @@ class SchemaTest extends TestCase {
         $this->assertSame( array( 'view_category', 'add_to_wishlist' ), array_values( $locked ) );
     }
 
+    public function test_x_rows_wait_for_their_event_id_and_unlocking_turns_on_the_recommended_ones() {
+        $twitter = Schema::get()['platforms']['twitter']['schema'];
+        $events  = Schema::fields( $twitter )['events'];
+
+        $this->assertSame( array( 'page_view', 'purchase' ), $events['default'], 'Free: Add to cart and Start checkout are locked' );
+        $this->assertSame( array( '', 'cart_event_id', 'checkout_event_id', 'purchase_event_id', 'signup_event_id' ), array_column( $events['options'], 'needs' ) );
+
+        $unlocked = Schema::fields( Schema::unlock_options( $twitter, 'events' ) )['events'];
+
+        $this->assertSame( array( 'page_view', 'add_to_cart', 'begin_checkout', 'purchase' ), $unlocked['default'] );
+        // Meta's Pro events aren't recommended, so its default stays.
+        $this->assertSame( array( 'view_product', 'add_to_cart', 'begin_checkout', 'purchase' ), Schema::fields( Schema::unlock_options( Schema::get()['platforms']['facebook']['schema'], 'events' ) )['events']['default'] );
+    }
+
     public function test_a_filter_adds_a_platform_and_unlocks_options() {
         $GLOBALS['wcct_test_filters']['wcct_settings_schema'] = function ( $schema ) {
             $schema['platforms']['bing_ads'] = array(
