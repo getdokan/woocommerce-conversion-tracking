@@ -4,7 +4,10 @@
     "phpVersion": "8.3",
     "port": 8894,
     "testsEnvironment": false,
-    "plugins": ["https://downloads.wordpress.org/plugin/woocommerce.11.2.2.zip"],
+    "plugins": [
+        "https://downloads.wordpress.org/plugin/woocommerce.11.2.2.zip",
+        "https://downloads.wordpress.org/plugin/yith-woocommerce-wishlist.4.20.0.zip"
+    ],
     "themes": ["https://downloads.wordpress.org/theme/storefront.zip"],
     "config": {
         "WP_DEBUG": true,

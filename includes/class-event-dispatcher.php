@@ -3,6 +3,7 @@
 use StorePulse\ConversionTracking\Events\EventFactory;
 use StorePulse\ConversionTracking\Events\Pipeline;
 use StorePulse\ConversionTracking\Events\SignUp;
+use StorePulse\ConversionTracking\Events\Wishlist;
 use StorePulse\ConversionTracking\Log\AjaxCheckIn;
 use StorePulse\ConversionTracking\Log\ThankYouSeen;
 use StorePulse\ConversionTracking\Onboarding\Verify;
@@ -59,9 +60,9 @@ class WCCT_Event_Dispatcher {
         // New accounts are flagged here and sent on the user's next page view.
         SignUp::init_hooks();
 
-        // Wishlist Event
-        add_action( 'yith_wcwl_added_to_wishlist', array( $this, 'product_wishlist' ) );
-        add_action( 'woocommerce_wishlist_add_item', array( $this, 'product_wishlist' ), 10, 0 );
+        // Wishlist adds, as actions: YITH passes the product ID, WooCommerce Wishlists the cart item key first.
+        add_action( 'yith_wcwl_added_to_wishlist', array( $this, 'product_wishlist' ), 10, 1 );
+        add_action( 'woocommerce_wishlist_add_item', array( $this, 'wc_wishlists_item_added' ), 10, 4 );
     }
 
     /**
@@ -104,14 +105,32 @@ class WCCT_Event_Dispatcher {
     }
 
     /**
-     * Product wishlist event
+     * Product wishlist event, queued for the visitor's browser: adds are AJAX, REST or a redirected form post
      *
      * @param int $product_id Product added, from YITH's hook; 0 when the hook doesn't pass one.
      *
-     * @return void
+     * @return int The product ID, unchanged, should the hook ever be applied as a filter.
      */
     public function product_wishlist( $product_id = 0 ) {
-        $this->pipeline->dispatch( EventFactory::add_to_wishlist( $product_id ) );
+        if ( Wishlist::active() ) {
+            $this->pipeline->queue( EventFactory::add_to_wishlist( $product_id ), true );
+        }
+
+        return $product_id;
+    }
+
+    /**
+     * WooCommerce Wishlists add
+     *
+     * @param string $cart_item_key Wishlist item key.
+     * @param int    $product_id    Product ID.
+     * @param int    $quantity      Quantity.
+     * @param int    $variation_id  Variation ID.
+     *
+     * @return void
+     */
+    public function wc_wishlists_item_added( $cart_item_key = '', $product_id = 0, $quantity = 1, $variation_id = 0 ) {
+        $this->product_wishlist( Wishlist::product_id( $product_id, $variation_id ) );
     }
 
     /**

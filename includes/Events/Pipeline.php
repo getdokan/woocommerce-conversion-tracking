@@ -9,7 +9,7 @@ use StorePulse\ConversionTracking\Platforms\Registry;
  *
  * Page events are decided on page load (PageEvents) and printed through wp_add_inline_script.
  * Add to cart is per visitor: it waits in the session (PendingEvents) and reaches the browser through a cart
- * fragment or an uncached request, never through page HTML. Wishlist adds still wait here for the footer.
+ * fragment or an uncached request, never through page HTML. Wishlist adds go the same way.
  */
 class Pipeline {
 
@@ -152,11 +152,12 @@ class Pipeline {
     /**
      * Render an event for every platform now and keep it in the visitor's session until their browser runs it.
      *
-     * @param Event $event Event.
+     * @param Event $event         Event.
+     * @param bool  $start_session Start a WooCommerce session for a visitor without one (wishlist adds come without a cart).
      *
      * @return bool Whether anything was queued.
      */
-    public function queue( Event $event ) {
+    public function queue( Event $event, $start_session = false ) {
         $scripts = array();
 
         foreach ( $this->get_platforms() as $id => $platform ) {
@@ -164,6 +165,21 @@ class Pipeline {
             ob_start();
             $scripts[ $id ] = $platform->get_event_script( $event );
             ob_end_clean();
+        }
+
+        $scripts = array_filter(
+            $scripts,
+            function ( $code ) {
+                return is_string( $code ) && '' !== trim( $code );
+            }
+        );
+
+        if ( ! $scripts ) {
+            return false;
+        }
+
+        if ( $start_session ) {
+            self::start_session();
         }
 
         if ( ! $this->pending()->add( $event->get_event_id(), $scripts ) ) {
@@ -178,6 +194,27 @@ class Pipeline {
         }
 
         return true;
+    }
+
+    /**
+     * Start a WooCommerce session that outlives the request: REST requests have none, and a guest without a cart has no cookie.
+     *
+     * @return void
+     */
+    public static function start_session() {
+        if ( ! function_exists( 'WC' ) ) {
+            return;
+        }
+
+        if ( ! WC()->session && method_exists( WC(), 'initialize_session' ) ) {
+            WC()->initialize_session();
+        }
+
+        $session = WC()->session;
+
+        if ( $session && method_exists( $session, 'has_session' ) && ! $session->has_session() && method_exists( $session, 'set_customer_session_cookie' ) && ! headers_sent() ) {
+            $session->set_customer_session_cookie( true );
+        }
     }
 
     /**
@@ -349,7 +386,7 @@ class Pipeline {
 
         $scripts = array();
 
-        if ( $this->sends( Event::ADD_TO_CART ) ) {
+        if ( $this->sends( Event::ADD_TO_CART ) || $this->triggers() ) {
             // With consent mode on, each platform's queued code waits for its consent category.
             $scripts[ self::RUNNER_HANDLE ] = \StorePulse\ConversionTracking\Consent\ConsentMode::gate_runner( $this->runner_script(), $this->consent_categories() );
         }
@@ -413,11 +450,21 @@ class Pipeline {
     }
 
     /**
+     * jQuery events, besides add to cart, after which the runner asks for pending events: a wishlist plugin's add, when one is active and a platform sends it.
+     *
+     * @return string[]
+     */
+    public function triggers() {
+        return Wishlist::active() && $this->sends( Event::ADD_TO_WISHLIST ) ? Wishlist::TRIGGERS : array();
+    }
+
+    /**
      * Script that runs the visitor's pending events; the same for every visitor, so pages stay cacheable.
      *
      * @return string
      */
     public function runner_script() {
+        $triggers = $this->triggers();
         $config = array(
             'endpoint' => \WC_AJAX::get_endpoint( self::AJAX_ACTION ),
             'fragment' => self::AJAX_ACTION,
@@ -488,6 +535,10 @@ class Pipeline {
                 check();
             }
         });
+<?php if ( $triggers ) : ?>
+        // A wishlist add queued its event on the server.
+        window.jQuery(document).on(<?php echo wp_json_encode( implode( ' ', $triggers ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>, check);
+<?php endif; ?>
     };
     bindJQuery();
     document.addEventListener('DOMContentLoaded', bindJQuery);

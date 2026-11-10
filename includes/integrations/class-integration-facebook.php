@@ -3,6 +3,7 @@
 use StorePulse\ConversionTracking\Events\Event;
 use StorePulse\ConversionTracking\Events\OrderReceived;
 use StorePulse\ConversionTracking\Events\UserData;
+use StorePulse\ConversionTracking\Platforms\MetaSettings;
 use StorePulse\ConversionTracking\Platforms\PlatformSettings;
 use StorePulse\ConversionTracking\Settings\LegacyView;
 
@@ -19,9 +20,7 @@ class WCCT_Integration_Facebook extends WCCT_Integration {
     /**
      * Settings key per Meta event name, where they differ
      */
-    const EVENT_SETTINGS = array(
-        'CompleteRegistration' => 'Registration',
-    );
+    const EVENT_SETTINGS = MetaSettings::SETTINGS_KEYS;
 
     /**
      * Constructor for WC_Conversion_Tracking_Gateway_Facebook
@@ -131,7 +130,7 @@ class WCCT_Integration_Facebook extends WCCT_Integration {
     }
 
     /**
-     * The pixel ID
+     * The pixel ID, from the 3.0 settings
      *
      * @return string
      */

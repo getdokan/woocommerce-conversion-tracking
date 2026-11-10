@@ -33,8 +33,13 @@
         new Image().src = 'https://www.facebook.com/tr/?' + query.join( '&' );
     };
 
+    // Every fbq() call this page made, so a spec can check the method ([method, pixel or event, ...]).
+    window.ctE2eFbqCalls = window.ctE2eFbqCalls || [];
+
     var handle = function ( args ) {
         var method = args[ 0 ];
+
+        window.ctE2eFbqCalls.push( Array.prototype.slice.call( args ) );
 
         if ( method === 'init' ) {
             if ( pixels.indexOf( String( args[ 1 ] ) ) === -1 ) {
