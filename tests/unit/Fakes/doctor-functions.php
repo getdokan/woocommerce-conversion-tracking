@@ -64,3 +64,17 @@ if ( ! function_exists( 'wp_remote_retrieve_body' ) ) {
         return isset( $response['body'] ) ? $response['body'] : '';
     }
 }
+
+if ( ! function_exists( '_n' ) ) {
+    function _n( $single, $plural, $number, $domain = 'default' ) {
+        return 1 === (int) $number ? $single : $plural;
+    }
+}
+
+if ( ! function_exists( 'wp_sprintf_l' ) ) {
+    function wp_sprintf_l( $pattern, $args ) {
+        $last = array_pop( $args );
+
+        return $args ? implode( ', ', $args ) . ' and ' . $last : (string) $last;
+    }
+}

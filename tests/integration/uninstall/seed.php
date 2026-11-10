@@ -21,7 +21,7 @@ $free_options = array(
     'wcct_onboarding'             => array( 'status' => 'done' ),
     'wcct_count_once_since'       => 1,
     'wcct_secret_capi_token'      => 'wcct:sb1:fake',
-    'wcct_order_log_db_version'   => '1',
+    'wcct_order_log_db_version'   => '2',
     'wcct_verify'                 => array( 'token' => 'fake' ),
     'wcct_last_purchase_facebook' => array( 'last_purchase_at' => 1 ),
     'woocommerce_wc_conv_tracking_settings' => array( 'fb_pixel' => '1' ),

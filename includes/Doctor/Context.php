@@ -2,6 +2,7 @@
 
 namespace StorePulse\ConversionTracking\Doctor;
 
+use StorePulse\ConversionTracking\Platforms\Pause;
 use StorePulse\ConversionTracking\Settings\Store;
 
 /**
@@ -117,17 +118,14 @@ class Context {
     }
 
     /**
-     * Whether an integration is paused (wcct_paused_platforms).
+     * Whether an integration or platform is paused (Platforms\Pause).
      *
      * @param string $integration Integration ID, for example facebook or ga4.
      *
      * @return bool
      */
     public function is_paused( $integration ) {
-        $paused = get_option( 'wcct_paused_platforms', array() );
-
-        // phpcs:ignore WooCommerce.Commenting.CommentHooks.MissingHookComment -- documented in WCCT_Integration::is_paused().
-        return (bool) apply_filters( 'wcct_platform_paused', is_array( $paused ) && in_array( $integration, $paused, true ), $integration );
+        return Pause::is_paused( (string) $integration, $this->settings() );
     }
 
     /**

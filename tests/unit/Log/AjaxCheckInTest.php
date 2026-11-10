@@ -98,10 +98,10 @@ class AjaxCheckInTest extends TestCase {
     }
 
     public function test_a_valid_check_in_is_recorded() {
-        $response = $this->post( array( 'order_id' => '9', 'key' => 'wc_order_abc', 'platform' => 'facebook', 'loaded' => '1', 'consent' => 'granted', 'event_id' => 'wcct_9_purchase', 'reason' => '', 'action' => 'wcct_events' ) );
+        $response = $this->post( array( 'order_id' => '9', 'key' => 'wc_order_abc', 'platform' => 'facebook', 'loaded' => '1', 'consent' => 'granted', 'event_id' => 'wcct_9_purchase', 'reason' => '', 'load' => 'pageA1', 'action' => 'wcct_events' ) );
 
         $this->assertSame( array( true, array( 'result' => 'recorded' ), null ), $response );
-        $this->assertSame( array( array( 9, 'facebook', array( 'loaded' => '1', 'consent' => 'granted', 'reason' => '', 'event_id' => 'wcct_9_purchase' ) ) ), $this->recorded );
+        $this->assertSame( array( array( 9, 'facebook', array( 'loaded' => '1', 'consent' => 'granted', 'reason' => '', 'event_id' => 'wcct_9_purchase', 'load' => 'pageA1' ) ) ), $this->recorded );
     }
 
     public function test_the_same_rejections_as_the_route() {

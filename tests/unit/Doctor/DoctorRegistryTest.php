@@ -23,7 +23,8 @@ class DoctorRegistryTest extends TestCase {
     }
 
     public function test_lite_registers_its_checks() {
-        $this->assertSame( array( 'consent-off' ), array_keys( Registry::all() ) );
+        $this->assertSame( array( 'tracking-plugins', 'id-formats', 'consent-plugin', 'tag-manager', 'purchase-on', 'purchases-24h', 'consent-off' ), array_keys( Registry::all() ) );
+        $this->assertCount( 7, Registry::applicable(), 'Free: "We checked 7 things"' );
         $this->assertInstanceOf( ConsentOffCheck::class, Registry::all()['consent-off'] );
     }
 
@@ -48,7 +49,7 @@ class DoctorRegistryTest extends TestCase {
 
         $checks = Registry::all();
 
-        $this->assertSame( array( 'consent-off', 'named', 'sample' ), array_keys( $checks ) );
+        $this->assertSame( array( 'tracking-plugins', 'id-formats', 'consent-plugin', 'tag-manager', 'purchase-on', 'purchases-24h', 'consent-off', 'named', 'sample' ), array_keys( $checks ) );
         $this->assertSame( $first, $checks['sample'], 'The first check with an ID wins' );
     }
 
@@ -63,6 +64,6 @@ class DoctorRegistryTest extends TestCase {
     public function test_checks_that_do_not_apply_are_left_out() {
         $this->register( array( new WCCT_Test_Sample_Check( 'off', 'local', false ), new WCCT_Test_Sample_Check( 'on' ) ) );
 
-        $this->assertSame( array( 'consent-off', 'on' ), array_keys( Registry::applicable() ) );
+        $this->assertSame( array( 'tracking-plugins', 'id-formats', 'consent-plugin', 'tag-manager', 'purchase-on', 'purchases-24h', 'consent-off', 'on' ), array_keys( Registry::applicable() ) );
     }
 }

@@ -6,6 +6,7 @@ require_once dirname( __DIR__ ) . '/Fakes/FakeChecks.php';
 use PHPUnit\Framework\TestCase;
 use StorePulse\ConversionTracking\Consent\ConsentMode;
 use StorePulse\ConversionTracking\Doctor\Check;
+use StorePulse\ConversionTracking\Doctor\Checks\ConsentOffCheck;
 use StorePulse\ConversionTracking\Doctor\Context;
 use StorePulse\ConversionTracking\Doctor\Doctor;
 use StorePulse\ConversionTracking\Doctor\Finding;
@@ -39,8 +40,9 @@ class DoctorTest extends TestCase {
 
         $registered = array_values( $this->checks );
 
-        $GLOBALS['wcct_test_filters'][ Registry::FILTER ] = function ( $defaults ) use ( $registered ) {
-            return array_merge( $defaults, $registered );
+        // Lite's own consent check only: the other checks have tests of their own.
+        $GLOBALS['wcct_test_filters'][ Registry::FILTER ] = function () use ( $registered ) {
+            return array_merge( array( ConsentOffCheck::class ), $registered );
         };
     }
 
@@ -156,7 +158,9 @@ class DoctorTest extends TestCase {
         $this->finds( 'pro-only', array( 'found' => 'Pro' ) );
         Doctor::run();
 
-        unset( $GLOBALS['wcct_test_filters'][ Registry::FILTER ] );
+        $GLOBALS['wcct_test_filters'][ Registry::FILTER ] = function () {
+            return array( ConsentOffCheck::class );
+        };
         $report = Doctor::report();
 
         $this->assertSame( array(), $report['findings'] );

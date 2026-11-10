@@ -15,7 +15,7 @@ class OrderLog {
     /**
      * Schema version; bump it when the table changes.
      */
-    const DB_VERSION = '1';
+    const DB_VERSION = '2';
 
     /**
      * Option holding the installed schema version.
@@ -51,6 +51,8 @@ class OrderLog {
         'consent'          => "varchar(16) NOT NULL DEFAULT ''",
         'reason'           => "varchar(32) NOT NULL DEFAULT ''",
         'event_id'         => "varchar(64) NOT NULL DEFAULT ''",
+        // Token of the page load that checked in; a hand-over from another page load is a repeat (Log\RepeatSends).
+        'load_id'          => 'varchar(32) NULL DEFAULT NULL',
         'created_at'       => 'datetime NOT NULL',
         'updated_at'       => 'datetime NOT NULL',
     );
@@ -58,7 +60,7 @@ class OrderLog {
     /**
      * Columns a check-in writes; kept when the row was already handed over.
      */
-    const CHECKIN_COLUMNS = array( 'sent_at', 'consent', 'reason', 'event_id', 'updated_at' );
+    const CHECKIN_COLUMNS = array( 'sent_at', 'consent', 'reason', 'event_id', 'load_id', 'updated_at' );
 
     /**
      * Full table name.

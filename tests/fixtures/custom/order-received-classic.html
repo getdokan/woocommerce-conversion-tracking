@@ -62,6 +62,8 @@
     var sent = window.wcctPurchaseSent, all = sent.all = sent.all || {}, id = platform + ":" + orderId;
     if (all[id]) return all[id];
     var order = window.wcctOrder, done = false, missed = "";
+    // One token per page load, sent with every check-in: the admin-ajax retry carries the same one, another load a new one.
+    var load = sent.load = sent.load || (Math.random().toString(36).slice(2, 12) + Date.now().toString(36));
     // Funnel pages may not print the key; the head script kept it before it cleaned the address bar.
     if (!key && order && order.key && (!+order.id || String(order.id) === String(orderId))) key = order.key;
     var consentState = function () {
@@ -83,7 +85,7 @@
             if (window.console) console.warn("wcct: no order key on this page, the purchase check-in was skipped");
             return;
         }
-        var body = "order_id=" + encodeURIComponent(orderId) + "&key=" + encodeURIComponent(key) + "&platform=" + encodeURIComponent(platform) + "&loaded=" + (loaded ? 1 : 0) + "&consent=" + consentState() + "&event_id=" + encodeURIComponent(eventId || "") + "&reason=" + reason;
+        var body = "order_id=" + encodeURIComponent(orderId) + "&key=" + encodeURIComponent(key) + "&platform=" + encodeURIComponent(platform) + "&loaded=" + (loaded ? 1 : 0) + "&consent=" + consentState() + "&event_id=" + encodeURIComponent(eventId || "") + "&reason=" + reason + "&load=" + load;
         if (!unloading && window.fetch) return post(url, body, true);
         try {
             if (navigator.sendBeacon && navigator.sendBeacon(url, new Blob([body], { type: "application/x-www-form-urlencoded" }))) return;

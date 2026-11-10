@@ -91,7 +91,7 @@ class AjaxCheckIn {
 
         $params = array();
 
-        foreach ( array( 'order_id', 'key', 'platform', 'loaded', 'consent', 'reason', 'event_id' ) as $name ) {
+        foreach ( array( 'order_id', 'key', 'platform', 'loaded', 'consent', 'reason', 'event_id', 'load' ) as $name ) {
             // phpcs:ignore WordPress.Security.NonceVerification.Missing, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- the order key is the credential; CheckIn::process() and normalise() validate every field.
             $params[ $name ] = isset( $_POST[ $name ] ) && is_string( $_POST[ $name ] ) ? wp_unslash( $_POST[ $name ] ) : '';
         }

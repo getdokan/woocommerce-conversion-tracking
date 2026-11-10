@@ -16,9 +16,11 @@ const resetDoctor = async (page: Page): Promise<void> => {
 const finding = (page: Page, text: string) => page.getByTestId('wcct-finding').filter({ hasText: text });
 
 test.describe('Tracking Doctor', () => {
-    test.beforeEach(async ({ page }) => {
+    test.beforeEach(async ({ page, context }) => {
         await loginAsAdmin(page);
         await resetDoctor(page);
+        // The framework with Lite's consent note only; doctor-checks.spec.ts covers the other checks.
+        await setCookies(context, { ct_e2e_doctor_checks: 'consent-off' });
     });
 
     test('the first visit runs the checks and shows "Everything looks good" with the Working list collapsed', async ({ page, context }) => {
@@ -93,6 +95,8 @@ test.describe('Tracking Doctor', () => {
         await expect(finding(page, 'An e2e tag manager is active').getByRole('button', { name: 'Dismiss' })).toBeFocused();
         await page.getByRole('button', { name: 'Undo' }).click();
         await expect(duplicate).toBeVisible();
+        // Let the Undo toast leave before the next Dismiss (it never covers a Dismiss button at this viewport).
+        await expect(page.locator('[data-sonner-toast]')).toHaveCount(0);
 
         await duplicate.getByRole('button', { name: 'Dismiss' }).click();
         await expect(duplicate).toHaveCount(0);

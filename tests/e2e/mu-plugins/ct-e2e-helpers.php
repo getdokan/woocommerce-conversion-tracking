@@ -103,6 +103,11 @@ add_filter(
     }
 );
 
+// Lite's real Doctor checks against cookie-only store states (doctor-states.php, doctor-checks.spec.ts).
+if ( isset( $_COOKIE['ct_e2e_doctor_checks'] ) || isset( $_COOKIE['ct_e2e_doctor_state'] ) ) {
+    require __DIR__ . '/ct-e2e/doctor-states.php';
+}
+
 add_filter(
     'wcct_consent_mode_enabled',
     static function ( $enabled ) {

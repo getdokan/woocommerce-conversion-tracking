@@ -19,6 +19,12 @@ class Registry {
      */
     public static function defaults() {
         return array(
+            Checks\TrackingPluginsCheck::class,
+            Checks\IdFormatsCheck::class,
+            Checks\ConsentPluginCheck::class,
+            Checks\TagManagerCheck::class,
+            Checks\PurchaseOnCheck::class,
+            Checks\PurchasesCheck::class,
             Checks\ConsentOffCheck::class,
         );
     }

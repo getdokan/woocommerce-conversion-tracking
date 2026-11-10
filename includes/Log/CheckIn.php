@@ -53,7 +53,7 @@ class CheckIn {
     }
 
     /**
-     * Clean the check-in fields: loaded, consent, reason and event_id.
+     * Clean the check-in fields: loaded, consent, reason, event_id and load (the page load's token).
      *
      * @param array $input Raw fields.
      *
@@ -64,12 +64,14 @@ class CheckIn {
         $consent  = isset( $input['consent'] ) && in_array( $input['consent'], self::CONSENT, true ) ? $input['consent'] : 'off';
         $reason   = ! $loaded && isset( $input['reason'] ) && in_array( $input['reason'], self::REASONS, true ) ? $input['reason'] : '';
         $event_id = isset( $input['event_id'] ) && is_string( $input['event_id'] ) ? substr( preg_replace( '/[^A-Za-z0-9_\-]/', '', $input['event_id'] ), 0, 64 ) : '';
+        $load     = isset( $input['load'] ) && is_string( $input['load'] ) ? substr( preg_replace( '/[^A-Za-z0-9]/', '', $input['load'] ), 0, 32 ) : '';
 
         return array(
             'loaded'   => $loaded,
             'consent'  => $consent,
             'reason'   => $reason,
             'event_id' => $event_id,
+            'load'     => $load,
         );
     }
 
@@ -104,6 +106,7 @@ class CheckIn {
             'consent'        => $checkin['consent'],
             'reason'         => $checkin['reason'],
             'event_id'       => $checkin['event_id'],
+            'load_id'        => '' !== $checkin['load'] ? $checkin['load'] : null,
             'updated_at'     => $stamp,
         );
     }
@@ -130,6 +133,11 @@ class CheckIn {
         $row     = OrderLog::get( $order->get_id(), $platform );
         $changes = self::merge( $row, $checkin, $now );
 
+        // A hand-over from another page load means the platform took this Purchase twice; the admin-ajax retry of the same load is not one.
+        if ( self::is_repeat( $row, $checkin ) ) {
+            RepeatSends::record( $order->get_id(), $platform, $now );
+        }
+
         // The flag follows the flag and the row follows the row: a hand-over always makes sure the flag is there (mark_sent() is idempotent).
         $flagged = $checkin['loaded'] && SentFlags::mark_sent( $order, $platform );
 
@@ -147,7 +155,7 @@ class CheckIn {
     /**
      * Validate a check-in request and record it; shared by the REST route and the admin-ajax fallback.
      *
-     * @param array    $params     Request fields: order_id, key, platform, loaded, consent, reason, event_id.
+     * @param array    $params     Request fields: order_id, key, platform, loaded, consent, reason, event_id, load.
      * @param string[] $platforms  Active platform IDs.
      * @param callable $find_order Receives ( order ID, key ), returns the order or false.
      * @param callable $record     Receives ( order, platform, fields ), returns a result constant.
@@ -168,9 +176,25 @@ class CheckIn {
             return array( 'status' => 403, 'code' => 'wcct_rest_invalid_order', 'result' => '' );
         }
 
-        $fields = array_intersect_key( $params, array_flip( array( 'loaded', 'consent', 'reason', 'event_id' ) ) );
+        $fields = array_intersect_key( $params, array_flip( array( 'loaded', 'consent', 'reason', 'event_id', 'load' ) ) );
 
         return array( 'status' => 200, 'code' => '', 'result' => (string) call_user_func( $record, $order, $platform, $fields ) );
+    }
+
+    /**
+     * Whether a check-in hands over a Purchase that another page load already handed over.
+     *
+     * @param array|null $row     Existing row, null for none.
+     * @param array      $checkin Check-in fields.
+     *
+     * @return bool
+     */
+    public static function is_repeat( $row, array $checkin ) {
+        $checkin = self::normalise( $checkin );
+        $before  = is_array( $row ) && isset( $row['load_id'] ) && is_string( $row['load_id'] ) ? $row['load_id'] : '';
+
+        // Without both tokens (rows from before the token, old cached pages) we can't tell, so it isn't counted.
+        return $checkin['loaded'] && is_array( $row ) && ! empty( $row['library_loaded'] ) && '' !== $before && '' !== $checkin['load'] && $before !== $checkin['load'];
     }
 
     /**

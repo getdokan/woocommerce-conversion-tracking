@@ -1,6 +1,6 @@
 <?php
 /**
- * Doctor route steps with two sample checks registered through wcct_doctor_checks (see REST/DoctorRouteTest), then the steps of rest-requests.php.
+ * Doctor route steps with two sample checks registered through wcct_doctor_checks next to Lite's consent note (see REST/DoctorRouteTest), then the steps of rest-requests.php.
  *
  * wcct_test_plugin_found (option): the local sample check finds a plugin named by it.
  * wcct_test_loopback (option): 'ok', 'blocked' (403) or 'down' (request error) turns on the remote sample check; every request
@@ -88,6 +88,15 @@ class WCCT_Test_Doctor_Loopback_Check extends AbstractCheck {
 add_filter(
     'wcct_doctor_checks',
     function ( $checks ) {
+        // The framework's routes with Lite's consent note only; the other checks have DoctorChecksTest.
+        $checks = array_values(
+            array_filter(
+                $checks,
+                function ( $check ) {
+                    return ! is_string( $check ) || 0 !== strpos( $check, 'StorePulse\\ConversionTracking\\Doctor\\Checks\\' ) || 'StorePulse\\ConversionTracking\\Doctor\\Checks\\ConsentOffCheck' === $check;
+                }
+            )
+        );
         $checks[] = WCCT_Test_Doctor_Plugin_Check::class;
         $checks[] = WCCT_Test_Doctor_Loopback_Check::class;
 

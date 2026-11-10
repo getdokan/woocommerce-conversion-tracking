@@ -98,6 +98,12 @@ class EventsController extends Controller {
                             'pattern'     => '^[A-Za-z0-9_\-]{0,64}$',
                             'default'     => '',
                         ),
+                        'load'      => array(
+                            'description' => __( 'Token of the page load that checks in.', 'woocommerce-conversion-tracking' ),
+                            'type'        => 'string',
+                            'pattern'     => '^[A-Za-z0-9]{0,32}$',
+                            'default'     => '',
+                        ),
                         'token'     => array(
                             'description' => __( 'Test link token.', 'woocommerce-conversion-tracking' ),
                             'type'        => 'string',
@@ -128,7 +134,7 @@ class EventsController extends Controller {
 
         $params = array();
 
-        foreach ( array( 'order_id', 'key', 'platform', 'loaded', 'consent', 'reason', 'event_id' ) as $name ) {
+        foreach ( array( 'order_id', 'key', 'platform', 'loaded', 'consent', 'reason', 'event_id', 'load' ) as $name ) {
             $params[ $name ] = $request->get_param( $name );
         }
 

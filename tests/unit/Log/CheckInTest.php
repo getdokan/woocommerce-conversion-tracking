@@ -23,14 +23,15 @@ class CheckInTest extends TestCase {
 
     public function test_fields_are_cleaned_to_known_values() {
         $this->assertSame(
-            array( 'loaded' => true, 'consent' => 'denied', 'reason' => '', 'event_id' => 'wcct_9_purchase' ),
-            CheckIn::normalise( array( 'loaded' => '1', 'consent' => 'denied', 'reason' => 'timeout', 'event_id' => 'wcct_9_purchase' ) )
+            array( 'loaded' => true, 'consent' => 'denied', 'reason' => '', 'event_id' => 'wcct_9_purchase', 'load' => 'k3x9a' ),
+            CheckIn::normalise( array( 'loaded' => '1', 'consent' => 'denied', 'reason' => 'timeout', 'event_id' => 'wcct_9_purchase', 'load' => 'k3x9a' ) )
         );
         $this->assertSame(
-            array( 'loaded' => false, 'consent' => 'off', 'reason' => '', 'event_id' => 'scriptalert1' ),
-            CheckIn::normalise( array( 'loaded' => 'yes', 'consent' => 'maybe', 'reason' => 'blocked', 'event_id' => '<script>alert(1)' ) )
+            array( 'loaded' => false, 'consent' => 'off', 'reason' => '', 'event_id' => 'scriptalert1', 'load' => 'ab' ),
+            CheckIn::normalise( array( 'loaded' => 'yes', 'consent' => 'maybe', 'reason' => 'blocked', 'event_id' => '<script>alert(1)', 'load' => 'a-b' ) )
         );
         $this->assertSame( 64, strlen( CheckIn::normalise( array( 'event_id' => str_repeat( 'a', 100 ) ) )['event_id'] ) );
+        $this->assertSame( 32, strlen( CheckIn::normalise( array( 'load' => str_repeat( 'b', 40 ) ) )['load'] ) );
         $this->assertSame( 'hidden', CheckIn::normalise( array( 'loaded' => 0, 'reason' => 'hidden' ) )['reason'] );
     }
 
@@ -42,10 +43,31 @@ class CheckInTest extends TestCase {
                 'consent'        => 'granted',
                 'reason'         => '',
                 'event_id'       => 'wcct_9_purchase',
+                'load_id'        => 'pageA1',
                 'updated_at'     => '2026-01-01 00:00:00',
             ),
-            CheckIn::merge( null, array( 'loaded' => true, 'consent' => 'granted', 'event_id' => 'wcct_9_purchase' ), self::NOW )
+            CheckIn::merge( null, array( 'loaded' => true, 'consent' => 'granted', 'event_id' => 'wcct_9_purchase', 'load' => 'pageA1' ), self::NOW )
         );
+        $this->assertNull( CheckIn::merge( null, array( 'loaded' => true ), self::NOW )['load_id'], 'No token from an old cached page' );
+    }
+
+    public function test_a_hand_over_from_another_page_load_is_a_repeat() {
+        $sent = $this->row( array( 'library_loaded' => 1, 'load_id' => 'pageA1' ) );
+
+        $this->assertTrue( CheckIn::is_repeat( $sent, array( 'loaded' => true, 'load' => 'pageB2' ) ), 'A second page load handed it over again' );
+        $this->assertTrue( CheckIn::is_repeat( $this->row( array( 'library_loaded' => 1, 'load_id' => 'pageB2' ) ), array( 'loaded' => '1', 'load' => 'pageA1' ) ), 'An earlier miss, then two loads' );
+    }
+
+    public function test_the_admin_ajax_retry_after_a_lost_response_is_not_a_repeat() {
+        // The REST check-in was recorded but its answer was lost, so the page retried the same check-in on admin-ajax.
+        $sent = $this->row( array( 'library_loaded' => 1, 'load_id' => 'pageA1' ) );
+
+        $this->assertFalse( CheckIn::is_repeat( $sent, array( 'loaded' => true, 'load' => 'pageA1' ) ) );
+        $this->assertFalse( CheckIn::is_repeat( $sent, array( 'loaded' => false, 'load' => 'pageB2' ) ), 'A miss is never a repeat' );
+        $this->assertFalse( CheckIn::is_repeat( $this->row( array( 'load_id' => 'pageA1' ) ), array( 'loaded' => true, 'load' => 'pageB2' ) ), 'Not handed over before' );
+        $this->assertFalse( CheckIn::is_repeat( $this->row( array( 'library_loaded' => 1, 'load_id' => null ) ), array( 'loaded' => true, 'load' => 'pageB2' ) ), 'A row from before the token' );
+        $this->assertFalse( CheckIn::is_repeat( $sent, array( 'loaded' => true ) ), 'An old cached page without a token' );
+        $this->assertFalse( CheckIn::is_repeat( null, array( 'loaded' => true, 'load' => 'pageA1' ) ) );
     }
 
     public function test_a_first_miss_writes_the_reason_and_no_sent_at() {
