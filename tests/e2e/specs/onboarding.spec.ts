@@ -223,11 +223,11 @@ test.describe('setup wizard', () => {
             await expect(button(page, 'Continue')).toBeDisabled();
 
             await page.locator('#wcct-connect-facebook-pixel_id').fill('EAA1234');
-            await expect(page.getByTestId('wcct-connect-facebook')).toContainText('Pixel IDs are 15 or 16 digits, numbers only.');
+            await expect(page.getByTestId('wcct-connect-facebook')).toContainText('Pixel IDs are numbers only.');
             await expect(button(page, 'Continue')).toBeDisabled();
             await page.locator('#wcct-connect-facebook-pixel_id').fill(PIXEL);
-            await expect(page.getByTestId('wcct-connect-facebook')).toContainText('Looks like a Pixel ID.');
-            await expect(page.getByTestId('wcct-connect-facebook')).toContainText('Looks right');
+            await expect(page.getByTestId('wcct-connect-facebook')).toContainText('Format looks right. Meta confirms it once events arrive.');
+            await expect(page.getByTestId('wcct-connect-facebook')).not.toContainText('Check it\'s yours');
             await expect(page.getByTestId('wcct-onboarding-note')).toHaveText('1 of 3 ready to connect.');
 
             // Skip: back to the dashboard checklist; nothing on this step is saved.

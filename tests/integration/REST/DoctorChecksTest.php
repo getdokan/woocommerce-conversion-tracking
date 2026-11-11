@@ -70,7 +70,7 @@ class DoctorChecksTest extends WCCT_Test_Rest_Case {
         $working = self::working( $results[2] );
 
         $this->assertSame( 'No other tracking plugin sends to your platforms', $working['tracking-plugins'] );
-        $this->assertSame( 'Your platform IDs look valid', $working['id-formats'] );
+        $this->assertSame( 'Your platform IDs have the right format', $working['id-formats'] );
         $this->assertSame( 'Respect cookie choices is off, so no tag waits for a cookie choice', $working['consent-plugin'] );
         $this->assertSame( 'No Google Tag Manager plugin is active', $working['tag-manager'] );
         $this->assertSame( 'Purchase is on for every connected platform', $working['purchase-on'] );
@@ -137,7 +137,7 @@ class DoctorChecksTest extends WCCT_Test_Rest_Case {
 
         $this->assertSame( array( 'Your Meta Pixel ID doesn\'t look right', 'Your Google Analytics Measurement ID doesn\'t look right', 'Your Google Ads conversion label looks incomplete' ), array_keys( $ids ) );
         $this->assertSame( '#/platforms/facebook?field=pixel_id', $ids['Your Meta Pixel ID doesn\'t look right']['action']['url'] );
-        $this->assertSame( 'Meta ignores events sent with an ID it doesn\'t know, so they aren\'t counted. Expected: 15 or 16 digits, numbers only.', $ids['Your Meta Pixel ID doesn\'t look right']['why'] );
+        $this->assertSame( 'Meta ignores events sent with an ID it doesn\'t know, so they aren\'t counted. Expected: Numbers only, usually 15 or 16 digits.', $ids['Your Meta Pixel ID doesn\'t look right']['why'] );
 
         $purchase = self::of( $results[1], 'purchase-on' );
 

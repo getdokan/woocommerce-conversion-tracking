@@ -53,7 +53,7 @@ class WCCT_Integration_Custom extends WCCT_Integration {
                 'name'  => 'registration',
                 'label' => __( 'Registration Scripts', 'woocommerce-conversion-tracking' ),
                 'value' => '',
-                'help'  => sprintf( __( '<a href="%s" target="_blank">Learn more</a> about setting up custom scripts.' ), 'https://wedevs.com/docs/woocommerce-conversion-tracking/custom/?utm_source=wp-admin&utm_medium=inline-helpk&utm_campaign=wcct_docs&utm_content=Custom' )
+                'help'  => sprintf( __( '<a href="%s" target="_blank">Learn more</a> about setting up custom scripts.' ), 'https://wedevs.com/docs/woocommerce-conversion-tracking/custom-channel-integration/custom/?utm_source=wp-admin&utm_medium=inline-helpk&utm_campaign=wcct_docs&utm_content=Custom' )
             )
         );
 

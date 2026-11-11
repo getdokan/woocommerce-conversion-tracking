@@ -49,7 +49,7 @@ class TagManagerCheck extends AbstractCheck {
                 'active'    => array( self::class, 'gtm4wp_container' ),
             ),
             'gtm-ecommerce'    => array(
-                'name'    => 'GTM for WooCommerce',
+                'name'    => 'Tag Pilot (GTM for WooCommerce)',
                 'plugins' => array( 'gtm-ecommerce-woo/gtm-ecommerce-woo.php', 'gtm-ecommerce-woo-pro/gtm-ecommerce-woo-pro.php' ),
             ),
             'metronet-gtm'     => array(
@@ -134,6 +134,24 @@ class TagManagerCheck extends AbstractCheck {
      * @return bool
      */
     public static function gtm4wp_container() {
+        // A wp-config.php constant overrides the saved containers.
+        if ( defined( 'GTM4WP_HARDCODED_GTM_ID' ) ) {
+            return true;
+        }
+
+        // 2.x saves container rows; 1.x only gtm-code, which 2.x reads until the rows are saved.
+        $rows = Plugins::option_value( 'gtm4wp-options', array( 'gtm-containers' ) );
+
+        if ( null !== $rows ) {
+            foreach ( is_array( $rows ) ? $rows : array() as $row ) {
+                if ( is_array( $row ) && isset( $row['id'] ) && is_scalar( $row['id'] ) && '' !== trim( (string) $row['id'] ) ) {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
         $container = Plugins::option_value( 'gtm4wp-options', array( 'gtm-code' ) );
 
         return is_scalar( $container ) && '' !== trim( (string) $container );

@@ -28,6 +28,13 @@ window.wcctConsentConfig = {"api":false,"bridge":false,"cookiePrefix":"wp_consen
         statistics: ['analytics_storage'],
         marketing: ['ad_storage', 'ad_user_data', 'ad_personalization']
     };
+    // How long after DOMContentLoaded an expected consent type may take before we resolve as "no type".
+    var TYPE_TIMEOUT = 3000;
+
+    // Whether a consent type is opt-out; the API matches it with indexOf too.
+    function isOptout(type) {
+        return !!type && String(type).indexOf('optout') !== -1;
+    }
 
     // Value of one cookie in a document.cookie string, '' when unset.
     function readCookie(cookies, name) {
@@ -85,7 +92,7 @@ window.wcctConsentConfig = {"api":false,"bridge":false,"cookiePrefix":"wp_consen
         }
 
         for (var category in GOOGLE_TYPES) {
-            if (type === 'optout') {
+            if (isOptout(type)) {
                 if (cookieValue(category) === 'deny') {
                     count += setGoogle(update, category, 'denied');
                 }
@@ -101,7 +108,7 @@ window.wcctConsentConfig = {"api":false,"bridge":false,"cookiePrefix":"wp_consen
     function earlyAllows(type, cookieValue, category) {
         var cookie = cookieValue(category);
 
-        if (type === 'optout') {
+        if (isOptout(type)) {
             return cookie !== 'deny';
         }
 
@@ -122,7 +129,7 @@ window.wcctConsentConfig = {"api":false,"bridge":false,"cookiePrefix":"wp_consen
         var doc = win.document;
         var prefix = config.cookiePrefix || 'wp_consent';
         var state = {}, waiting = [], listeners = [], scripts = {};
-        var resolved = false, lastUpdate = '';
+        var resolved = false, timedOut = false, lastUpdate = '';
         var api = {};
 
         function cookieValue(category) {
@@ -194,12 +201,12 @@ window.wcctConsentConfig = {"api":false,"bridge":false,"cookiePrefix":"wp_consen
             }
         }
 
-        // Decide every category once the type is known; while the server expects a type, "no type" is never final.
+        // Decide every category once the type is known; while the server expects a type, "no type" is final only after the timeout.
         function resolve() {
             var type = consentType();
             var categories = CATEGORIES.slice(0), category;
 
-            if (!type && config.typeExpected) {
+            if (!type && config.typeExpected && !timedOut) {
                 return;
             }
 
@@ -385,8 +392,19 @@ window.wcctConsentConfig = {"api":false,"bridge":false,"cookiePrefix":"wp_consen
         };
 
         var ready = function () {
-            if (config.api && !(win.consent_api && win.consent_api.waitfor_consent_hook)) {
+            // With the wait-for hook, wait only while the banner hasn't set a type yet (the API's own check).
+            if (config.api && !(win.consent_api && win.consent_api.waitfor_consent_hook && win.wp_consent_type === undefined)) {
                 resolve();
+            }
+
+            // A type that never comes resolves as "no type"; one arriving later still goes through resolve().
+            if (config.api && !resolved && typeof win.setTimeout === 'function') {
+                win.setTimeout(function () {
+                    if (!resolved) {
+                        timedOut = true;
+                        resolve();
+                    }
+                }, TYPE_TIMEOUT);
             }
 
             activateHeld();
@@ -412,6 +430,7 @@ window.wcctConsentConfig = {"api":false,"bridge":false,"cookiePrefix":"wp_consen
         googleUpdateForType: googleUpdateForType,
         earlyAllows: earlyAllows,
         resolvedAllows: resolvedAllows,
+        TYPE_TIMEOUT: TYPE_TIMEOUT,
         create: create
     };
 }));
@@ -607,7 +626,7 @@ wcctGtag('js', new Date());
     "extra": {
         "after": [
             false,
-            "(function (window, document) {\n    var config = {\"endpoint\":\"\\/?wc-ajax=wcct_events\",\"fragment\":\"wcct_events\",\"pending\":\"wcct_events\",\"seen\":\"wcct_events_seen\",\"path\":\"\\/\",\"domain\":\"\",\"secure\":false};\n    // IDs already run in this tab session, shared across pages and tabs of the same session.\n    var ranKey = 'wcct_events_ran';\n    var readRan = function () {\n        try { return JSON.parse(window.sessionStorage.getItem(ranKey)) || []; } catch (e) { return []; }\n    };\n    var ran = readRan();\n    var cookie = function (name) {\n        var match = document.cookie.match(new RegExp('(?:^|; )' + name + '=([^;]*)'));\n        return match ? decodeURIComponent(match[1]) : '';\n    };\n    var markSeen = function (id) {\n        document.cookie = config.seen + '=' + encodeURIComponent(id) + '; path=' + config.path + (config.domain ? '; domain=' + config.domain : '') + (config.secure ? '; secure' : '') + '; SameSite=Lax';\n    };\n    // Runs each platform's code in its own script, so one failing platform doesn't stop the others.\n    var run = function (entries, pending) {\n        var last = '';\n        ran = ran.concat(readRan());\n        for (var i = 0; entries && i < entries.length; i++) {\n            if (!entries[i] || !entries[i].id || ran.indexOf(entries[i].id) > -1) continue;\n            ran.push(entries[i].id);\n            last = entries[i].id;\n            for (var platform in entries[i].scripts) {\n                if (window.wcctConsent) { window.wcctConsent.inline(({\"facebook\":\"marketing\",\"adwords\":\"marketing\",\"twitter\":\"marketing\",\"ga4\":\"statistics\",\"custom\":\"marketing\"})[platform] || 'marketing', entries[i].scripts[platform]); }\n            }\n        }\n        try { window.sessionStorage.setItem(ranKey, JSON.stringify(ran.slice(-50))); } catch (e) {}\n        // Nothing left on the server: stop asking until the next add.\n        if (!last && !(entries && entries.length)) last = pending;\n        if (last) markSeen(last);\n    };\n    // Events come from the session: in the add to cart fragment or from this uncached POST, never from the page HTML.\n    var check = function () {\n        var pending = cookie(config.pending);\n        if (!pending || pending === cookie(config.seen) || !window.fetch) return;\n        window.fetch(config.endpoint, { method: 'POST', credentials: 'same-origin', headers: { 'X-Requested-With': 'XMLHttpRequest' } })\n            .then(function (response) { return response.ok ? response.json() : null; })\n            .then(function (data) { if (data) run(data.events, pending); })\n            .catch(function () {});\n    };\n    // jQuery may load after this script (deferred or in the footer), so bind again once the page has loaded.\n    var bound = false;\n    var bindJQuery = function () {\n        if (bound || !window.jQuery) return;\n        bound = true;\n        window.jQuery(document.body).on('added_to_cart', function (e, fragments) {\n            if (fragments && fragments[config.fragment]) {\n                run(fragments[config.fragment], '');\n                delete fragments[config.fragment];\n            } else {\n                check();\n            }\n        });\n    };\n    bindJQuery();\n    document.addEventListener('DOMContentLoaded', bindJQuery);\n    window.addEventListener('load', bindJQuery);\n    document.body.addEventListener('wc-blocks_added_to_cart', check);\n    check();\n})(window, document);"
+            "(function (window, document) {\n    var config = {\"endpoint\":\"\\/?wc-ajax=wcct_events\",\"fragment\":\"wcct_events\",\"pending\":\"wcct_events\",\"seen\":\"wcct_events_seen\",\"path\":\"\\/\",\"domain\":\"\",\"secure\":false};\n    // IDs already run in this tab session, shared across pages and tabs of the same session.\n    var ranKey = 'wcct_events_ran';\n    var readRan = function () {\n        try { return JSON.parse(window.sessionStorage.getItem(ranKey)) || []; } catch (e) { return []; }\n    };\n    var ran = readRan();\n    var cookie = function (name) {\n        var match = document.cookie.match(new RegExp('(?:^|; )' + name + '=([^;]*)'));\n        return match ? decodeURIComponent(match[1]) : '';\n    };\n    var markSeen = function (id) {\n        document.cookie = config.seen + '=' + encodeURIComponent(id) + '; path=' + config.path + (config.domain ? '; domain=' + config.domain : '') + (config.secure ? '; secure' : '') + '; SameSite=Lax';\n    };\n    // Runs each platform's code in its own script, so one failing platform doesn't stop the others.\n    var run = function (entries, pending) {\n        var last = '';\n        ran = ran.concat(readRan());\n        for (var i = 0; entries && i < entries.length; i++) {\n            if (!entries[i] || !entries[i].id || ran.indexOf(entries[i].id) > -1) continue;\n            ran.push(entries[i].id);\n            last = entries[i].id;\n            for (var platform in entries[i].scripts) {\n                var category = ({\"facebook\":\"marketing\",\"adwords\":\"\",\"twitter\":\"marketing\",\"ga4\":\"\",\"custom\":\"marketing\"})[platform]; if (category === '') { var script = document.createElement('script');\n                script.setAttribute('data-no-optimize', '1');\n                script.text = entries[i].scripts[platform];\n                document.body.appendChild(script); } else if (window.wcctConsent) { window.wcctConsent.inline(category || 'marketing', entries[i].scripts[platform]); }\n            }\n        }\n        try { window.sessionStorage.setItem(ranKey, JSON.stringify(ran.slice(-50))); } catch (e) {}\n        // Nothing left on the server: stop asking until the next add.\n        if (!last && !(entries && entries.length)) last = pending;\n        if (last) markSeen(last);\n    };\n    // Events come from the session: in the add to cart fragment or from this uncached POST, never from the page HTML.\n    var check = function () {\n        var pending = cookie(config.pending);\n        if (!pending || pending === cookie(config.seen) || !window.fetch) return;\n        window.fetch(config.endpoint, { method: 'POST', credentials: 'same-origin', headers: { 'X-Requested-With': 'XMLHttpRequest' } })\n            .then(function (response) { return response.ok ? response.json() : null; })\n            .then(function (data) { if (data) run(data.events, pending); })\n            .catch(function () {});\n    };\n    // jQuery may load after this script (deferred or in the footer), so bind again once the page has loaded.\n    var bound = false;\n    var bindJQuery = function () {\n        if (bound || !window.jQuery) return;\n        bound = true;\n        window.jQuery(document.body).on('added_to_cart', function (e, fragments) {\n            if (fragments && fragments[config.fragment]) {\n                run(fragments[config.fragment], '');\n                delete fragments[config.fragment];\n            } else {\n                check();\n            }\n        });\n    };\n    bindJQuery();\n    document.addEventListener('DOMContentLoaded', bindJQuery);\n    window.addEventListener('load', bindJQuery);\n    document.body.addEventListener('wc-blocks_added_to_cart', check);\n    check();\n})(window, document);"
         ]
     }
 }

@@ -41,10 +41,14 @@ import {
 import {
     checkId,
     controlId,
+    formatLooksRight,
+    unusualLength,
+    unusualLengthMessage,
     type EventOption,
 } from '../../../data/platformForm';
 import { shortId } from '../../../data/platforms';
 import type { SchemaElement } from '../../../data/types';
+import { CheckItsYours } from './CheckItsYours';
 import { EventsTable } from './EventsTable';
 
 const text = ( value: unknown ): string =>
@@ -111,6 +115,8 @@ type ExtraPixelsProps = {
     pixels: Pixel[];
     // The main Pixel ID; its events are the table above.
     main: string;
+    // Saved extra Pixel IDs; "Check it's yours" waits for a save.
+    saved: string[];
     events: EventOption[];
     readOnly: boolean;
     // A failed save: missing IDs show too.
@@ -129,6 +135,7 @@ export const ExtraPixels = ( {
     field,
     pixels,
     main,
+    saved,
     events,
     readOnly,
     attempted,
@@ -232,10 +239,12 @@ export const ExtraPixels = ( {
                 if ( shown ) {
                     message = shown.message;
                     tone = shown.blocks ? 'error' : 'warn';
+                } else if ( unusualLength( idField, pixel.pixel_id ) ) {
+                    message = unusualLengthMessage();
+                    tone = 'warn';
                 } else if ( check === 'valid' ) {
-                    message = __(
-                        'Looks like a Pixel ID.',
-                        'woocommerce-conversion-tracking'
+                    message = formatLooksRight(
+                        __( 'Meta', 'woocommerce-conversion-tracking' )
                     );
                 }
 
@@ -266,7 +275,7 @@ export const ExtraPixels = ( {
                                 id={ inputId }
                                 value={ pixel.pixel_id }
                                 placeholder={ __(
-                                    '15 or 16 digits, numbers only',
+                                    'Numbers only, usually 15 or 16 digits',
                                     'woocommerce-conversion-tracking'
                                 ) }
                                 inputMode="numeric"
@@ -291,6 +300,15 @@ export const ExtraPixels = ( {
                                 tone={ tone }
                                 live
                             />
+                            { check === 'valid' &&
+                                ! shown?.blocks &&
+                                saved.includes( pixel.pixel_id ) && (
+                                    <CheckItsYours
+                                        platform="facebook"
+                                        field="pixel_id"
+                                        id={ inputId }
+                                    />
+                                ) }
                         </div>
                         <EventsTable
                             platform={ `${ platform }-${ field.id }-${ index }` }

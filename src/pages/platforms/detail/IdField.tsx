@@ -13,17 +13,28 @@ import { __ } from '@wordpress/i18n';
 /**
  * Internal dependencies
  */
-import { checkId, controlId } from '../../../data/platformForm';
+import {
+    checkId,
+    controlId,
+    formatLooksRight,
+    unusualLength,
+    unusualLengthMessage,
+} from '../../../data/platformForm';
 import type { SchemaElement } from '../../../data/types';
+import { CheckItsYours } from './CheckItsYours';
 
 type IdFieldProps = {
     platform: string;
+    // Platform name for the hint, like Meta.
+    platformName: string;
     field: SchemaElement;
     value: string;
     // Whether the platform is connected; the valid line then skips "Click Connect".
     connected: boolean;
     // Message from a failed save.
     error?: string;
+    // Whether the value shown is the saved one; "Check it's yours" waits for a save.
+    saved: boolean;
     readOnly: boolean;
     onChange: ( value: string ) => void;
 };
@@ -38,25 +49,28 @@ const text = ( value: unknown ): string =>
  */
 export const IdField = ( {
     platform,
+    platformName,
     field,
     value,
     connected,
     error,
+    saved,
     readOnly,
     onChange,
 }: IdFieldProps ) => {
     const id = controlId( platform, field.id );
     const onboarding = ( field.onboarding ?? {} ) as Record< string, unknown >;
     const state = checkId( field, value );
+    const unusual = unusualLength( field, value );
     const locked = field.pro === true && field.disabled === true;
     let message = '';
 
     if ( error ) {
         message = error;
+    } else if ( unusual ) {
+        message = unusualLengthMessage();
     } else if ( state === 'valid' ) {
-        message =
-            text( onboarding.valid ) ||
-            __( 'Looks right.', 'woocommerce-conversion-tracking' );
+        message = text( onboarding.valid ) || formatLooksRight( platformName );
 
         if ( ! connected ) {
             message = `${ message } ${ __(
@@ -68,7 +82,7 @@ export const IdField = ( {
         message =
             text( onboarding.invalid ) ||
             __(
-                "This doesn't look like a valid ID.",
+                "This doesn't match the ID format.",
                 'woocommerce-conversion-tracking'
             );
     } else if ( state === 'short' ) {
@@ -78,7 +92,7 @@ export const IdField = ( {
         );
     }
 
-    const good = ! error && state === 'valid';
+    const good = ! error && ! unusual && state === 'valid';
     const description = text( field.description );
     const described = [
         description && `${ id }-hint`,
@@ -142,6 +156,13 @@ export const IdField = ( {
                 ) }
                 { message && <span>{ message }</span> }
             </p>
+            { ! error && saved && state === 'valid' && (
+                <CheckItsYours
+                    platform={ platform }
+                    field={ field.id }
+                    id={ id }
+                />
+            ) }
         </div>
     );
 };

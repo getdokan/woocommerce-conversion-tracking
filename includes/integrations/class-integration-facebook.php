@@ -52,7 +52,7 @@ class WCCT_Integration_Facebook extends WCCT_Integration {
                 'label'     => __( 'Pixel ID', 'woocommerce-conversion-tracking' ),
                 'required'  => true,
                 'value'     => '',
-                'help'      => sprintf( __( 'Find the Pixel ID from <a href="%s" target="_blank">here</a>.', 'woocommerce-conversion-tracking' ), 'https://www.facebook.com/ads/manager/pixel/facebook_pixel' ) . ' ' . __( 'Logged-in shoppers\' email is sent for advanced matching. Hashed before it\'s sent to the platform.', 'woocommerce-conversion-tracking' )
+                'help'      => sprintf( __( 'Find the Pixel ID from <a href="%s" target="_blank">here</a>.', 'woocommerce-conversion-tracking' ), 'https://business.facebook.com/events_manager2/' ) . ' ' . __( 'Logged-in shoppers\' email is sent for advanced matching. Hashed before it\'s sent to the platform.', 'woocommerce-conversion-tracking' )
             ),
             'events'    => array(
                 'type'    => 'multicheck',

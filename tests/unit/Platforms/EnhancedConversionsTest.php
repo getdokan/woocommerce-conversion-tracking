@@ -188,6 +188,20 @@ class EnhancedConversionsTest extends TestCase {
         $this->assertFalse( ( new WCCT_Integration_Google() )->enhanced_conversions_on() );
     }
 
+    public function test_the_conversion_value_is_a_number_not_a_string() {
+        $this->consent_mode( false );
+
+        $google     = new WCCT_Test_Google_Integration();
+        $google->on = false;
+
+        foreach ( array( '20.00' => '20', '12.50' => '12.5', '0' => '0' ) as $total => $json ) {
+            $order = $this->order( array( 'id' => 40 + (int) $total, 'total' => $total ) );
+            $code  = $this->script( $google, $order );
+
+            $this->assertMatchesRegularExpression( '/"value": ' . preg_quote( $json, '/' ) . ',\s*"currency": "USD"/', $code, $total );
+        }
+    }
+
     public function test_a_sent_order_sets_nothing() {
         $this->consent_mode( true );
 

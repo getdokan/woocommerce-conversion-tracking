@@ -22,7 +22,7 @@ class WCCT_GA4_Data {
 
         $measurement_id = strtoupper( trim( $measurement_id ) );
 
-        if ( ! preg_match( '/^GT?-[A-Z0-9]{4,20}$/', $measurement_id ) ) {
+        if ( ! preg_match( '/^(?=.{1,40}$)GT?-[A-Z0-9]+$/', $measurement_id ) ) {
             return '';
         }
 

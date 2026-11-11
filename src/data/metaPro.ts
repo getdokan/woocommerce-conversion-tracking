@@ -106,6 +106,7 @@ export const pixelIdField = ( field: SchemaElement ): SchemaElement => ( {
     variant: 'text',
     format: 'id',
     pattern: text( field.pixel_pattern ),
+    typical_length: field.typical_length,
 } );
 
 export type PixelProblem = { message: string; blocks: boolean };
@@ -142,7 +143,7 @@ export const pixelProblems = (
         } else if ( check === 'invalid' ) {
             problems[ index ] = {
                 message: __(
-                    'Pixel IDs are 15 or 16 digits.',
+                    'Pixel IDs are numbers only.',
                     'woocommerce-conversion-tracking'
                 ),
                 blocks: true,

@@ -17,9 +17,11 @@ import {
     checkField,
     isRequired,
     listOf,
+    unusualLength,
     type OnboardingField,
     type PanelCheck,
 } from '../../data/onboarding';
+import { unusualLengthMessage } from '../../data/platformForm';
 import { isProOutdated, proUpdateUrl, upgradeUrl } from '../../data/plan';
 import type { PlatformCardInfo } from '../../data/platforms';
 import { NewTabNote } from '../../shell/NewTabNote';
@@ -73,7 +75,7 @@ export const ConnectPanel = ( {
                     >
                         { check.ready
                             ? __(
-                                  'Looks right',
+                                  'Format looks right',
                                   'woocommerce-conversion-tracking'
                               )
                             : __(
@@ -89,9 +91,12 @@ export const ConnectPanel = ( {
                 const value = values[ field.id ] ?? '';
                 const state = checkField( field, value );
                 const missing = check.missing.includes( field.id );
+                const unusual = unusualLength( field, value );
                 let message = '';
 
-                if ( state === 'valid' ) {
+                if ( unusual ) {
+                    message = unusualLengthMessage();
+                } else if ( state === 'valid' ) {
                     message = field.valid;
                 } else if ( state === 'invalid' ) {
                     message = field.invalid;
@@ -150,18 +155,20 @@ export const ConnectPanel = ( {
                             aria-live="polite"
                             className={ cn(
                                 'm-0 flex items-start gap-1.5 text-[13px]',
-                                state === 'valid'
-                                    ? 'text-tone-ok-fg'
-                                    : 'text-destructive'
+                                state !== 'valid' && 'text-destructive',
+                                state === 'valid' &&
+                                    ( unusual
+                                        ? 'text-tone-warn-fg'
+                                        : 'text-tone-ok-fg' )
                             ) }
                         >
-                            { message && state === 'valid' && (
+                            { message && state === 'valid' && ! unusual && (
                                 <CircleCheck
                                     className="mt-0.5 size-3.5 shrink-0"
                                     aria-hidden="true"
                                 />
                             ) }
-                            { message && state !== 'valid' && (
+                            { message && ( state !== 'valid' || unusual ) && (
                                 <TriangleAlert
                                     className="mt-0.5 size-3.5 shrink-0"
                                     aria-hidden="true"

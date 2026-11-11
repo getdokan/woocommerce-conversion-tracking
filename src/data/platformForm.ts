@@ -145,20 +145,112 @@ export const changedValues = (
 };
 
 /**
- * A typed ID as the server stores it: ID characters only, in the field's case (Sanitizer::id()).
+ * Whether a value matches an ID pattern; a pattern JavaScript can't read counts as a match, left to the server.
+ *
+ * @param {string} pattern Pattern, or empty.
+ * @param {string} value   Cleaned value.
+ */
+const fitsPattern = ( pattern: string, value: string ): boolean => {
+    if ( ! pattern ) {
+        return true;
+    }
+
+    try {
+        return new RegExp( pattern ).test( value );
+    } catch {
+        return true;
+    }
+};
+
+/**
+ * The value with the field's prefix in front when it only fits with it, like a bare Ads conversion ID (Sanitizer::with_prefix()).
+ *
+ * @param {string} prefix  Prefix, or empty.
+ * @param {string} pattern Pattern, or empty.
+ * @param {string} value   Cleaned, cased value.
+ */
+export const withPrefix = (
+    prefix: string,
+    pattern: string,
+    value: string
+): string => {
+    if (
+        ! prefix ||
+        ! value ||
+        ! pattern ||
+        value.startsWith( prefix ) ||
+        fitsPattern( pattern, value )
+    ) {
+        return value;
+    }
+
+    return fitsPattern( pattern, prefix + value ) ? prefix + value : value;
+};
+
+/**
+ * Whether a cleaned ID is outside its typical length [ min, max ]; a soft warning only, it still saves.
+ *
+ * @param {unknown} typical The field's typical_length.
+ * @param {string}  value   Cleaned value.
+ */
+export const outsideTypicalLength = (
+    typical: unknown,
+    value: string
+): boolean =>
+    !! value &&
+    Array.isArray( typical ) &&
+    typical.length === 2 &&
+    ( value.length < Number( typical[ 0 ] ) ||
+        value.length > Number( typical[ 1 ] ) );
+
+/**
+ * The hint under an ID in the right format: format only, the platform confirms it.
+ *
+ * @param {string} platform Platform name, like Meta.
+ */
+export const formatLooksRight = ( platform: string ): string =>
+    sprintf(
+        /* translators: %s: platform name, like Meta */
+        __(
+            'Format looks right. %s confirms it once events arrive.',
+            'woocommerce-conversion-tracking'
+        ),
+        platform
+    );
+
+/**
+ * The soft warning under an ID outside its typical length.
+ */
+export const unusualLengthMessage = (): string =>
+    __( 'Unusual length, double-check it.', 'woocommerce-conversion-tracking' );
+
+/**
+ * A typed ID as the server stores it: ID characters only, in the field's case, with its prefix when missing (Sanitizer::id()).
  *
  * @param {SchemaElement} field Field.
  * @param {string}        raw   Typed value.
  */
 export const cleanId = ( field: SchemaElement, raw: string ): string => {
-    const value = raw.trim().replace( /[^A-Za-z0-9_\-/.:]/g, '' );
+    let value = raw.trim().replace( /[^A-Za-z0-9_\-/.:]/g, '' );
 
     if ( field.case === 'upper' ) {
-        return value.toUpperCase();
+        value = value.toUpperCase();
+    } else if ( field.case === 'lower' ) {
+        value = value.toLowerCase();
     }
 
-    return field.case === 'lower' ? value.toLowerCase() : value;
+    return withPrefix( text( field.prefix ), text( field.pattern ), value );
 };
+
+/**
+ * Whether a typed ID that fits its format is outside the field's typical length.
+ *
+ * @param {SchemaElement} field Field.
+ * @param {string}        raw   Typed value.
+ */
+export const unusualLength = ( field: SchemaElement, raw: string ): boolean =>
+    checkId( field, raw ) === 'valid' &&
+    outsideTypicalLength( field.typical_length, cleanId( field, raw ) );
 
 export type IdCheck = 'empty' | 'valid' | 'invalid' | 'short';
 
@@ -175,16 +267,8 @@ export const checkId = ( field: SchemaElement, raw: string ): IdCheck => {
         return 'empty';
     }
 
-    const pattern = text( field.pattern );
-
-    if ( pattern ) {
-        try {
-            if ( ! new RegExp( pattern ).test( value ) ) {
-                return 'invalid';
-            }
-        } catch {
-            // A pattern JavaScript can't read is left to the server.
-        }
+    if ( ! fitsPattern( text( field.pattern ), value ) ) {
+        return 'invalid';
     }
 
     // Ads conversion labels are usually 10 or more characters; shorter often means a partial copy.

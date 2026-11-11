@@ -568,7 +568,7 @@ const Wizard = ( {
 
         case 3: {
             let note: string = __(
-                'Add a valid ID for at least one platform.',
+                'Add an ID in the right format for at least one platform.',
                 'woocommerce-conversion-tracking'
             );
 

@@ -130,21 +130,22 @@ test.describe.serial('X and Microsoft pages', () => {
         // The help column for X.
         const help = page.getByTestId('wcct-platform-help');
 
-        await expect(help).toContainText('Where to find the event ID');
+        await expect(help).toContainText('Where to find the Pixel ID and event IDs');
         await expect(help).toContainText('Why a re-setup');
 
         // Rows wait for their ID; the page view comes from the base tag.
         await expect(page.getByTestId('wcct-twitter-event-page_view')).toContainText('Always on');
         await expect(page.getByTestId('wcct-twitter-event-purchase-seen')).toHaveText('Needs its event ID');
         await expect(page.getByRole('switch', { name: 'Send Purchase (add its event ID first)' })).toBeDisabled();
-        await expect(page.getByTestId('wcct-twitter-pixel_id-check')).toHaveText('Looks right. This is the base tag on every page.');
+        await expect(page.getByTestId('wcct-twitter-pixel_id-check')).toHaveText('Format looks right. X confirms it once events arrive.');
+        await expect(page.getByTestId('wcct-twitter-pixel_id-verify').getByRole('link')).toHaveAttribute('href', 'https://ads.x.com/');
 
         const purchase = field(page, 'twitter', 'purchase_event_id');
 
         await purchase.fill('tw-bad');
         await expect(page.getByTestId('wcct-twitter-purchase_event_id-check')).toContainText('Starts with tw-, then your Pixel ID');
         await purchase.fill(X_PURCHASE);
-        await expect(page.getByTestId('wcct-twitter-purchase_event_id-check')).toContainText('Looks right.');
+        await expect(page.getByTestId('wcct-twitter-purchase_event_id-check')).toContainText('Format looks right. X confirms it once events arrive.');
         await expect(page.getByRole('switch', { name: 'Send Purchase', exact: true })).toBeChecked();
 
         if (pro) {
@@ -216,9 +217,12 @@ test.describe.serial('X and Microsoft pages', () => {
 
         await expect(tag).toHaveValue(/^\d{7,9}$/);
         await tag.fill('abc');
-        await expect(page.getByTestId('wcct-bing_ads-tag_id-check')).toHaveText('UET tag IDs are 7 to 9 digits.');
+        await expect(page.getByTestId('wcct-bing_ads-tag_id-check')).toHaveText('UET tag IDs are numbers only.');
+        await tag.fill('12345');
+        await expect(page.getByTestId('wcct-bing_ads-tag_id-check')).toHaveText('Unusual length, double-check it.');
         await tag.fill(UET_TAG);
-        await expect(page.getByTestId('wcct-bing_ads-tag_id-check')).toHaveText('Looks like a UET tag ID.');
+        await expect(page.getByTestId('wcct-bing_ads-tag_id-check')).toHaveText('Format looks right. Microsoft confirms it once events arrive.');
+        await expect(page.getByTestId('wcct-bing_ads-tag_id-verify')).toHaveCount(0);
 
         await expect(page.getByTestId('wcct-bing_ads-event-page_view')).toContainText('Always on');
 
@@ -234,6 +238,8 @@ test.describe.serial('X and Microsoft pages', () => {
         await expect(page.getByTestId('wcct-bing_ads-developer')).toContainText('bing_ads');
 
         await saveAndWait(page);
+        await expect(page.getByTestId('wcct-bing_ads-tag_id-verify')).toContainText('UET Tag Helper');
+        await expect(page.getByTestId('wcct-bing_ads-tag_id-verify').getByRole('link')).toHaveAttribute('href', 'https://learn.microsoft.com/en-us/advertising/msa-help/hlp_ba_conc_uet_taghelper');
 
         const body = await settings(page);
 

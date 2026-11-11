@@ -15,11 +15,23 @@ class ConsentMode {
     const OPTION = 'wcct_consent_mode';
 
     /**
+     * Platforms whose browser hits Google consent mode covers, so they are never held.
+     */
+    const GOOGLE_PLATFORMS = array( 'ga4', 'adwords' );
+
+    /**
      * Consent API reader; replaced in tests.
      *
      * @var WpConsentApi|null
      */
     private static $api = null;
+
+    /**
+     * Consent tool signals; replaced in tests.
+     *
+     * @var array|null
+     */
+    private static $signals = null;
 
     /**
      * Runtime JavaScript, read once.
@@ -165,7 +177,8 @@ class ConsentMode {
             'external_source_name'    => $name,
             'owns_google_consent'     => $enabled && false === $source,
             'wp_consent_api'          => self::api()->is_available(),
-            'complianz_blocks_google' => isset( $signals['complianz'] ) && empty( $signals['complianz']['consent_mode'] ) && 'google-analytics' === $signals['complianz']['statistics'],
+            // Complianz blocks gtag.js as statistics whenever it adds Google Analytics, also with consent mode on.
+            'complianz_blocks_google' => isset( $signals['complianz']['statistics'] ) && 'google-analytics' === $signals['complianz']['statistics'],
             'message'                 => $source ? sprintf(
                 /* translators: %s: consent tool name, for example Complianz */
                 __( 'Consent signals are handled by %s. Conversion Tracking will not set its own defaults.', 'woocommerce-conversion-tracking' ),
@@ -206,20 +219,28 @@ class ConsentMode {
      * @return array
      */
     public static function signals() {
+        if ( null !== self::$signals ) {
+            return self::$signals;
+        }
+
         $site_kit = defined( 'GOOGLESITEKIT_VERSION' ) && ! empty( self::option_value( 'googlesitekit_consent_mode', array( 'enabled' ) ) );
 
         return array(
             'complianz'          => defined( 'CMPLZ_VERSION' ) ? array(
                 'consent_mode' => function_exists( 'cmplz_consent_mode' ) && cmplz_consent_mode(),
                 'statistics'   => function_exists( 'cmplz_get_option' ) ? (string) cmplz_get_option( 'compile_statistics' ) : '',
+                'configured'   => function_exists( 'cmplz_get_option' ) ? (string) cmplz_get_option( 'configuration_by_complianz' ) : '',
             ) : null,
             'cookieyes'          => defined( 'CLI_VERSION' ) ? array(
                 'gcm_status' => self::option_value( 'cky_gcm_settings', array( 'status' ) ),
                 'connected'  => self::option_value( 'cky_settings', array( 'account', 'connected' ) ),
+                'legacy'     => ! function_exists( 'cky_is_legacy' ) || cky_is_legacy(),
             ) : null,
             'cookiebot'          => defined( 'CYBOT_COOKIEBOT_PLUGIN_DIR' ) ? array(
-                'cbid' => get_option( 'cookiebot-cbid', '' ),
-                'gcm'  => get_option( 'cookiebot-gcm', false ),
+                'cbid'         => get_option( 'cookiebot-cbid', '' ),
+                // Multisite: the network CBID applies when the site has none.
+                'network_cbid' => function_exists( 'get_site_option' ) ? get_site_option( 'cookiebot-cbid', '' ) : '',
+                'gcm'          => get_option( 'cookiebot-gcm', false ),
             ) : null,
             'cookie-notice'      => class_exists( 'Cookie_Notice' ) ? array(
                 'gcm' => self::option_value( 'cookie_notice_app_blocking', array( 'google_consent_default' ) ),
@@ -283,7 +304,7 @@ class ConsentMode {
             'bridge'       => $owns && $api->is_available(),
             'cookiePrefix' => $api->get_cookie_prefix(),
             'type'         => $type,
-            'typeExpected' => $api->is_available() && ( '' !== $type || self::consent_tool_active() || has_filter( 'wp_get_consent_type' ) ),
+            'typeExpected' => ConsentData::type_expected( $api->is_available(), $type, self::signals() ),
         );
 
         $js = $owns ? self::google_default_script() : '';
@@ -297,16 +318,19 @@ class ConsentMode {
      * @return bool
      */
     public static function consent_tool_active() {
-        $signals = self::signals();
+        return array() !== ConsentData::type_tools( self::signals() );
+    }
 
-        unset( $signals['site-kit'], $signals['ga-for-woocommerce'] );
+    /**
+     * Active consent banners that report no consent type to us (none do without the WP Consent API), so our defaults apply.
+     *
+     * @return string[] Tool slugs.
+     */
+    public static function silent_tools() {
+        $signals  = self::signals();
+        $detected = ConsentData::detected_tools( $signals );
 
-        return array() !== array_filter(
-            $signals,
-            function ( $signal ) {
-                return null !== $signal;
-            }
-        );
+        return self::api()->is_available() ? array_values( array_diff( $detected, ConsentData::type_tools( $signals ) ) ) : $detected;
     }
 
     /**
@@ -394,7 +418,7 @@ class ConsentMode {
     /**
      * The pending events runner with each platform's queued code held until its category is allowed; unchanged with consent mode off.
      *
-     * Empty when the runner's script insertion isn't found, so queued code never runs ungated.
+     * Google platforms run at once, like their other hits. Empty when the runner's script insertion isn't found, so queued code never runs ungated.
      *
      * @param string $runner     Runner JavaScript (Pipeline::runner_script()).
      * @param array  $categories Consent category per platform ID; others need marketing.
@@ -406,15 +430,26 @@ class ConsentMode {
             return $runner;
         }
 
-        $gated = preg_replace(
+        // An empty category runs at once.
+        foreach ( self::GOOGLE_PLATFORMS as $id ) {
+            if ( isset( $categories[ $id ] ) ) {
+                $categories[ $id ] = '';
+            }
+        }
+
+        $gated = preg_replace_callback(
             '/var script = document\.createElement\(\'script\'\);\s*script\.setAttribute\(\'data-no-optimize\', \'1\'\);\s*script\.text = entries\[i\]\.scripts\[platform\];\s*document\.body\.appendChild\(script\);/',
-            'if (window.wcctConsent) { window.wcctConsent.inline((' . self::json( (object) $categories ) . ')[platform] || \'marketing\', entries[i].scripts[platform]); }',
+            function ( $match ) use ( $categories ) {
+                return 'var category = (' . self::json( (object) $categories ) . ')[platform]; '
+                    . 'if (category === \'\') { ' . $match[0] . ' } '
+                    . 'else if (window.wcctConsent) { window.wcctConsent.inline(category || \'marketing\', entries[i].scripts[platform]); }';
+            },
             (string) $runner,
             1,
             $count
         );
 
-        return 1 === $count ? $gated : '';
+        return 1 === $count ? (string) $gated : '';
     }
 
     /**
@@ -438,6 +473,17 @@ class ConsentMode {
      */
     public static function use_api( $api = null ) {
         self::$api = $api;
+    }
+
+    /**
+     * Replace the consent tool signals; null reads the site again.
+     *
+     * @param array|null $signals Signals as signals() returns them.
+     *
+     * @return void
+     */
+    public static function use_signals( $signals = null ) {
+        self::$signals = is_array( $signals ) ? $signals : null;
     }
 
     /**

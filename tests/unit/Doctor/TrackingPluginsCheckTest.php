@@ -101,6 +101,121 @@ class TrackingPluginsCheckTest extends DoctorCheckTestCase {
         $this->assertSame( array( 'unsure', 'sure', 'sure' ), array_column( $findings, 'confidence' ) );
     }
 
+    public function test_a_paused_pixel_manager_pixel_does_not_send() {
+        $this->platforms(
+            array(
+                'facebook' => array( 'pixel_id' => '123456789012345' ),
+                'google'   => array( 'mode' => 'ads', 'ads_id' => 'AW-123', 'purchase_label' => 'abc' ),
+                'twitter'  => array( 'pixel_id' => 'o8x2k' ),
+            )
+        );
+        $this->activate( 'woocommerce-google-adwords-conversion-tracking-tag/wgact.php' );
+        $this->option(
+            'wgact_plugin_options',
+            array(
+                'facebook'      => array( 'pixel_id' => '999999999999999' ),
+                'google'        => array(
+                    'ads'       => array( 'conversion_id' => '123456' ),
+                    'analytics' => array( 'ga4' => array( 'measurement_id' => 'G-PMW' ) ),
+                ),
+                'twitter'       => array( 'pixel_id' => 'abc12' ),
+                'paused_pixels' => array( 'facebook' => 1767225600, 'google_ads' => 1767225600, 'ga4' => 0, 'twitter' => 0 ),
+            )
+        );
+
+        $this->assertSame( array( 'pixel-manager:google', 'pixel-manager:twitter' ), array_column( $this->run_check( new TrackingPluginsCheck() ), 'key' ), 'Meta paused; Google still sends GA4' );
+
+        $options                         = get_option( 'wgact_plugin_options' );
+        $options['paused_pixels']['ga4'] = 1767225600;
+        $this->option( 'wgact_plugin_options', $options );
+
+        $this->assertSame( array( 'pixel-manager:twitter' ), array_column( $this->run_check( new TrackingPluginsCheck() ), 'key' ), 'Google Ads and GA4 both paused' );
+    }
+
+    public function test_google_plugins_turned_off_by_their_own_filters_send_nothing() {
+        $this->platforms( array( 'google' => array( 'mode' => 'analytics', 'measurement_id' => 'G-ABC123' ) ) );
+        $this->activate( 'woocommerce-google-analytics-integration/woocommerce-google-analytics-integration.php', 'google-listings-and-ads/google-listings-and-ads.php' );
+        $this->option( 'woocommerce_google_analytics_settings', array( 'ga_id' => 'G-OTHER', 'ga_ecommerce_tracking_enabled' => 'yes' ) );
+        $this->option( 'gla_ads_conversion_action', array( 'id' => '123' ) );
+
+        $type = null;
+        $this->filter( 'woocommerce_gla_disable_gtag_tracking', function () { return true; } );
+        $this->filter(
+            'woocommerce_ga_disable_tracking',
+            function ( $disable, $tracking ) use ( &$type ) {
+                $type = $tracking;
+
+                return true;
+            }
+        );
+
+        $this->assertSame( array(), $this->run_check( new TrackingPluginsCheck() ) );
+        $this->assertSame( 'all', $type );
+    }
+
+    public function test_monsterinsights_and_exactmetrics_lite_do_not_count_but_premium_does() {
+        $this->platforms( array( 'google' => array( 'mode' => 'analytics', 'measurement_id' => 'G-ABC123' ) ) );
+        $this->activate( 'google-analytics-for-wordpress/googleanalytics.php', 'google-analytics-dashboard-for-wp/gadwp.php' );
+
+        $this->assertSame( array(), $this->run_check( new TrackingPluginsCheck() ), 'Lite prints only the GA4 base tag' );
+
+        $this->activate( 'google-analytics-premium/googleanalytics-premium.php', 'exactmetrics-premium/exactmetrics-premium.php' );
+
+        $this->assertSame( array( 'monsterinsights:google', 'exactmetrics:google' ), array_column( $this->run_check( new TrackingPluginsCheck() ), 'key' ) );
+    }
+
+    public function test_meta_for_woocommerce_stands_in_for_meta_pixel_for_wordpress() {
+        $this->meta_connected();
+        $this->activate( 'official-facebook-pixel/facebook-for-wordpress.php' );
+
+        $this->assertSame( array( 'official-facebook-pixel:facebook' ), array_column( $this->run_check( new TrackingPluginsCheck() ), 'key' ) );
+
+        $this->activate( 'official-facebook-pixel/facebook-for-wordpress.php', self::META );
+        $this->option( 'wc_facebook_pixel_id', '999999999999999' );
+
+        $this->assertSame( array( 'facebook-for-woocommerce:facebook' ), array_column( $this->run_check( new TrackingPluginsCheck() ), 'key' ) );
+    }
+
+    public function test_conversios_may_send_to_four_platforms() {
+        $this->platforms(
+            array(
+                'facebook' => array( 'pixel_id' => '123456789012345' ),
+                'google'   => array( 'mode' => 'analytics', 'measurement_id' => 'G-ABC123' ),
+                'twitter'  => array( 'pixel_id' => 'o8x2k' ),
+            )
+        );
+        $this->activate( 'enhanced-e-commerce-for-woocommerce-store/enhanced-ecommerce-google-analytics.php' );
+
+        $this->assertSame( array( 'conversios:google', 'conversios:facebook', 'conversios:twitter' ), array_column( $this->run_check( new TrackingPluginsCheck() ), 'key' ) );
+        $this->assertSame( array( 'PLUGIN_TVC_VERSION' ), TrackingPluginsCheck::known()['conversios']['constants'] );
+        $this->assertSame( array( 'google', 'facebook', 'bing_ads', 'twitter' ), TrackingPluginsCheck::known()['conversios']['platforms'] );
+    }
+
+    public function test_product_feed_pro_sends_when_its_pixel_or_remarketing_is_on_with_an_id() {
+        $this->platforms(
+            array(
+                'facebook' => array( 'pixel_id' => '123456789012345' ),
+                'google'   => array( 'mode' => 'ads', 'ads_id' => 'AW-123', 'purchase_label' => 'abc' ),
+            )
+        );
+        $this->activate( 'woo-product-feed-pro/woocommerce-sea.php' );
+        $this->option( 'adt_add_facebook_pixel', 'no' );
+        $this->option( 'adt_facebook_pixel_id', '999999999999999' );
+        $this->option( 'adt_add_remarketing', 'yes' );
+        $this->option( 'adt_adwords_conversion_id', '' );
+
+        $this->assertSame( array(), $this->run_check( new TrackingPluginsCheck() ), 'Pixel off, remarketing without an ID' );
+
+        $this->option( 'adt_add_facebook_pixel', 'yes' );
+        $this->option( 'adt_adwords_conversion_id', '123456789' );
+
+        $findings = $this->run_check( new TrackingPluginsCheck() );
+
+        $this->assertSame( array( 'product-feed-pro:facebook', 'product-feed-pro:google' ), array_column( $findings, 'key' ) );
+        $this->assertSame( array( 'sure', 'sure' ), array_column( $findings, 'confidence' ) );
+        $this->assertSame( 'Product Feed PRO for WooCommerce also sends to Meta', $findings[0]['found'] );
+    }
+
     public function test_pixelyoursite_pro_stands_in_for_the_free_plugin() {
         $this->meta_connected();
         $this->activate( 'pixelyoursite/pixelyoursite.php', 'pixelyoursite-pro/pixelyoursite-pro.php' );

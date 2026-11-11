@@ -125,13 +125,20 @@ test.describe.serial('Platforms pages', () => {
 
         await expect(pixel).toHaveValue(TEST_IDS.meta!.pixelId);
         await pixel.fill('EAA12345');
-        await expect(page.getByTestId('wcct-facebook-pixel_id-check')).toHaveText('Pixel IDs are 15 or 16 digits, numbers only.');
+        await expect(page.getByTestId('wcct-facebook-pixel_id-check')).toHaveText('Pixel IDs are numbers only. One that starts with "EAA" is an access token, not a Pixel ID.');
+        await expect(page.getByTestId('wcct-facebook-pixel_id-verify')).toHaveCount(0);
         await expect(save(page)).toHaveText('Save changes');
         await save(page).click();
         await expect(page.getByTestId('wcct-facebook-pixel_id-check')).toContainText('Fix this ID before saving');
         await expect(pixel).toBeFocused();
+        // An unusual length is a soft warning; it still saves.
+        await pixel.fill('1234567890');
+        await expect(page.getByTestId('wcct-facebook-pixel_id-check')).toHaveText('Unusual length, double-check it.');
+        await expect(pixel).not.toHaveAttribute('aria-invalid', 'true');
         await pixel.fill(NEW_PIXEL);
-        await expect(page.getByTestId('wcct-facebook-pixel_id-check')).toHaveText('Looks like a Pixel ID.');
+        await expect(page.getByTestId('wcct-facebook-pixel_id-check')).toHaveText('Format looks right. Meta confirms it once events arrive.');
+        // "Check it's yours" waits for a save.
+        await expect(page.getByTestId('wcct-facebook-pixel_id-verify')).toHaveCount(0);
 
         // Presets come from the switches: Recommended, then one more event makes it Custom.
         const presets = page.getByRole('group', { name: 'Event preset' });
@@ -168,6 +175,9 @@ test.describe.serial('Platforms pages', () => {
         await saveAndWait(page);
         await expect(page.locator('[data-sonner-toast]').filter({ hasText: 'Saved.' })).toBeVisible();
         await expect(listItem(page, 'facebook')).toContainText('Customised');
+        // Saved: the platform's own tool says whose ID it is.
+        await expect(page.getByTestId('wcct-facebook-pixel_id-verify').getByRole('link', { name: /Check it's yours/ })).toHaveAttribute('href', 'https://business.facebook.com/events_manager2/');
+        await expect(page.getByTestId('wcct-facebook-pixel_id-verify').getByRole('link')).toHaveAttribute('rel', 'noopener noreferrer');
 
         const { body } = await settings(page);
 
@@ -276,8 +286,8 @@ test.describe.serial('Platforms pages', () => {
         // Advanced: the optional GT- tag ID and the product ID.
         await page.getByTestId('wcct-google-advanced').locator('summary').click();
         await field(page, 'google', 'tag_id').fill('gt-ab12');
-        await expect(page.getByTestId('wcct-google-tag_id-check')).toHaveText('Looks right.');
-        await expect(page.getByTestId('wcct-google-value_mode-field')).toContainText('Analytics always gets the item total');
+        await expect(page.getByTestId('wcct-google-tag_id-check')).toHaveText('Format looks right. Google confirms it once events arrive.');
+        await expect(page.getByTestId('wcct-google-value_mode-field')).toContainText('Analytics always gets the product total, without fees');
         await pick(page, 'Product ID sent', 'SKU');
         await saveAndWait(page);
         await expect(listItem(page, 'google')).toContainText('Customised');

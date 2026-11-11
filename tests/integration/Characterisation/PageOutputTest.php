@@ -221,6 +221,7 @@ class PageOutputTest extends WCCT_Test_Page_Case {
         $this->assertStringContainsString( '"em": "' . hash( 'sha256', 'jane@example.com' ) . '"', $guest );
         $this->assertStringContainsString( '"ph": "' . hash( 'sha256', '15550100' ) . '"', $guest );
         $this->assertStringContainsString( '"zp": "' . hash( 'sha256', '94105' ) . '"', $guest );
+        $this->assertStringContainsString( '"country": "' . hash( 'sha256', 'us' ) . '"', $guest );
     }
 
     public function test_meta_matching_is_empty_without_a_verified_order_or_login() {

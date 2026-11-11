@@ -535,9 +535,13 @@ export const PlatformDetail = ( {
 
                 const message = card.connected
                     ? __( 'Saved.', 'woocommerce-conversion-tracking' )
-                    : __(
-                          'Connected. We wait for the first event from your store.',
-                          'woocommerce-conversion-tracking'
+                    : sprintf(
+                          /* translators: %s: platform name, like Meta */
+                          __(
+                              'Saved. We wait for the first event from your store; %s confirms your IDs once events arrive.',
+                              'woocommerce-conversion-tracking'
+                          ),
+                          platform.label || card.name
                       );
 
                 setNote( message );
@@ -611,10 +615,15 @@ export const PlatformDetail = ( {
                 <IdField
                     key={ field.id }
                     platform={ id }
+                    platformName={ platform.label || card.name }
                     field={ field }
                     value={ text( value ) }
                     connected={ card.connected }
                     error={ error }
+                    saved={
+                        text( value ) !== '' &&
+                        text( value ) === text( saved.fields[ field.id ] )
+                    }
                     readOnly={ readOnly }
                     onChange={ ( next ) => setField( field.id, next ) }
                 />
@@ -964,6 +973,9 @@ export const PlatformDetail = ( {
                                     draft.fields[ pixelsField.id ]
                                 ) }
                                 main={ text( draft.fields.pixel_id ) }
+                                saved={ asPixels(
+                                    saved.fields[ pixelsField.id ]
+                                ).map( ( pixel ) => pixel.pixel_id ) }
                                 events={ events }
                                 readOnly={ pixelsField.readonly === true }
                                 attempted={ attempted }

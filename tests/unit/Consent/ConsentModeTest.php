@@ -3,6 +3,7 @@
 require_once dirname( __DIR__ ) . '/Fakes/settings-functions.php';
 
 use PHPUnit\Framework\TestCase;
+use StorePulse\ConversionTracking\Consent\ConsentData;
 use StorePulse\ConversionTracking\Consent\ConsentMode;
 use StorePulse\ConversionTracking\Settings\Schema;
 use StorePulse\ConversionTracking\Settings\Store;
@@ -16,10 +17,18 @@ class ConsentModeTest extends TestCase {
     protected function tearDown(): void {
         unset( $GLOBALS['wcct_test_options'], $GLOBALS['wcct_test_filters'] );
         ConsentMode::use_api( null );
+        ConsentMode::use_signals( null );
     }
 
     private function turn_on() {
         $GLOBALS['wcct_test_options'][ ConsentMode::OPTION ] = 'on';
+    }
+
+    /**
+     * Signals with only the given tools active.
+     */
+    private function with_tools( array $tools ) {
+        ConsentMode::use_signals( array_merge( array_fill_keys( ConsentData::CONSENT_TOOLS, null ), $tools ) );
     }
 
     public function test_off_by_default() {
@@ -209,14 +218,75 @@ class ConsentModeTest extends TestCase {
         $this->assertStringContainsString( '"type":"optin","typeExpected":true}', ConsentMode::head_script() );
     }
 
-    public function test_a_type_is_expected_when_something_filters_it() {
+    public function test_a_filter_on_the_consent_type_that_returns_none_expects_no_type() {
         $this->turn_on();
         ConsentMode::use_api( new WCCT_Test_Fake_Consent_Api( true, '' ) );
-        $GLOBALS['wcct_test_filters']['wp_get_consent_type'] = function ( $type ) {
-            return $type;
+        $this->with_tools( array() );
+        // Cookie Notice without its app hooks the filter and returns ''.
+        $GLOBALS['wcct_test_filters']['wp_get_consent_type'] = function () {
+            return '';
         };
 
-        $this->assertStringContainsString( '"type":"","typeExpected":true}', ConsentMode::head_script() );
+        $this->assertStringContainsString( '"type":"","typeExpected":false}', ConsentMode::head_script() );
+    }
+
+    /**
+     * @dataProvider tool_signals
+     */
+    public function test_a_type_is_expected_only_from_tools_that_set_one( array $tools, $expected ) {
+        $this->turn_on();
+        ConsentMode::use_api( new WCCT_Test_Fake_Consent_Api( true, '' ) );
+        $this->with_tools( $tools );
+
+        $this->assertStringContainsString( '"type":"","typeExpected":' . ( $expected ? 'true' : 'false' ) . '}', ConsentMode::head_script() );
+        $this->assertSame( $expected, ConsentMode::consent_tool_active() );
+    }
+
+    public function tool_signals() {
+        return array(
+            'Complianz'                => array( array( 'complianz' => array( 'consent_mode' => false, 'statistics' => '' ) ), true ),
+            'Cookiebot'                => array( array( 'cookiebot' => array( 'cbid' => '', 'gcm' => false ) ), true ),
+            'CookieYes'                => array( array( 'cookieyes' => array( 'legacy' => false ) ), true ),
+            'CookieYes legacy'         => array( array( 'cookieyes' => array( 'legacy' => true ) ), false ),
+            'CookieYes mode unknown'   => array( array( 'cookieyes' => array() ), false ),
+            'Cookie Notice'            => array( array( 'cookie-notice' => array( 'gcm' => null ) ), false ),
+            'CookieAdmin'              => array( array( 'cookieadmin' => array( 'gcm' => '1' ) ), false ),
+            'Real Cookie Banner'       => array( array( 'real-cookie-banner' => array( 'gcm' => '1' ) ), false ),
+            'Real Cookie Banner and Complianz' => array( array( 'real-cookie-banner' => array(), 'complianz' => array() ), true ),
+            'No tool'                  => array( array(), false ),
+        );
+    }
+
+    public function test_no_type_is_expected_from_a_tool_without_the_consent_api() {
+        $this->turn_on();
+        ConsentMode::use_api( new WCCT_Test_Fake_Consent_Api( false, '' ) );
+        $this->with_tools( array( 'complianz' => array() ) );
+
+        $this->assertStringContainsString( '"typeExpected":false}', ConsentMode::head_script() );
+    }
+
+    public function test_silent_tools_are_active_banners_that_set_no_type() {
+        ConsentMode::use_api( new WCCT_Test_Fake_Consent_Api( true, '' ) );
+        $this->with_tools( array( 'complianz' => array(), 'real-cookie-banner' => array(), 'cookieyes' => array( 'legacy' => true ), 'site-kit' => array( 'status' => 'enabled' ) ) );
+
+        $this->assertSame( array( 'cookieyes', 'real-cookie-banner' ), ConsentMode::silent_tools() );
+
+        // Without the WP Consent API no tool reports a type.
+        ConsentMode::use_api( new WCCT_Test_Fake_Consent_Api( false, '' ) );
+        $this->assertSame( array( 'complianz', 'cookieyes', 'real-cookie-banner' ), ConsentMode::silent_tools() );
+    }
+
+    public function test_complianz_blocks_google_whenever_it_adds_google_analytics() {
+        $this->turn_on();
+        ConsentMode::use_api( new WCCT_Test_Fake_Consent_Api( true, 'optin' ) );
+
+        foreach ( array( false, true ) as $consent_mode ) {
+            $this->with_tools( array( 'complianz' => array( 'consent_mode' => $consent_mode, 'statistics' => 'google-analytics', 'configured' => 'yes' ) ) );
+            $this->assertTrue( ConsentMode::status()['complianz_blocks_google'] );
+        }
+
+        $this->with_tools( array( 'complianz' => array( 'consent_mode' => false, 'statistics' => 'matomo', 'configured' => 'yes' ) ) );
+        $this->assertFalse( ConsentMode::status()['complianz_blocks_google'] );
     }
 
     public function test_no_type_is_expected_without_the_consent_api() {
@@ -261,11 +331,24 @@ class ConsentModeTest extends TestCase {
         $this->assertSame( $runner, ConsentMode::gate_runner( $runner, array( 'facebook' => 'marketing' ) ) );
 
         $this->turn_on();
+        $insert = "var script = document.createElement('script');\n                script.setAttribute('data-no-optimize', '1');\n                script.text = entries[i].scripts[platform];\n                document.body.appendChild(script);";
         $this->assertSame(
-            "for (var platform in entries[i].scripts) {\n                if (window.wcctConsent) { window.wcctConsent.inline(({\"facebook\":\"marketing\",\"ga4\":\"statistics\"})[platform] || 'marketing', entries[i].scripts[platform]); }\n            }",
-            ConsentMode::gate_runner( $runner, array( 'facebook' => 'marketing', 'ga4' => 'statistics' ) )
+            "for (var platform in entries[i].scripts) {\n                var category = ({\"facebook\":\"marketing\",\"twitter\":\"marketing\"})[platform]; if (category === '') { $insert } else if (window.wcctConsent) { window.wcctConsent.inline(category || 'marketing', entries[i].scripts[platform]); }\n            }",
+            ConsentMode::gate_runner( $runner, array( 'facebook' => 'marketing', 'twitter' => 'marketing' ) )
         );
         $this->assertSame( '', ConsentMode::gate_runner( 'changed runner', array() ) );
+    }
+
+    public function test_gate_runner_never_holds_google_add_to_cart() {
+        $runner = "var script = document.createElement('script'); script.setAttribute('data-no-optimize', '1'); script.text = entries[i].scripts[platform]; document.body.appendChild(script);";
+
+        $this->turn_on();
+        $gated = ConsentMode::gate_runner( $runner, array( 'facebook' => 'marketing', 'ga4' => 'statistics', 'adwords' => 'marketing', 'bing_ads' => 'marketing' ) );
+
+        // Google consent mode covers Google hits, so GA4 and Google Ads run at once; Meta, X and Microsoft stay held.
+        $this->assertStringContainsString( '({"facebook":"marketing","ga4":"","adwords":"","bing_ads":"marketing"})[platform]', $gated );
+        $this->assertStringContainsString( "if (category === '') { $runner }", $gated );
+        $this->assertStringContainsString( "else if (window.wcctConsent) { window.wcctConsent.inline(category || 'marketing',", $gated );
     }
 
     public function test_no_bridge_without_the_consent_api() {

@@ -163,12 +163,14 @@ test.describe.serial('Meta Pro editors', () => {
 
         const id = page.locator('#wcct-facebook-pixels-0-pixel_id');
 
+        await id.fill('EAA12345');
+        await expect(page.getByTestId('wcct-facebook-pixels-0-pixel_id-check')).toHaveText('Pixel IDs are numbers only.');
         await id.fill('12345');
-        await expect(page.getByTestId('wcct-facebook-pixels-0-pixel_id-check')).toHaveText('Pixel IDs are 15 or 16 digits.');
+        await expect(page.getByTestId('wcct-facebook-pixels-0-pixel_id-check')).toHaveText('Unusual length, double-check it.');
         await id.fill(MAIN);
         await expect(page.getByTestId('wcct-facebook-pixels-0-pixel_id-check')).toHaveText('This pixel is already on the page. It gets each event once.');
         await id.fill(SECOND);
-        await expect(page.getByTestId('wcct-facebook-pixels-0-pixel_id-check')).toHaveText('Looks like a Pixel ID.');
+        await expect(page.getByTestId('wcct-facebook-pixels-0-pixel_id-check')).toHaveText('Format looks right. Meta confirms it once events arrive.');
 
         // Its own events: Recommended to start, then Purchase only.
         const first = pixel(page, 0);
@@ -229,7 +231,7 @@ test.describe.serial('Meta Pro editors', () => {
 
         expect(tooMany.status).toBe(400);
         expect(tooMany.body.data.errors['platforms.facebook.pixels']).toBe('Add up to 10 more pixels.');
-        expect((await settings(page, { platforms: { facebook: { pixels: [{ pixel_id: '12345', events: [] }] } } })).status).toBe(400);
+        expect((await settings(page, { platforms: { facebook: { pixels: [{ pixel_id: 'EAAB12345', events: [] }] } } })).status).toBe(400);
     });
 
     test('Pro: a save the server refuses opens Advanced settings at the refused editor', async ({ page, jsErrors }) => {

@@ -10,7 +10,7 @@ class UserData {
     /**
      * Fields that are hashed, in output order.
      */
-    const FIELDS = array( 'em', 'ph', 'fn', 'ln', 'ct', 'st', 'zp', 'external_id' );
+    const FIELDS = array( 'em', 'ph', 'fn', 'ln', 'ct', 'st', 'zp', 'country', 'external_id' );
 
     /**
      * Calling codes (IT, SM, VA) whose national numbers keep their leading 0.
@@ -22,7 +22,7 @@ class UserData {
      *
      * @param string $field   Field key, one of FIELDS.
      * @param mixed  $value   Raw value.
-     * @param string $country ISO country code of the address, for the postcode rule.
+     * @param string $country ISO country code of the address, for the phone and postcode rules.
      *
      * @return string Normalised value, empty when there is nothing to send.
      */
@@ -51,6 +51,9 @@ class UserData {
 
             case 'zp':
                 return self::postcode( $value, $country );
+
+            case 'country':
+                return preg_match( '/^[a-z]{2}$/', $value ) ? $value : '';
 
             case 'external_id':
                 return $value;
@@ -119,6 +122,7 @@ class UserData {
                 'ct'          => $order->get_billing_city(),
                 'st'          => $order->get_billing_state(),
                 'zp'          => $order->get_billing_postcode(),
+                'country'     => $order->get_billing_country(),
                 'external_id' => $customer_id > 0 ? $customer_id : '',
             ),
             $order->get_billing_country()
@@ -148,6 +152,7 @@ class UserData {
                 'ct'          => $customer->get_billing_city(),
                 'st'          => $customer->get_billing_state(),
                 'zp'          => $customer->get_billing_postcode(),
+                'country'     => $customer->get_billing_country(),
                 'external_id' => $customer->get_id() > 0 ? $customer->get_id() : '',
             ),
             $customer->get_billing_country()
@@ -155,7 +160,7 @@ class UserData {
     }
 
     /**
-     * Hashed email, name and ID of a WordPress user.
+     * Hashed email, name, billing country and ID of a WordPress user.
      *
      * @param \WP_User $user User.
      *
@@ -166,13 +171,18 @@ class UserData {
             return array();
         }
 
+        // The billing country WooCommerce keeps for a user who has bought or saved an address.
+        $country = function_exists( 'get_user_meta' ) ? get_user_meta( (int) $user->ID, 'billing_country', true ) : '';
+
         return self::hash_fields(
             array(
                 'em'          => isset( $user->user_email ) ? $user->user_email : '',
                 'fn'          => isset( $user->first_name ) ? $user->first_name : '',
                 'ln'          => isset( $user->last_name ) ? $user->last_name : '',
+                'country'     => $country,
                 'external_id' => (int) $user->ID,
-            )
+            ),
+            is_string( $country ) ? $country : ''
         );
     }
 
@@ -238,14 +248,6 @@ class UserData {
             return '';
         }
 
-        $value         = trim( (string) $value );
-        $international = 0 === strpos( $value, '+' ) || 0 === strpos( preg_replace( '/\D+/', '', $value ), '00' );
-
-        // A national number without its country's calling code can't be written in E.164.
-        if ( ! $international && '' === preg_replace( '/\D+/', '', (string) $calling_code ) ) {
-            return '';
-        }
-
         $phone = '+' . self::phone( $value, $calling_code );
 
         return preg_match( '/^\+[1-9][0-9]{6,14}$/', $phone ) ? $phone : '';
@@ -257,7 +259,7 @@ class UserData {
      * @param string $value        Raw phone number.
      * @param string $calling_code Calling code of the address country, with or without +; empty when unknown.
      *
-     * @return string
+     * @return string Empty for a national number when the calling code is unknown.
      */
     public static function phone( $value, $calling_code = '' ) {
         $value  = trim( (string) $value );
@@ -273,11 +275,16 @@ class UserData {
 
         $code = preg_replace( '/\D+/', '', (string) $calling_code );
 
+        // Without a calling code a national number has no country code, so it isn't sent.
+        if ( '' === $code ) {
+            return '';
+        }
+
         // Italy, San Marino and Vatican City keep the leading 0 of national numbers in E.164.
         $digits = in_array( $code, self::KEEP_LEADING_ZERO, true ) ? $digits : ltrim( $digits, '0' );
 
         // A number that already starts with the calling code and is long enough for one keeps it.
-        if ( '' === $code || '' === $digits || ( 0 === strpos( $digits, $code ) && strlen( $digits ) >= 11 ) ) {
+        if ( '' === $digits || ( 0 === strpos( $digits, $code ) && strlen( $digits ) >= 11 ) ) {
             return $digits;
         }
 
@@ -302,7 +309,7 @@ class UserData {
     }
 
     /**
-     * Postcode: no spaces or dashes; the first 5 digits in the US, the outward code in the UK.
+     * Postcode: lower case without spaces or dashes; the first 5 digits in the US.
      *
      * @param string $value   Lower-cased postcode.
      * @param string $country ISO country code.
@@ -314,12 +321,6 @@ class UserData {
 
         if ( 'US' === $country ) {
             return substr( preg_replace( '/\D+/', '', $value ), 0, 5 );
-        }
-
-        if ( 'GB' === $country ) {
-            $parts = preg_split( '/\s+/', $value );
-            $value = count( $parts ) > 1 ? $parts[0] : preg_replace( '/[^a-z0-9]/', '', $value );
-            $value = count( $parts ) > 1 || strlen( $value ) < 5 ? $value : substr( $value, 0, -3 );
         }
 
         return preg_replace( '/[^\p{L}\p{N}]/u', '', $value );

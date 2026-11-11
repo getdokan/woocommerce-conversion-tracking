@@ -2,6 +2,7 @@
 
 namespace StorePulse\ConversionTracking\Doctor\Checks;
 
+use StorePulse\ConversionTracking\Access\SettingsIds;
 use StorePulse\ConversionTracking\Doctor\AbstractCheck;
 use StorePulse\ConversionTracking\Doctor\Context;
 use StorePulse\ConversionTracking\Doctor\Finding;
@@ -9,7 +10,7 @@ use StorePulse\ConversionTracking\Doctor\Platforms;
 use StorePulse\ConversionTracking\Settings\Sanitizer;
 
 /**
- * Saved IDs that don't match their format, and IDs a Purchase needs that are missing.
+ * Saved IDs that don't match their format, IDs of an unusual length (a note) and IDs a Purchase needs that are missing.
  * New saves are checked already; settings saved before 3.0 and imports are not.
  */
 class IdFormatsCheck extends AbstractCheck {
@@ -37,7 +38,7 @@ class IdFormatsCheck extends AbstractCheck {
      * @return string
      */
     public function label() {
-        return __( 'Your platform IDs look valid', 'woocommerce-conversion-tracking' );
+        return __( 'Your platform IDs have the right format', 'woocommerce-conversion-tracking' );
     }
 
     /**
@@ -62,8 +63,14 @@ class IdFormatsCheck extends AbstractCheck {
         $findings = array();
 
         foreach ( self::ids( $states ) as $id ) {
-            if ( '' !== $id['value'] && ! self::saves( $id ) ) {
+            if ( '' === $id['value'] ) {
+                continue;
+            }
+
+            if ( ! self::saves( $id ) ) {
                 $findings[] = $this->malformed( $id );
+            } elseif ( self::unusual_length( $id ) ) {
+                $findings[] = $this->unusual( $id );
             }
         }
 
@@ -87,7 +94,7 @@ class IdFormatsCheck extends AbstractCheck {
      *
      * @param array $states Platform states.
      *
-     * @return array[] { platform, platform_label, field, label, value, pattern, case, hint }.
+     * @return array[] { platform, platform_label, field, label, value, pattern, case, prefix, hint, typical_length }.
      */
     public static function ids( array $states ) {
         $ids = array();
@@ -106,7 +113,9 @@ class IdFormatsCheck extends AbstractCheck {
                     'value'          => Platforms::filled( $state['values'], $field['id'] ) ? trim( $state['values'][ $field['id'] ] ) : '',
                     'pattern'        => (string) $field['pattern'],
                     'case'           => isset( $field['case'] ) ? (string) $field['case'] : '',
+                    'prefix'         => isset( $field['prefix'] ) ? (string) $field['prefix'] : '',
                     'hint'           => isset( $field['placeholder'] ) ? (string) $field['placeholder'] : '',
+                    'typical_length' => isset( $field['typical_length'] ) ? $field['typical_length'] : array(),
                 );
             }
         }
@@ -116,7 +125,7 @@ class IdFormatsCheck extends AbstractCheck {
          *
          * @since 3.0.0
          *
-         * @param array $ids    { platform, platform_label, field, label, value, pattern, case (upper, lower or empty), hint }.
+         * @param array $ids    { platform, platform_label, field, label, value, pattern, case (upper, lower or empty), prefix, hint, typical_length ([ min, max ], optional) }.
          * @param array $states Platform states keyed by settings platform ID.
          */
         $ids = apply_filters( 'wcct_doctor_ids', $ids, $states );
@@ -150,6 +159,7 @@ class IdFormatsCheck extends AbstractCheck {
                 array(
                     'pattern' => $id['pattern'],
                     'case'    => isset( $id['case'] ) && is_string( $id['case'] ) ? $id['case'] : '',
+                    'prefix'  => isset( $id['prefix'] ) && is_string( $id['prefix'] ) ? $id['prefix'] : '',
                 ),
                 $id['value']
             );
@@ -158,6 +168,42 @@ class IdFormatsCheck extends AbstractCheck {
         }
 
         return true;
+    }
+
+    /**
+     * The typical length of an ID as [ min, max ], or null when it has none.
+     *
+     * @param array $id ID from ids().
+     *
+     * @return int[]|null
+     */
+    private static function typical_length( array $id ) {
+        $range = isset( $id['typical_length'] ) && is_array( $id['typical_length'] ) ? array_values( $id['typical_length'] ) : array();
+
+        if ( 2 !== count( $range ) || ! is_int( $range[0] ) || ! is_int( $range[1] ) ) {
+            return null;
+        }
+
+        return $range;
+    }
+
+    /**
+     * Whether a saved ID is outside its typical length; it still saves and sends.
+     *
+     * @param array $id ID from ids().
+     *
+     * @return bool
+     */
+    private static function unusual_length( array $id ) {
+        $range = self::typical_length( $id );
+
+        if ( ! $range ) {
+            return false;
+        }
+
+        $length = strlen( SettingsIds::clean_id( trim( $id['value'] ) ) );
+
+        return $length < $range[0] || $length > $range[1];
     }
 
     /**
@@ -233,6 +279,47 @@ class IdFormatsCheck extends AbstractCheck {
                 'label'      => __( 'ID', 'woocommerce-conversion-tracking' ),
                 'tags'       => array( $platform ),
                 'confidence' => Finding::SURE,
+                'action'     => array(
+                    /* translators: %s: platform name */
+                    'label' => sprintf( __( 'Open %s', 'woocommerce-conversion-tracking' ), $platform ),
+                    'url'   => self::field_url( $id['platform'], $id['field'] ),
+                ),
+                'evidence'   => array(
+                    'platform' => $id['platform'],
+                    'field'    => $id['field'],
+                    'value'    => $id['value'],
+                ),
+            )
+        );
+    }
+
+    /**
+     * The note for an ID outside its typical length: format only, it may still be right.
+     *
+     * @param array $id ID from ids().
+     *
+     * @return Finding
+     */
+    private function unusual( array $id ) {
+        $platform = isset( $id['platform_label'] ) && is_string( $id['platform_label'] ) ? $id['platform_label'] : $id['platform'];
+        $range    = self::typical_length( $id );
+        $typical  = $range[0] === $range[1]
+            /* translators: %d: number of characters */
+            ? sprintf( _n( 'Most are %d character long.', 'Most are %d characters long.', $range[0], 'woocommerce-conversion-tracking' ), $range[0] )
+            /* translators: 1: fewest characters, 2: most characters */
+            : sprintf( __( 'Most are %1$d to %2$d characters long.', 'woocommerce-conversion-tracking' ), $range[0], $range[1] );
+
+        return $this->finding(
+            array(
+                'key'        => $id['platform'] . ':' . $id['field'],
+                /* translators: %s: platform and field name, for example "Meta Pixel ID" */
+                'found'      => sprintf( __( 'Your %s has an unusual length', 'woocommerce-conversion-tracking' ), self::subject( $platform, isset( $id['label'] ) ? $id['label'] : $id['field'] ) ),
+                /* translators: 1: typical length sentence, 2: platform name */
+                'why'        => sprintf( __( '%1$s It is saved and sent as it is; double-check it. %2$s confirms it once events arrive.', 'woocommerce-conversion-tracking' ), $typical, $platform ),
+                'label'      => __( 'ID', 'woocommerce-conversion-tracking' ),
+                'tags'       => array( $platform ),
+                'confidence' => Finding::UNSURE,
+                'severity'   => Finding::INFO,
                 'action'     => array(
                     /* translators: %s: platform name */
                     'label' => sprintf( __( 'Open %s', 'woocommerce-conversion-tracking' ), $platform ),

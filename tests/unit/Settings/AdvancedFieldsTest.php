@@ -60,6 +60,6 @@ class AdvancedFieldsTest extends TestCase {
 
         $this->assertNotEmpty( Schema::fields( $platforms['facebook']['schema'] )['value_mode']['kept_note'] );
         $this->assertNotEmpty( Schema::fields( $platforms['google']['schema'] )['value_mode']['kept_note'], 'Google Ads kept the total too' );
-        $this->assertStringContainsString( 'Analytics always gets the item total', Schema::fields( $platforms['google']['schema'] )['value_mode']['description'] );
+        $this->assertStringContainsString( 'Analytics always gets the product total, without fees', Schema::fields( $platforms['google']['schema'] )['value_mode']['description'] );
     }
 }

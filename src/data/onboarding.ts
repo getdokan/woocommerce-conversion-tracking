@@ -8,6 +8,11 @@ import { __, _x, sprintf } from '@wordpress/i18n';
  * Internal dependencies
  */
 import { NAMESPACE } from './api';
+import {
+    formatLooksRight,
+    outsideTypicalLength,
+    withPrefix,
+} from './platformForm';
 import { platformCards } from './platforms';
 import type {
     AppData,
@@ -74,6 +79,10 @@ export type OnboardingField = {
     placeholder: string;
     pattern: string;
     letterCase: '' | 'upper' | 'lower';
+    // Added in front when the value only fits with it (AW-).
+    prefix: string;
+    // [ min, max ]; outside it is a soft warning only.
+    typicalLength: number[];
     required: boolean;
     // Required once this other field is filled (Google's label with the Ads ID).
     with: string;
@@ -132,17 +141,21 @@ export const onboardingFields = (
                     element.case === 'upper' || element.case === 'lower'
                         ? element.case
                         : '',
+                prefix: text( element.prefix ),
+                typicalLength: Array.isArray( element.typical_length )
+                    ? element.typical_length.map( Number )
+                    : [],
                 required: info.required === true,
                 with: text( info.with ),
                 hint: text( info.hint ),
                 valid:
                     text( info.valid ) ||
-                    __( 'Looks right.', 'woocommerce-conversion-tracking' ),
+                    formatLooksRight( platform.label || platform.id ),
                 invalid:
                     text( info.invalid ) ||
                     text( element.description ) ||
                     __(
-                        "This doesn't look like a valid ID.",
+                        "This doesn't match the ID format.",
                         'woocommerce-conversion-tracking'
                     ),
                 missing: text( info.missing ),
@@ -150,19 +163,21 @@ export const onboardingFields = (
         } );
 
 /**
- * A typed ID as the server stores it: ID characters only, in the field's case (Sanitizer::id()).
+ * A typed ID as the server stores it: ID characters only, in the field's case, with its prefix when missing (Sanitizer::id()).
  *
  * @param {OnboardingField} field Field.
  * @param {string}          raw   Typed value.
  */
 export const cleanId = ( field: OnboardingField, raw: string ): string => {
-    const value = raw.trim().replace( /[^A-Za-z0-9_\-/.:]/g, '' );
+    let value = raw.trim().replace( /[^A-Za-z0-9_\-/.:]/g, '' );
 
     if ( field.letterCase === 'upper' ) {
-        return value.toUpperCase();
+        value = value.toUpperCase();
+    } else if ( field.letterCase === 'lower' ) {
+        value = value.toLowerCase();
     }
 
-    return field.letterCase === 'lower' ? value.toLowerCase() : value;
+    return withPrefix( field.prefix, field.pattern, value );
 };
 
 export type FieldCheck = 'empty' | 'valid' | 'invalid';
@@ -194,6 +209,16 @@ export const checkField = (
         return 'valid';
     }
 };
+
+/**
+ * Whether a typed ID in the right format is outside its typical length; it still saves.
+ *
+ * @param {OnboardingField} field Field.
+ * @param {string}          raw   Typed value.
+ */
+export const unusualLength = ( field: OnboardingField, raw: string ): boolean =>
+    checkField( field, raw ) === 'valid' &&
+    outsideTypicalLength( field.typicalLength, cleanId( field, raw ) );
 
 export type PanelCheck = {
     // Has fields to fill in the wizard.

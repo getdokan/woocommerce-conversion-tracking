@@ -53,7 +53,7 @@ test.describe('Tracking Doctor checks', () => {
         // ID formats: a link to the field.
         const pixel = finding(page, 'Your Meta Pixel ID doesn\'t look right');
 
-        await expect(pixel).toContainText('Meta ignores events sent with an ID it doesn\'t know, so they aren\'t counted. Expected: 15 or 16 digits, numbers only.');
+        await expect(pixel).toContainText('Meta ignores events sent with an ID it doesn\'t know, so they aren\'t counted. Expected: Numbers only, usually 15 or 16 digits.');
         await expect(pixel.getByRole('link', { name: 'Open Meta' })).toHaveAttribute('href', '#/platforms/facebook?field=pixel_id');
 
         const label = finding(page, 'Your Google Ads conversion label looks incomplete');
@@ -110,7 +110,7 @@ test.describe('Tracking Doctor checks', () => {
 
         for (const line of [
             'No other tracking plugin sends to your platforms',
-            'Your platform IDs look valid',
+            'Your platform IDs have the right format',
             'Cookie choices reach your tags through your consent plugin',
             'No Google Tag Manager plugin is active',
             'Purchase is on for every connected platform',

@@ -21,9 +21,9 @@ class Sanitizer {
     const LIST_VARIANTS = array( 'multicheck', 'checkbox_group' );
 
     /**
-     * Longest ID or label kept.
+     * Longest ID or label kept; only blocks junk, never a real ID.
      */
-    const MAX_ID_LENGTH = 100;
+    const MAX_ID_LENGTH = 40;
 
     /**
      * The clean value.
@@ -72,9 +72,9 @@ class Sanitizer {
     }
 
     /**
-     * A platform ID or label: ID characters only, in the field's case, matching its pattern; empty clears it.
+     * A platform ID or label: ID characters only, in the field's case, with its prefix added when missing, matching its pattern; empty clears it.
      *
-     * @param array  $field Field with optional case (upper, lower) and pattern.
+     * @param array  $field Field with optional case (upper, lower), prefix and pattern.
      * @param string $value Value.
      *
      * @throws InvalidArgumentException When it is too long or doesn't match the pattern.
@@ -91,15 +91,36 @@ class Sanitizer {
             $value = strtolower( $value );
         }
 
+        $value = self::with_prefix( $field, $value );
+
         if ( strlen( $value ) > self::MAX_ID_LENGTH ) {
             throw new InvalidArgumentException( __( 'This ID is too long.', 'woocommerce-conversion-tracking' ) );
         }
 
         if ( '' !== $value && ! empty( $field['pattern'] ) && ! preg_match( '~' . $field['pattern'] . '~', $value ) ) {
-            throw new InvalidArgumentException( __( 'This doesn\'t look like a valid ID.', 'woocommerce-conversion-tracking' ) );
+            throw new InvalidArgumentException( __( 'This doesn\'t match the ID format.', 'woocommerce-conversion-tracking' ) );
         }
 
         return $value;
+    }
+
+    /**
+     * The value with the field's prefix in front when it only fits with it, like a bare Ads conversion ID (123 to AW-123).
+     *
+     * @param array  $field Field with optional prefix and pattern.
+     * @param string $value Cleaned, cased value.
+     *
+     * @return string
+     */
+    public static function with_prefix( array $field, string $value ): string {
+        $prefix  = isset( $field['prefix'] ) && is_string( $field['prefix'] ) ? $field['prefix'] : '';
+        $pattern = isset( $field['pattern'] ) && is_string( $field['pattern'] ) ? $field['pattern'] : '';
+
+        if ( '' === $prefix || '' === $value || '' === $pattern || 0 === strpos( $value, $prefix ) || preg_match( '~' . $pattern . '~', $value ) ) {
+            return $value;
+        }
+
+        return preg_match( '~' . $pattern . '~', $prefix . $value ) ? $prefix . $value : $value;
     }
 
     /**

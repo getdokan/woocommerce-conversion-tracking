@@ -45,6 +45,8 @@ class TrackingPluginsCheck extends AbstractCheck {
                 'classes'   => array( 'WC_Facebookcommerce' ),
                 'platforms' => array( 'facebook' ),
                 'sending'   => array( self::class, 'meta_for_woocommerce_sends' ),
+                // Meta Pixel for WordPress sends no WooCommerce events while this plugin is active.
+                'replaces'  => array( 'official-facebook-pixel' ),
             ),
             'official-facebook-pixel'          => array(
                 'name'      => 'Meta Pixel for WordPress',
@@ -98,22 +100,31 @@ class TrackingPluginsCheck extends AbstractCheck {
                 'plugins'   => array( 'woocommerce-google-analytics-pro/woocommerce-google-analytics-pro.php' ),
                 'platforms' => array( 'google' ),
             ),
+            // MonsterInsights and ExactMetrics Lite print only the GA4 base tag, never purchases, so only premium counts.
             'monsterinsights'                  => array(
                 'name'      => 'MonsterInsights',
-                'plugins'   => array( 'google-analytics-for-wordpress/googleanalytics.php', 'google-analytics-premium/googleanalytics-premium.php' ),
-                'classes'   => array( 'MonsterInsights_Lite', 'MonsterInsights' ),
+                'plugins'   => array( 'google-analytics-premium/googleanalytics-premium.php' ),
+                'classes'   => array( 'MonsterInsights' ),
                 'platforms' => array( 'google' ),
             ),
             'exactmetrics'                     => array(
                 'name'      => 'ExactMetrics',
-                'plugins'   => array( 'google-analytics-dashboard-for-wp/gadwp.php', 'exactmetrics-premium/exactmetrics-premium.php' ),
-                'classes'   => array( 'ExactMetrics_Lite', 'ExactMetrics' ),
+                'plugins'   => array( 'exactmetrics-premium/exactmetrics-premium.php' ),
+                'classes'   => array( 'ExactMetrics' ),
                 'platforms' => array( 'google' ),
             ),
             'conversios'                       => array(
                 'name'      => 'Conversios',
                 'plugins'   => array( 'enhanced-e-commerce-for-woocommerce-store/enhanced-ecommerce-google-analytics.php' ),
-                'platforms' => array( 'google', 'facebook' ),
+                'constants' => array( 'PLUGIN_TVC_VERSION' ),
+                'platforms' => array( 'google', 'facebook', 'bing_ads', 'twitter' ),
+            ),
+            'product-feed-pro'                 => array(
+                'name'      => 'Product Feed PRO for WooCommerce',
+                'plugins'   => array( 'woo-product-feed-pro/woocommerce-sea.php' ),
+                'constants' => array( 'WOOCOMMERCESEA_PLUGIN_VERSION' ),
+                'platforms' => array( 'facebook', 'google' ),
+                'sending'   => array( self::class, 'product_feed_pro_sends' ),
             ),
         );
 
@@ -275,18 +286,22 @@ class TrackingPluginsCheck extends AbstractCheck {
     }
 
     /**
-     * Pixel Manager for WooCommerce: an ID in its settings per platform.
+     * Pixel Manager for WooCommerce: an ID in its settings per platform, unless that pixel is paused.
      *
      * @param string $platform Settings platform ID.
      *
      * @return bool|null
      */
     public static function pixel_manager_sends( $platform ) {
+        // Its pause key => the ID path it guards.
         $paths = array(
-            'facebook' => array( array( 'facebook', 'pixel_id' ) ),
-            'google'   => array( array( 'google', 'ads', 'conversion_id' ), array( 'google', 'analytics', 'ga4', 'measurement_id' ) ),
-            'twitter'  => array( array( 'twitter', 'pixel_id' ) ),
-            'bing_ads' => array( array( 'bing', 'uet_tag_id' ) ),
+            'facebook' => array( 'facebook' => array( 'facebook', 'pixel_id' ) ),
+            'google'   => array(
+                'google_ads' => array( 'google', 'ads', 'conversion_id' ),
+                'ga4'        => array( 'google', 'analytics', 'ga4', 'measurement_id' ),
+            ),
+            'twitter'  => array( 'twitter' => array( 'twitter', 'pixel_id' ) ),
+            'bing_ads' => array( 'bing' => array( 'bing', 'uet_tag_id' ) ),
         );
 
         if ( ! isset( $paths[ $platform ] ) || ! is_array( get_option( 'wgact_plugin_options', null ) ) ) {
@@ -295,10 +310,11 @@ class TrackingPluginsCheck extends AbstractCheck {
 
         $read = false;
 
-        foreach ( $paths[ $platform ] as $path ) {
-            $value = Plugins::option_value( 'wgact_plugin_options', $path );
+        foreach ( $paths[ $platform ] as $pixel => $path ) {
+            $value  = Plugins::option_value( 'wgact_plugin_options', $path );
+            $paused = Plugins::option_value( 'wgact_plugin_options', array( 'paused_pixels', $pixel ) );
 
-            if ( is_scalar( $value ) && '' !== trim( (string) $value ) ) {
+            if ( is_scalar( $value ) && '' !== trim( (string) $value ) && ! ( is_numeric( $paused ) && (int) $paused > 0 ) ) {
                 return true;
             }
 
@@ -319,6 +335,11 @@ class TrackingPluginsCheck extends AbstractCheck {
     public static function google_for_woocommerce_sends( $platform ) {
         if ( 'google' !== $platform ) {
             return null;
+        }
+
+        // phpcs:ignore WooCommerce.Commenting.CommentHooks.MissingHookComment -- Google for WooCommerce's own filter.
+        if ( apply_filters( 'woocommerce_gla_disable_gtag_tracking', false ) ) {
+            return false;
         }
 
         return (bool) get_option( 'gla_ads_conversion_action', null );
@@ -342,7 +363,34 @@ class TrackingPluginsCheck extends AbstractCheck {
             return false;
         }
 
+        // phpcs:ignore WooCommerce.Commenting.CommentHooks.MissingHookComment -- Google Analytics for WooCommerce's own filter.
+        if ( apply_filters( 'woocommerce_ga_disable_tracking', false, 'all' ) ) {
+            return false;
+        }
+
         return is_scalar( $id ) && '' !== trim( (string) $id );
+    }
+
+    /**
+     * Product Feed PRO for WooCommerce: its Meta pixel or Google Ads remarketing tag is on with an ID.
+     *
+     * @param string $platform Settings platform ID.
+     *
+     * @return bool|null
+     */
+    public static function product_feed_pro_sends( $platform ) {
+        $options = array(
+            'facebook' => array( 'adt_add_facebook_pixel', 'adt_facebook_pixel_id' ),
+            'google'   => array( 'adt_add_remarketing', 'adt_adwords_conversion_id' ),
+        );
+
+        if ( ! isset( $options[ $platform ] ) ) {
+            return null;
+        }
+
+        $id = get_option( $options[ $platform ][1], '' );
+
+        return 'yes' === get_option( $options[ $platform ][0], 'no' ) && is_numeric( $id ) && (int) $id > 0;
     }
 
     /**

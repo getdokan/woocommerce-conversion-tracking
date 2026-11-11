@@ -168,6 +168,8 @@ class SettingsRouteTest extends TestCase {
             array(
                 array( 'as' => 'admin', 'method' => 'POST', 'path' => '/wcct/v1/settings', 'body' => array( 'platforms' => array( 'google' => array( 'ads_id' => 'AW-123/label' ) ) ) ),
                 array( 'as' => 'admin', 'method' => 'POST', 'path' => '/wcct/v1/settings', 'body' => array( 'platforms' => array( 'google' => array( 'measurement_id' => ' g-abc123 ' ), 'twitter' => array( 'purchase_event_id' => 'TW-O8X2K-O8X3A' ) ) ) ),
+                // A bare Ads conversion ID gets AW-; an unusual length still saves.
+                array( 'as' => 'admin', 'method' => 'POST', 'path' => '/wcct/v1/settings', 'body' => array( 'platforms' => array( 'google' => array( 'ads_id' => '123456789' ), 'facebook' => array( 'pixel_id' => '1234567890' ) ) ) ),
             )
         );
 
@@ -176,6 +178,9 @@ class SettingsRouteTest extends TestCase {
         $this->assertSame( 200, $result['responses'][1]['status'] );
         $this->assertSame( 'G-ABC123', $result['responses'][1]['data']['platforms']['google']['measurement_id'] );
         $this->assertSame( 'tw-o8x2k-o8x3a', $result['responses'][1]['data']['platforms']['twitter']['purchase_event_id'] );
+        $this->assertSame( 200, $result['responses'][2]['status'] );
+        $this->assertSame( 'AW-123456789', $result['responses'][2]['data']['platforms']['google']['ads_id'] );
+        $this->assertSame( '1234567890', $result['responses'][2]['data']['platforms']['facebook']['pixel_id'] );
     }
 
     public function test_pause_and_resume_take_effect_at_once_and_purge_the_page_caches() {

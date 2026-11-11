@@ -202,7 +202,7 @@ class WCCT_Integration_Google extends WCCT_Integration {
         $code = $this->build_event( 'conversion', array(
             'send_to'        => sprintf( "%s/%s", $account_id, $label ),
             'transaction_id' => $order_id,
-            'value'          => $this->purchase_value( $order ),
+            'value'          => (float) $this->purchase_value( $order ),
             'currency'       => $order->get_currency(),
             'event_callback' => self::CALLBACK_PLACEHOLDER,
             'event_timeout'  => 60000,

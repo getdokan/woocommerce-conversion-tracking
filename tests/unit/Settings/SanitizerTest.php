@@ -36,19 +36,70 @@ class SanitizerTest extends TestCase {
         Sanitizer::field( $google['ads_id'], 'AW-123/label', '' );
     }
 
-    public function test_a_meta_pixel_id_must_be_15_or_16_digits() {
+    public function test_a_meta_pixel_id_must_be_digits() {
         $this->expectException( InvalidArgumentException::class );
 
-        Sanitizer::field( Schema::fields( Schema::lite()['platforms']['facebook']['schema'] )['pixel_id'], '1234', '' );
+        // An access token, not a Pixel ID.
+        Sanitizer::field( Schema::fields( Schema::lite()['platforms']['facebook']['schema'] )['pixel_id'], 'EAAB12345', '' );
     }
 
-    public function test_ids_are_capped_at_100_characters() {
-        $field = Schema::id_field( 's', 'label', 'Label', '', '', '', 10 );
+    public function test_ids_of_an_unusual_length_save() {
+        $meta = Schema::fields( Schema::lite()['platforms']['facebook']['schema'] );
+        $x    = Schema::fields( Schema::lite()['platforms']['twitter']['schema'] );
 
-        $this->assertSame( 100, strlen( Sanitizer::field( $field, str_repeat( 'a', 100 ), '' ) ) );
+        $this->assertSame( '1', Sanitizer::field( $meta['pixel_id'], '1', '' ) );
+        $this->assertSame( str_repeat( '1', 40 ), Sanitizer::field( $meta['pixel_id'], str_repeat( '1', 40 ), '' ) );
+        $this->assertSame( 'abc', Sanitizer::field( $x['pixel_id'], 'ABC', '' ) );
+        $this->assertSame( 'o8x2k0o8x2k', Sanitizer::field( $x['pixel_id'], 'o8x2k0o8x2k', '' ) );
+        $this->assertSame( array( 15, 16 ), $meta['pixel_id']['typical_length'] );
+        $this->assertSame( array( 5, 5 ), $x['pixel_id']['typical_length'] );
+    }
+
+    /**
+     * @dataProvider over_40_characters
+     */
+    public function test_every_id_field_is_capped_at_40_characters( $platform, $field, $value ) {
+        $fields = Schema::fields( Schema::lite()['platforms'][ $platform ]['schema'] );
+
+        $this->assertSame( strtolower( substr( $value, 0, 40 ) ), strtolower( Sanitizer::field( $fields[ $field ], substr( $value, 0, 40 ), '' ) ) );
 
         $this->expectException( InvalidArgumentException::class );
-        Sanitizer::field( $field, str_repeat( 'a', 101 ), '' );
+        Sanitizer::field( $fields[ $field ], $value, '' );
+    }
+
+    public function over_40_characters() {
+        return array(
+            'Meta Pixel ID'       => array( 'facebook', 'pixel_id', str_repeat( '1', 41 ) ),
+            'Measurement ID'      => array( 'google', 'measurement_id', 'G-' . str_repeat( 'A', 39 ) ),
+            'Google tag ID'       => array( 'google', 'tag_id', 'GT-' . str_repeat( 'A', 38 ) ),
+            'Ads conversion ID'   => array( 'google', 'ads_id', 'AW-' . str_repeat( '1', 38 ) ),
+            'Ads label'           => array( 'google', 'purchase_label', str_repeat( 'a', 41 ) ),
+            'X Pixel ID'          => array( 'twitter', 'pixel_id', str_repeat( 'a', 41 ) ),
+            'X Purchase event ID' => array( 'twitter', 'purchase_event_id', 'tw-o8x2k-' . str_repeat( 'a', 32 ) ),
+        );
+    }
+
+    public function test_a_bare_ads_conversion_id_gets_aw() {
+        $google = Schema::fields( Schema::lite()['platforms']['google']['schema'] );
+
+        $this->assertSame( 'AW-123456789', Sanitizer::field( $google['ads_id'], ' 123456789 ', '' ) );
+        $this->assertSame( 'AW-123456789', Sanitizer::field( $google['ads_id'], 'AW-123456789', '' ) );
+        // Only where the prefix makes it fit: other fields and other values are left alone.
+        $this->assertSame( '123', Sanitizer::with_prefix( array( 'pattern' => '^[0-9]+$' ), '123' ) );
+        $this->assertSame( 'ABC', Sanitizer::with_prefix( $google['ads_id'], 'ABC' ) );
+
+        $this->expectException( InvalidArgumentException::class );
+        Sanitizer::field( $google['ads_id'], 'G-123', '' );
+    }
+
+    public function test_ids_are_capped_at_40_characters() {
+        $field = Schema::id_field( 's', 'label', 'Label', '', '', '', 10 );
+
+        $this->assertSame( 40, Sanitizer::MAX_ID_LENGTH );
+        $this->assertSame( 40, strlen( Sanitizer::field( $field, str_repeat( 'a', 40 ), '' ) ) );
+
+        $this->expectException( InvalidArgumentException::class );
+        Sanitizer::field( $field, str_repeat( 'a', 41 ), '' );
     }
 
     public function test_text_rejects_arrays() {

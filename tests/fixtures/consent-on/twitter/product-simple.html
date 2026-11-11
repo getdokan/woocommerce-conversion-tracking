@@ -28,6 +28,13 @@ window.wcctConsentConfig = {"api":false,"bridge":false,"cookiePrefix":"wp_consen
         statistics: ['analytics_storage'],
         marketing: ['ad_storage', 'ad_user_data', 'ad_personalization']
     };
+    // How long after DOMContentLoaded an expected consent type may take before we resolve as "no type".
+    var TYPE_TIMEOUT = 3000;
+
+    // Whether a consent type is opt-out; the API matches it with indexOf too.
+    function isOptout(type) {
+        return !!type && String(type).indexOf('optout') !== -1;
+    }
 
     // Value of one cookie in a document.cookie string, '' when unset.
     function readCookie(cookies, name) {
@@ -85,7 +92,7 @@ window.wcctConsentConfig = {"api":false,"bridge":false,"cookiePrefix":"wp_consen
         }
 
         for (var category in GOOGLE_TYPES) {
-            if (type === 'optout') {
+            if (isOptout(type)) {
                 if (cookieValue(category) === 'deny') {
                     count += setGoogle(update, category, 'denied');
                 }
@@ -101,7 +108,7 @@ window.wcctConsentConfig = {"api":false,"bridge":false,"cookiePrefix":"wp_consen
     function earlyAllows(type, cookieValue, category) {
         var cookie = cookieValue(category);
 
-        if (type === 'optout') {
+        if (isOptout(type)) {
             return cookie !== 'deny';
         }
 
@@ -122,7 +129,7 @@ window.wcctConsentConfig = {"api":false,"bridge":false,"cookiePrefix":"wp_consen
         var doc = win.document;
         var prefix = config.cookiePrefix || 'wp_consent';
         var state = {}, waiting = [], listeners = [], scripts = {};
-        var resolved = false, lastUpdate = '';
+        var resolved = false, timedOut = false, lastUpdate = '';
         var api = {};
 
         function cookieValue(category) {
@@ -194,12 +201,12 @@ window.wcctConsentConfig = {"api":false,"bridge":false,"cookiePrefix":"wp_consen
             }
         }
 
-        // Decide every category once the type is known; while the server expects a type, "no type" is never final.
+        // Decide every category once the type is known; while the server expects a type, "no type" is final only after the timeout.
         function resolve() {
             var type = consentType();
             var categories = CATEGORIES.slice(0), category;
 
-            if (!type && config.typeExpected) {
+            if (!type && config.typeExpected && !timedOut) {
                 return;
             }
 
@@ -385,8 +392,19 @@ window.wcctConsentConfig = {"api":false,"bridge":false,"cookiePrefix":"wp_consen
         };
 
         var ready = function () {
-            if (config.api && !(win.consent_api && win.consent_api.waitfor_consent_hook)) {
+            // With the wait-for hook, wait only while the banner hasn't set a type yet (the API's own check).
+            if (config.api && !(win.consent_api && win.consent_api.waitfor_consent_hook && win.wp_consent_type === undefined)) {
                 resolve();
+            }
+
+            // A type that never comes resolves as "no type"; one arriving later still goes through resolve().
+            if (config.api && !resolved && typeof win.setTimeout === 'function') {
+                win.setTimeout(function () {
+                    if (!resolved) {
+                        timedOut = true;
+                        resolve();
+                    }
+                }, TYPE_TIMEOUT);
             }
 
             activateHeld();
@@ -412,6 +430,7 @@ window.wcctConsentConfig = {"api":false,"bridge":false,"cookiePrefix":"wp_consen
         googleUpdateForType: googleUpdateForType,
         earlyAllows: earlyAllows,
         resolvedAllows: resolvedAllows,
+        TYPE_TIMEOUT: TYPE_TIMEOUT,
         create: create
     };
 }));

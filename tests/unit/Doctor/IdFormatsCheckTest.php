@@ -21,7 +21,7 @@ class IdFormatsCheckTest extends DoctorCheckTestCase {
         $this->platforms( $this->valid() );
 
         $this->assertSame( array(), $this->run_check( new IdFormatsCheck() ) );
-        $this->assertSame( 'Your platform IDs look valid', ( new IdFormatsCheck() )->label() );
+        $this->assertSame( 'Your platform IDs have the right format', ( new IdFormatsCheck() )->label() );
     }
 
     /**
@@ -49,7 +49,32 @@ class IdFormatsCheckTest extends DoctorCheckTestCase {
             'Ads label with id'  => array( 'google', 'purchase_label', 'AW-123/abc', 'Your Google Ads conversion label doesn\'t look right' ),
             'X pixel'            => array( 'twitter', 'pixel_id', 'TOO-LONG-1', 'Your X Pixel ID doesn\'t look right' ),
             'X purchase eventid' => array( 'twitter', 'purchase_event_id', 'o8x2k-abc', 'Your X Purchase event ID doesn\'t look right' ),
+            'Over 40 characters' => array( 'facebook', 'pixel_id', str_repeat( '1', 41 ), 'Your Meta Pixel ID doesn\'t look right' ),
         );
+    }
+
+    public function test_an_unusual_length_is_a_note_not_a_problem() {
+        $platforms                          = $this->valid();
+        $platforms['facebook']['pixel_id']  = '1234567890';
+        $platforms['twitter']['pixel_id']   = 'o8x2k0';
+        $platforms['google']['measurement_id'] = 'G-' . str_repeat( 'A', 30 );
+        $this->platforms( $platforms );
+
+        $findings = $this->run_check( new IdFormatsCheck() );
+
+        $this->assertSame( array( 'Your Meta Pixel ID has an unusual length', 'Your X Pixel ID has an unusual length' ), array_column( $findings, 'found' ), 'Google has no typical length' );
+        $this->assertSame( array( 'unsure', 'info', 'ID' ), array( $findings[0]['confidence'], $findings[0]['severity'], $findings[0]['label'] ) );
+        $this->assertSame( 'Most are 15 to 16 characters long. It is saved and sent as it is; double-check it. Meta confirms it once events arrive.', $findings[0]['why'] );
+        $this->assertSame( 'Most are 5 characters long. It is saved and sent as it is; double-check it. X confirms it once events arrive.', $findings[1]['why'] );
+        $this->assertSame( '#/platforms/facebook?field=pixel_id', $findings[0]['action']['url'] );
+    }
+
+    public function test_a_bare_ads_conversion_id_is_not_reported() {
+        $platforms                     = $this->valid();
+        $platforms['google']['ads_id'] = '123456';
+        $this->platforms( $platforms );
+
+        $this->assertSame( array(), $this->run_check( new IdFormatsCheck() ), 'The save adds AW- in front' );
     }
 
     public function test_a_purchase_needs_the_ads_label_and_the_x_event_id() {
@@ -107,7 +132,7 @@ class IdFormatsCheckTest extends DoctorCheckTestCase {
         $this->filter(
             'wcct_doctor_ids',
             function ( $ids ) {
-                $ids[] = array( 'platform' => 'facebook', 'platform_label' => 'Meta', 'field' => 'pixels', 'label' => 'Second pixel ID', 'value' => '12', 'pattern' => '^[0-9]{15,16}$', 'hint' => '' );
+                $ids[] = array( 'platform' => 'facebook', 'platform_label' => 'Meta', 'field' => 'pixels', 'label' => 'Second pixel ID', 'value' => 'EAAB12', 'pattern' => '^[0-9]+$', 'hint' => '' );
 
                 return $ids;
             }

@@ -114,7 +114,7 @@ class GoogleTag {
     public static function tag_id( $tag_id ): string {
         $tag_id = is_string( $tag_id ) ? strtoupper( trim( $tag_id ) ) : '';
 
-        return preg_match( '/^GT-[A-Z0-9]{4,20}$/', $tag_id ) ? $tag_id : '';
+        return preg_match( '/^(?=.{1,40}$)GT-[A-Z0-9]+$/', $tag_id ) ? $tag_id : '';
     }
 
     /**

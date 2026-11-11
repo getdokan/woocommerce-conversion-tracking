@@ -27,6 +27,11 @@ class ConsentData {
     );
 
     /**
+     * Consent banners (not Google tag plugins), in detection order.
+     */
+    const CONSENT_TOOLS = array( 'complianz', 'cookieyes', 'cookiebot', 'cookie-notice', 'cookieadmin', 'real-cookie-banner' );
+
+    /**
      * Script types that run as JavaScript; empty means no type attribute.
      */
     const JS_TYPES = array( '', 'text/javascript', 'application/javascript', 'text/ecmascript', 'application/ecmascript', 'module' );
@@ -79,18 +84,28 @@ class ConsentData {
 
         switch ( $slug ) {
             case 'complianz':
-                // Premium consent mode, or statistics through Google Tag Gateway.
-                return (bool) $get( 'consent_mode' ) || 'gtg' === $get( 'statistics' );
+                // Google Tag Gateway, or consent mode with Complianz adding Google Analytics or Tag Manager (class-banner-loader.php).
+                $configured = (string) $get( 'configured' );
+                $statistics = $get( 'statistics' );
+
+                if ( 'gtg' === $statistics ) {
+                    return true;
+                }
+
+                return (bool) $get( 'consent_mode' ) && 'no' !== $configured
+                    && ( 'google-analytics' === $statistics || ( 'google-tag-manager' === $statistics && 'yes' === $configured ) );
 
             case 'cookieyes':
                 // Only when connected to the CookieYes web app.
                 return self::truthy( $get( 'gcm_status' ) ) && self::truthy( $get( 'connected' ) );
 
             case 'cookiebot':
-                // Prints whenever a CBID is set, also when toggled off ('0').
-                $gcm = $get( 'gcm' );
+                // Prints whenever a CBID is set, also when toggled off ('0'); the network CBID applies when the site has none.
+                $gcm  = $get( 'gcm' );
+                $cbid = trim( (string) $get( 'cbid' ) );
+                $cbid = '' !== $cbid ? $cbid : trim( (string) $get( 'network_cbid' ) );
 
-                return '' !== trim( (string) $get( 'cbid' ) ) && false !== $gcm && '' !== $gcm && null !== $gcm;
+                return '' !== $cbid && false !== $gcm && '' !== $gcm && null !== $gcm;
 
             case 'cookie-notice':
             case 'cookieadmin':
@@ -106,6 +121,60 @@ class ConsentData {
         }
 
         return false;
+    }
+
+    /**
+     * Active consent banners.
+     *
+     * @param array $signals Per tool slug: null when the tool is not active, else its settings.
+     *
+     * @return string[] Tool slugs.
+     */
+    public static function detected_tools( array $signals ) {
+        return array_values(
+            array_filter(
+                self::CONSENT_TOOLS,
+                function ( $slug ) use ( $signals ) {
+                    return isset( $signals[ $slug ] ) && is_array( $signals[ $slug ] );
+                }
+            )
+        );
+    }
+
+    /**
+     * Active consent banners whose current release sets a WP Consent API consent type.
+     *
+     * @param array $signals Per tool slug: null when the tool is not active, else its settings.
+     *
+     * @return string[] Tool slugs.
+     */
+    public static function type_tools( array $signals ) {
+        return array_values(
+            array_filter(
+                self::detected_tools( $signals ),
+                function ( $slug ) use ( $signals ) {
+                    if ( 'cookieyes' === $slug ) {
+                        // CookieYes bridges to the API only outside its legacy mode.
+                        return isset( $signals['cookieyes']['legacy'] ) && false === $signals['cookieyes']['legacy'];
+                    }
+
+                    return in_array( $slug, array( 'complianz', 'cookiebot' ), true );
+                }
+            )
+        );
+    }
+
+    /**
+     * Whether the page should wait for a consent type: the API is active and a type is set or a tool will set one.
+     *
+     * @param bool   $api_available Whether the WP Consent API is active.
+     * @param string $type          Consent type known on the server, empty when none.
+     * @param array  $signals       Per tool slug: null when the tool is not active, else its settings.
+     *
+     * @return bool
+     */
+    public static function type_expected( $api_available, $type, array $signals ) {
+        return (bool) $api_available && ( '' !== (string) $type || array() !== self::type_tools( $signals ) );
     }
 
     /**

@@ -45,16 +45,21 @@ function fakePage( { cookie = '', readyState = 'loading' } = {} ) {
     };
 
     const winListeners = {};
+    const timers = [];
     const win = {
         document: doc,
         dataLayer: [],
         addEventListener( name, fn ) {
             ( winListeners[ name ] = winListeners[ name ] || [] ).push( fn );
         },
-        setTimeout( fn ) {
-            fn();
+        setTimeout( fn, delay ) {
+            timers.push( { fn, delay } );
         },
     };
+
+    // Run the timers set so far, as if their delay passed.
+    win.tick = () => timers.splice( 0 ).forEach( ( timer ) => timer.fn() );
+    win.timers = timers;
 
     // The window load event; the document is complete by then.
     doc.load = () => {
@@ -128,6 +133,16 @@ test( 'consent type: opt-in sends every type, granted where the API has consent'
 test( 'consent type: opt-out only sends the categories whose cookie says deny', () => {
     assert.equal( lib.googleUpdateForType( 'optout', () => true, () => '' ), null );
     assert.deepEqual( lib.googleUpdateForType( 'optout', () => true, ( category ) => ( category === 'marketing' ? 'deny' : 'allow' ) ), adUpdate( 'denied' ) );
+} );
+
+test( 'consent type: any type containing optout is opt-out, as in the API', () => {
+    const deny = ( category ) => ( category === 'marketing' ? 'deny' : '' );
+
+    assert.equal( lib.googleUpdateForType( 'optout_us', () => true, () => '' ), null );
+    assert.deepEqual( lib.googleUpdateForType( 'us-optout', () => true, deny ), adUpdate( 'denied' ) );
+    assert.equal( lib.earlyAllows( 'optout_us', () => '', 'marketing' ), true );
+    assert.equal( lib.earlyAllows( 'optout_us', deny, 'marketing' ), false );
+    assert.equal( lib.earlyAllows( 'optinstats', () => '', 'marketing' ), false );
 } );
 
 test( 'early state from the cookies before the consent type is known', () => {
@@ -219,6 +234,29 @@ test( 'waitfor_consent_hook: DOMContentLoaded does not resolve, the type event d
     assert.deepEqual( googleUpdates( win ), [] );
 } );
 
+test( 'waitfor_consent_hook with no type ever: the timeout resolves even when no type was expected', () => {
+    const { win, doc } = fakePage();
+    const consent = lib.create( win, { api: true, typeExpected: false } );
+
+    win.consent_api = { waitfor_consent_hook: true };
+    doc.dispatch( 'DOMContentLoaded' );
+    assert.equal( consent.allows( 'marketing' ), false );
+
+    win.tick();
+    assert.equal( consent.allows( 'marketing' ), true );
+} );
+
+test( 'waitfor_consent_hook with the type already set before our script: resolves at DOMContentLoaded', () => {
+    const { win, doc } = fakePage( { cookie: 'wp_consent_marketing=deny' } );
+    const consent = lib.create( win, { api: true, typeExpected: true } );
+
+    win.consent_api = { waitfor_consent_hook: true };
+    win.wp_consent_type = 'optin';
+    doc.dispatch( 'DOMContentLoaded' );
+    assert.equal( consent.allows( 'marketing' ), false );
+    assert.equal( win.timers.length, 0 );
+} );
+
 test( 'an allow cookie from an earlier visit allows at once', () => {
     const { win } = fakePage( { cookie: 'wp_consent_marketing=allow' } );
     const consent = lib.create( win, { api: true } );
@@ -262,7 +300,7 @@ test( 'an explicitly empty wp_consent_type wins over the fallback type, as in wp
     assert.deepEqual( googleUpdates( win ), [] );
 } );
 
-test( 'a type is expected: no type at DOMContentLoaded or load keeps tags held', () => {
+test( 'a type is expected: no type at DOMContentLoaded or load keeps tags held until the timeout', () => {
     const { win, doc, inserted } = fakePage();
     const consent = lib.create( win, { api: true, bridge: true, typeExpected: true } );
 
@@ -274,6 +312,88 @@ test( 'a type is expected: no type at DOMContentLoaded or load keeps tags held',
     assert.equal( consent.allows( 'marketing' ), false );
     assert.equal( inserted.length, 0 );
     assert.deepEqual( googleUpdates( win ), [] );
+} );
+
+test( 'a type is expected but never comes: the timeout after DOMContentLoaded resolves as no type', () => {
+    const { win, doc, inserted } = fakePage();
+    const consent = lib.create( win, { api: true, bridge: true, typeExpected: true } );
+    const calls = [];
+
+    consent.sync( 'marketing', ( granted, first ) => calls.push( [ granted, first ] ) );
+    consent.script( 'marketing', '//static.ads-twitter.com/uwt.js' );
+    assert.equal( win.timers.length, 0, 'The timer starts at DOMContentLoaded' );
+
+    doc.dispatch( 'DOMContentLoaded' );
+    assert.deepEqual( win.timers.map( ( timer ) => timer.delay ), [ lib.TYPE_TIMEOUT ] );
+    assert.equal( lib.TYPE_TIMEOUT, 3000 );
+    assert.equal( inserted.length, 0 );
+
+    win.tick();
+
+    assert.equal( consent.allows( 'marketing' ), true );
+    assert.equal( consent.allows( 'statistics' ), true );
+    assert.equal( inserted.length, 1 );
+    assert.deepEqual( calls, [ [ false, true ], [ true, false ] ] );
+    assert.deepEqual( googleUpdates( win ), [], 'No type, so no Google update' );
+} );
+
+test( 'a type arriving after the timeout still updates the state through the change path', () => {
+    const { win, doc } = fakePage();
+    const consent = lib.create( win, { api: true, bridge: true, typeExpected: true } );
+    const calls = [];
+
+    consent.sync( 'marketing', ( granted ) => calls.push( granted ) );
+    doc.dispatch( 'DOMContentLoaded' );
+    win.tick();
+    assert.deepEqual( calls, [ false, true ] );
+
+    win.wp_consent_type = 'optin';
+    win.wp_has_consent = ( category ) => category === 'statistics';
+    doc.dispatch( 'wp_consent_type_defined' );
+
+    assert.deepEqual( calls, [ false, true, false ] );
+    assert.equal( consent.allows( 'statistics' ), true );
+    assert.deepEqual( googleUpdates( win ), [ Object.assign( { analytics_storage: 'granted' }, adUpdate( 'denied' ) ) ] );
+
+    doc.dispatch( 'wp_listen_for_consent_change', { marketing: 'allow' } );
+    assert.deepEqual( calls, [ false, true, false, true ] );
+} );
+
+test( 'a type arriving before the timeout wins and the timer then does nothing', () => {
+    const { win, doc } = fakePage();
+    const consent = lib.create( win, { api: true, bridge: true, typeExpected: true } );
+
+    doc.dispatch( 'DOMContentLoaded' );
+    win.wp_consent_type = 'optin';
+    win.wp_has_consent = () => false;
+    doc.dispatch( 'wp_consent_type_defined' );
+    win.tick();
+
+    assert.equal( consent.allows( 'marketing' ), false );
+    assert.equal( googleUpdates( win ).length, 1 );
+} );
+
+test( 'no timer when no type is expected, without the API or when the type is already known', () => {
+    for ( const config of [ { api: true, typeExpected: false }, { api: false, typeExpected: true }, { api: true, typeExpected: true, type: 'optin' } ] ) {
+        const { win, doc } = fakePage();
+
+        lib.create( win, config );
+        doc.dispatch( 'DOMContentLoaded' );
+
+        assert.equal( win.timers.length, 0, JSON.stringify( config ) );
+    }
+} );
+
+test( 'waitfor_consent_hook with a type expected: the timeout still resolves', () => {
+    const { win, doc } = fakePage();
+    const consent = lib.create( win, { api: true, typeExpected: true } );
+
+    win.consent_api = { waitfor_consent_hook: true };
+    doc.dispatch( 'DOMContentLoaded' );
+    assert.equal( consent.allows( 'marketing' ), false );
+
+    win.tick();
+    assert.equal( consent.allows( 'marketing' ), true );
 } );
 
 test( 'the type the server knows is used before the banner script runs', () => {

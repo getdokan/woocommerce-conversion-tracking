@@ -7,6 +7,7 @@ Version: 3.0.0
 Author: weDevs
 Author URI: https://wedevs.com/?utm_source=ORG_Author_URI_WCCT
 License: GPL2
+License URI: https://www.gnu.org/licenses/gpl-2.0.html
 Requires at least: 7.0
 Requires PHP: 7.4
 Requires Plugins: woocommerce
@@ -20,7 +21,7 @@ Domain Path: /languages
  * Copyright (c) 2020 Tareq Hasan (email: tareq@wedevs.com). All rights reserved.
  *
  * Released under the GPL license
- * http://www.opensource.org/licenses/gpl-license.php
+ * https://www.gnu.org/licenses/gpl-2.0.html
  *
  * This is an add-on for WordPress
  * http://wordpress.org/

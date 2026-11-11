@@ -85,7 +85,7 @@ const MetaHelp = () => (
                 <li>
                     { createInterpolateElement(
                         __(
-                            'Click <b>Settings</b>. The Pixel ID is the 15 or 16 digit number at the top.',
+                            'Click <b>Settings</b>. The Pixel ID is the number at the top, usually 15 or 16 digits.',
                             'woocommerce-conversion-tracking'
                         ),
                         { b: <b /> }
@@ -143,7 +143,7 @@ const GoogleHelp = () => (
                 <li>
                     { createInterpolateElement(
                         __(
-                            'Open your Purchase conversion and choose <b>Tag setup</b>, then <b>Use Google tag</b>.',
+                            'Open your Purchase conversion and choose <b>Tag setup</b>, then <b>Use Google Tag Manager</b>.',
                             'woocommerce-conversion-tracking'
                         ),
                         { b: <b /> }
@@ -152,7 +152,25 @@ const GoogleHelp = () => (
                 <li>
                     { createInterpolateElement(
                         __(
-                            'The event snippet ends in <code>AW-10938215/AbCdEfGhIj</code>. The part before the slash is the conversion ID, the part after it is the label.',
+                            'Copy the <b>Conversion ID</b> into Ads conversion ID. It is only numbers there; we add AW- in front when you save.',
+                            'woocommerce-conversion-tracking'
+                        ),
+                        { b: <b /> }
+                    ) }
+                </li>
+                <li>
+                    { createInterpolateElement(
+                        __(
+                            'Copy the <b>Conversion label</b> into Ads conversion label.',
+                            'woocommerce-conversion-tracking'
+                        ),
+                        { b: <b /> }
+                    ) }
+                </li>
+                <li>
+                    { createInterpolateElement(
+                        __(
+                            'Have an event snippet instead? It ends in <code>AW-10938215/AbCdEfGhIj</code>. The part before the slash is the conversion ID, the part after it is the label.',
                             'woocommerce-conversion-tracking'
                         ),
                         { code: <code className="font-mono text-[12px]" /> }
@@ -222,7 +240,7 @@ const XHelp = () => (
     <>
         <Block
             title={ __(
-                'Where to find the event ID',
+                'Where to find the Pixel ID and event IDs',
                 'woocommerce-conversion-tracking'
             ) }
         >
@@ -239,7 +257,16 @@ const XHelp = () => (
                 <li>
                     { createInterpolateElement(
                         __(
-                            'Choose <b>Add event</b>, pick <b>Purchase</b> and the <b>Pixel</b> install method.',
+                            "If you don't have an X Pixel event source yet, choose <b>Add event source</b>; its ID is your Pixel ID.",
+                            'woocommerce-conversion-tracking'
+                        ),
+                        { b: <b /> }
+                    ) }
+                </li>
+                <li>
+                    { createInterpolateElement(
+                        __(
+                            'Choose <b>Add events</b>, pick <b>Purchase</b> and the <b>Pixel</b> install method.',
                             'woocommerce-conversion-tracking'
                         ),
                         { b: <b /> }
@@ -285,7 +312,7 @@ const MicrosoftHelp = () => (
                 <li>
                     { createInterpolateElement(
                         __(
-                            'In <a>Microsoft Advertising</a><n/>, open <b>Tools</b>, then <b>UET tag</b>.',
+                            'In <a>Microsoft Advertising</a><n/>, open <b>Conversions</b>, then <b>UET tag</b>.',
                             'woocommerce-conversion-tracking'
                         ),
                         {

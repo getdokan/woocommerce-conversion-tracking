@@ -123,8 +123,9 @@ class ConsentPageOutputTest extends WCCT_Test_Page_Case {
     public function test_the_pending_events_runner_holds_queued_code_per_platform() {
         $output = $this->output_of( $this->request( 'all', 'home' ) );
 
-        $this->assertStringContainsString( 'window.wcctConsent.inline(({\"facebook\":\"marketing\",', $output );
-        $this->assertStringContainsString( '\"ga4\":\"statistics\"', $output );
-        $this->assertStringNotContainsString( 'document.body.appendChild(script)', $output );
+        $this->assertStringContainsString( 'var category = ({\"facebook\":\"marketing\",\"adwords\":\"\",\"twitter\":\"marketing\",\"ga4\":\"\",\"custom\":\"marketing\"})[platform]; if (category === \'\') { var script', $output );
+        $this->assertStringContainsString( "} else if (window.wcctConsent) { window.wcctConsent.inline(category || 'marketing', entries[i].scripts[platform]); }", $output );
+        // Google consent mode covers GA4 and Google Ads, so only their queued add to cart runs at once.
+        $this->assertSame( 1, substr_count( $output, 'document.body.appendChild(script)' ) );
     }
 }

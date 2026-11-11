@@ -345,17 +345,17 @@ class Schema {
                 'facebook_connection',
                 'pixel_id',
                 __( 'Pixel ID', 'woocommerce-conversion-tracking' ),
-                __( '15 or 16 digits, numbers only', 'woocommerce-conversion-tracking' ),
-                __( 'Numbers only, 15 or 16 digits. If it starts with "EAA", that\'s an access token, not a Pixel ID.', 'woocommerce-conversion-tracking' ),
-                '^[0-9]{15,16}$',
+                __( 'Numbers only, usually 15 or 16 digits', 'woocommerce-conversion-tracking' ),
+                __( 'Numbers only, usually 15 or 16 digits. If it starts with "EAA", that\'s an access token, not a Pixel ID.', 'woocommerce-conversion-tracking' ),
+                self::id_pattern( '[0-9]+' ),
                 10,
                 array(
                     'required_to_send' => true,
+                    'typical_length'   => array( 15, 16 ),
                     'onboarding'       => array(
                         'required' => true,
                         'hint'     => __( 'In Meta Events Manager, open your data source, then Settings. The Pixel ID is the number at the top.', 'woocommerce-conversion-tracking' ),
-                        'valid'    => __( 'Looks like a Pixel ID.', 'woocommerce-conversion-tracking' ),
-                        'invalid'  => __( 'Pixel IDs are 15 or 16 digits, numbers only.', 'woocommerce-conversion-tracking' ),
+                        'invalid'  => __( 'Pixel IDs are numbers only. One that starts with "EAA" is an access token, not a Pixel ID.', 'woocommerce-conversion-tracking' ),
                     ),
                 )
             ),
@@ -424,7 +424,7 @@ class Schema {
                 __( 'Analytics Measurement ID', 'woocommerce-conversion-tracking' ),
                 __( 'Starts with G-', 'woocommerce-conversion-tracking' ),
                 __( 'Measurement IDs start with G- followed by letters and numbers. Find it under Admin, then Data streams. A GT- Google tag ID works too. Avoid double counting: if this GA4 property is already a destination of your Google Ads tag, remove that destination or turn on "Ignore duplicate instances of on-page configuration" in your Google tag settings.', 'woocommerce-conversion-tracking' ),
-                '^GT?-[A-Z0-9]+$',
+                self::id_pattern( 'GT?-[A-Z0-9]+' ),
                 20,
                 array(
                     'case'         => 'upper',
@@ -436,16 +436,18 @@ class Schema {
                 'google_connection',
                 'ads_id',
                 __( 'Ads conversion ID', 'woocommerce-conversion-tracking' ),
-                __( 'Starts with AW-', 'woocommerce-conversion-tracking' ),
-                '',
-                '^AW-[0-9]+$',
+                __( 'AW- and numbers, or just the numbers', 'woocommerce-conversion-tracking' ),
+                __( 'Paste the Conversion ID. If it is only numbers, we add AW- in front.', 'woocommerce-conversion-tracking' ),
+                self::id_pattern( 'AW-[0-9]+' ),
                 30,
                 array(
                     'case'         => 'upper',
+                    // Google Tag Manager setup shows the Conversion ID without AW-.
+                    'prefix'       => 'AW-',
                     'dependencies' => $ads,
                     'onboarding'   => array(
                         'required' => false,
-                        'invalid'  => __( 'Starts with AW- followed by numbers.', 'woocommerce-conversion-tracking' ),
+                        'invalid'  => __( 'Numbers only, with or without AW- in front.', 'woocommerce-conversion-tracking' ),
                     ),
                 )
             ),
@@ -455,7 +457,7 @@ class Schema {
                 __( 'Ads conversion label', 'woocommerce-conversion-tracking' ),
                 __( 'Letters and numbers after the slash', 'woocommerce-conversion-tracking' ),
                 '',
-                '^[A-Za-z0-9_-]+$',
+                self::id_pattern( '[A-Za-z0-9_-]+' ),
                 40,
                 array(
                     'dependencies' => $ads,
@@ -501,11 +503,11 @@ class Schema {
                 __( 'Google tag ID (optional)', 'woocommerce-conversion-tracking' ),
                 __( 'Starts with GT-', 'woocommerce-conversion-tracking' ),
                 __( 'Only if your Analytics stream uses a combined Google tag. Leave empty to use the G- ID above. The Google tag must include this GA4 stream as a destination; events are still sent to the G- ID. Avoid double counting: don\'t also add this GA4 property as a destination of your Google Ads tag.', 'woocommerce-conversion-tracking' ),
-                '^GT-[A-Z0-9]+$',
+                self::id_pattern( 'GT-[A-Z0-9]+' ),
                 10,
                 array( 'case' => 'upper' )
             ),
-            self::value_mode_field( 'google_advanced', 'adwords', $ads, __( 'Sent with the Ads conversion. Analytics always gets the item total, as Google recommends. Fees count as items; tax is never part of items.', 'woocommerce-conversion-tracking' ) ),
+            self::value_mode_field( 'google_advanced', 'adwords', $ads, __( 'Sent with the Ads conversion; there, fees count as items and tax is never part of items. Analytics always gets the product total, without fees, tax or shipping, as Google recommends.', 'woocommerce-conversion-tracking' ) ),
             self::product_id_field( 'google_advanced' ),
             self::skip_roles_field( 'google_advanced' ),
         );
@@ -519,7 +521,7 @@ class Schema {
     private static function twitter(): array {
         $event_id = __( 'Starts with tw-', 'woocommerce-conversion-tracking' );
         $optional = __( 'Optional. The event stays off until it has an ID.', 'woocommerce-conversion-tracking' );
-        $pattern  = '^tw-[a-z0-9]+-[a-z0-9]+$';
+        $pattern  = self::id_pattern( 'tw-[a-z0-9]+-[a-z0-9]+' );
         $lower    = array( 'case' => 'lower' );
         // Free sends X Purchase only; Pro unlocks the other event IDs.
         $pro      = array_merge( $lower, array( 'pro' => true, 'disabled' => true ) );
@@ -527,8 +529,7 @@ class Schema {
         $wizard = array(
             'pixel_id'          => array(
                 'required' => true,
-                'valid'    => __( 'Looks right. This is the base tag on every page.', 'woocommerce-conversion-tracking' ),
-                'invalid'  => __( 'X Pixel IDs are 5 letters and numbers.', 'woocommerce-conversion-tracking' ),
+                'invalid'  => __( 'X Pixel IDs are lowercase letters and numbers.', 'woocommerce-conversion-tracking' ),
             ),
             'purchase_event_id' => array(
                 'required' => true,
@@ -539,7 +540,7 @@ class Schema {
         return array(
             self::page( 'twitter', __( 'X', 'woocommerce-conversion-tracking' ) ),
             self::section( 'twitter', 'twitter_connection', __( 'Connection', 'woocommerce-conversion-tracking' ) ),
-            self::id_field( 'twitter_connection', 'pixel_id', __( 'Pixel ID', 'woocommerce-conversion-tracking' ), __( '5 letters and numbers, like o8x2k', 'woocommerce-conversion-tracking' ), '', '^[a-z0-9]{5}$', 10, array_merge( $lower, array( 'required_to_send' => true, 'onboarding' => $wizard['pixel_id'] ) ) ),
+            self::id_field( 'twitter_connection', 'pixel_id', __( 'Pixel ID', 'woocommerce-conversion-tracking' ), __( 'Letters and numbers, usually 5, like o8x2k', 'woocommerce-conversion-tracking' ), __( 'The base tag on every page.', 'woocommerce-conversion-tracking' ), self::id_pattern( '[a-z0-9]+' ), 10, array_merge( $lower, array( 'required_to_send' => true, 'typical_length' => array( 5, 5 ), 'onboarding' => $wizard['pixel_id'] ) ) ),
             self::id_field( 'twitter_connection', 'purchase_event_id', __( 'Purchase event ID', 'woocommerce-conversion-tracking' ), $event_id, __( 'Starts with tw-, then your Pixel ID and the event code. Each event has its own ID in X Ads Manager.', 'woocommerce-conversion-tracking' ), $pattern, 20, array_merge( $lower, array( 'onboarding' => $wizard['purchase_event_id'] ) ) ),
             self::id_field( 'twitter_connection', 'cart_event_id', __( 'Add to cart event ID (optional)', 'woocommerce-conversion-tracking' ), $event_id, $optional, $pattern, 30, $pro ),
             self::id_field( 'twitter_connection', 'checkout_event_id', __( 'Start checkout event ID (optional)', 'woocommerce-conversion-tracking' ), $event_id, $optional, $pattern, 40, $pro ),
@@ -644,9 +645,9 @@ class Schema {
      * @param string $label       Label.
      * @param string $placeholder Placeholder.
      * @param string $description Help text.
-     * @param string $pattern     Format the value must match once cleaned (empty clears the field); extra 'case' (upper, lower) is applied first.
+     * @param string $pattern     Format the value must match once cleaned (empty clears the field), see id_pattern(); extra 'case' (upper, lower) and 'prefix' are applied first.
      * @param int    $priority    Order in the section.
-     * @param array  $extra       More element keys; 'onboarding' { required, with, hint, valid, invalid, missing } puts the field in the setup wizard; 'required_to_send' marks an ID the platform needs to be on (Platforms\PlatformSettings).
+     * @param array  $extra       More element keys; 'onboarding' { required, with, hint, valid, invalid, missing } puts the field in the setup wizard; 'required_to_send' marks an ID the platform needs to be on (Platforms\PlatformSettings); 'typical_length' [ min, max ] warns, never blocks, outside it.
      *
      * @return array
      */
@@ -667,6 +668,17 @@ class Schema {
             ),
             $extra
         );
+    }
+
+    /**
+     * An ID pattern: the type check, up to Sanitizer::MAX_ID_LENGTH characters in all.
+     *
+     * @param string $type Regex for the whole value, without anchors.
+     *
+     * @return string
+     */
+    public static function id_pattern( string $type ): string {
+        return '^(?=.{1,' . Sanitizer::MAX_ID_LENGTH . '}$)' . $type . '$';
     }
 
     /**

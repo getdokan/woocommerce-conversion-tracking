@@ -51,6 +51,13 @@ class ConsentDataTest extends TestCase {
             'Complianz free'                    => array( 'complianz', array( 'consent_mode' => false, 'statistics' => 'google-analytics' ), false ),
             'Complianz consent mode'            => array( 'complianz', array( 'consent_mode' => true, 'statistics' => 'google-analytics' ), true ),
             'Complianz Google Tag Gateway'      => array( 'complianz', array( 'consent_mode' => false, 'statistics' => 'gtg' ), true ),
+            'Complianz consent mode, GA added'  => array( 'complianz', array( 'consent_mode' => true, 'statistics' => 'google-analytics', 'configured' => 'yes' ), true ),
+            'Complianz consent mode, GA not added' => array( 'complianz', array( 'consent_mode' => true, 'statistics' => 'google-analytics', 'configured' => 'no' ), false ),
+            'Complianz leftover consent mode, Matomo' => array( 'complianz', array( 'consent_mode' => true, 'statistics' => 'matomo', 'configured' => 'yes' ), false ),
+            'Complianz leftover consent mode, no statistics' => array( 'complianz', array( 'consent_mode' => true, 'statistics' => '', 'configured' => 'yes' ), false ),
+            'Complianz consent mode, GTM added' => array( 'complianz', array( 'consent_mode' => true, 'statistics' => 'google-tag-manager', 'configured' => 'yes' ), true ),
+            'Complianz consent mode, GTM not added' => array( 'complianz', array( 'consent_mode' => true, 'statistics' => 'google-tag-manager', 'configured' => 'no' ), false ),
+            'Complianz GTG not added still prints' => array( 'complianz', array( 'consent_mode' => false, 'statistics' => 'gtg', 'configured' => 'no' ), true ),
             'CookieYes standalone'              => array( 'cookieyes', array( 'gcm_status' => true, 'connected' => false ), false ),
             'CookieYes connected without GCM'   => array( 'cookieyes', array( 'gcm_status' => false, 'connected' => true ), false ),
             'CookieYes connected with GCM'      => array( 'cookieyes', array( 'gcm_status' => true, 'connected' => true ), true ),
@@ -60,6 +67,9 @@ class ConsentDataTest extends TestCase {
             'Cookiebot toggled off still prints' => array( 'cookiebot', array( 'cbid' => 'abc-123', 'gcm' => '0' ), true ),
             'Cookiebot GCM option missing'      => array( 'cookiebot', array( 'cbid' => 'abc-123', 'gcm' => false ), false ),
             'Cookiebot GCM option empty'        => array( 'cookiebot', array( 'cbid' => 'abc-123', 'gcm' => '' ), false ),
+            'Cookiebot network CBID'            => array( 'cookiebot', array( 'cbid' => '', 'network_cbid' => 'net-123', 'gcm' => '1' ), true ),
+            'Cookiebot site CBID over network'  => array( 'cookiebot', array( 'cbid' => 'abc-123', 'network_cbid' => '', 'gcm' => '1' ), true ),
+            'Cookiebot no site or network CBID' => array( 'cookiebot', array( 'cbid' => '', 'network_cbid' => '', 'gcm' => '1' ), false ),
             'Cookie Notice app default'         => array( 'cookie-notice', array( 'gcm' => array( 'ad_storage' => 'denied' ) ), true ),
             'Cookie Notice without app'         => array( 'cookie-notice', array( 'gcm' => null ), false ),
             'CookieAdmin Pro GCM on'            => array( 'cookieadmin', array( 'gcm' => '1' ), true ),
@@ -72,6 +82,49 @@ class ConsentDataTest extends TestCase {
             'GA for WooCommerce without an ID'  => array( 'ga-for-woocommerce', array( 'ga_id' => '', 'modes' => array( array() ) ), false ),
             'GA for WooCommerce defaults off'   => array( 'ga-for-woocommerce', array( 'ga_id' => 'G-ABC', 'modes' => array() ), false ),
         );
+    }
+
+    public function test_detected_tools_are_the_active_banners_only() {
+        $signals = array(
+            'complianz'          => array(),
+            'cookieyes'          => null,
+            'real-cookie-banner' => array( 'gcm' => false ),
+            'site-kit'           => array( 'status' => 'enabled' ),
+            'ga-for-woocommerce' => array( 'ga_id' => 'G-ABC' ),
+        );
+
+        $this->assertSame( array( 'complianz', 'real-cookie-banner' ), ConsentData::detected_tools( $signals ) );
+        $this->assertSame( array( 'complianz' ), ConsentData::type_tools( $signals ) );
+    }
+
+    /**
+     * @dataProvider type_signals
+     */
+    public function test_type_tools_are_the_banners_that_set_a_consent_type( array $signals, array $tools ) {
+        $this->assertSame( $tools, ConsentData::type_tools( $signals ) );
+    }
+
+    public function type_signals() {
+        return array(
+            'Complianz'          => array( array( 'complianz' => array() ), array( 'complianz' ) ),
+            'Cookiebot'          => array( array( 'cookiebot' => array( 'cbid' => '' ) ), array( 'cookiebot' ) ),
+            'CookieYes current'  => array( array( 'cookieyes' => array( 'legacy' => false ) ), array( 'cookieyes' ) ),
+            'CookieYes legacy'   => array( array( 'cookieyes' => array( 'legacy' => true ) ), array() ),
+            'CookieYes unknown'  => array( array( 'cookieyes' => array( 'gcm_status' => true ) ), array() ),
+            'Cookie Notice'      => array( array( 'cookie-notice' => array( 'gcm' => array( 'ad_storage' => 'denied' ) ) ), array() ),
+            'CookieAdmin'        => array( array( 'cookieadmin' => array( 'gcm' => '1' ) ), array() ),
+            'Real Cookie Banner' => array( array( 'real-cookie-banner' => array( 'gcm' => '1' ) ), array() ),
+            'Site Kit'           => array( array( 'site-kit' => array( 'status' => 'enabled' ) ), array() ),
+        );
+    }
+
+    public function test_type_expected() {
+        $none = array( 'real-cookie-banner' => array(), 'cookieadmin' => array() );
+
+        $this->assertTrue( ConsentData::type_expected( true, 'optin', array() ), 'A server-side type' );
+        $this->assertTrue( ConsentData::type_expected( true, '', array( 'cookiebot' => array() ) ), 'A tool that sets one' );
+        $this->assertFalse( ConsentData::type_expected( true, '', $none ), 'Only tools that never set one' );
+        $this->assertFalse( ConsentData::type_expected( false, 'optin', array( 'complianz' => array() ) ), 'No WP Consent API' );
     }
 
     public function test_the_first_tool_in_detection_order_wins() {

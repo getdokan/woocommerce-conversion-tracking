@@ -204,13 +204,13 @@ class ValuesTest extends TestCase {
                 return ! $field['default'];
             case 'text':
                 $samples = array(
-                    '^[0-9]{15,16}$'           => '123456789012345',
-                    '^GT?-[A-Z0-9]+$'          => 'G-ABC123',
-                    '^AW-[0-9]+$'              => 'AW-123456789',
-                    '^[A-Za-z0-9_-]+$'         => 'AbC_label-1',
-                    '^GT-[A-Z0-9]+$'           => 'GT-ABC123',
-                    '^[a-z0-9]{5}$'            => 'o8x2k',
-                    '^tw-[a-z0-9]+-[a-z0-9]+$' => 'tw-o8x2k-' . substr( md5( $field['id'] ), 0, 5 ),
+                    Schema::id_pattern( '[0-9]+' )                  => '123456789012345',
+                    Schema::id_pattern( 'GT?-[A-Z0-9]+' )           => 'G-ABC123',
+                    Schema::id_pattern( 'AW-[0-9]+' )               => 'AW-123456789',
+                    Schema::id_pattern( '[A-Za-z0-9_-]+' )          => 'AbC_label-1',
+                    Schema::id_pattern( 'GT-[A-Z0-9]+' )            => 'GT-ABC123',
+                    Schema::id_pattern( '[a-z0-9]+' )               => 'o8x2k',
+                    Schema::id_pattern( 'tw-[a-z0-9]+-[a-z0-9]+' )  => 'tw-o8x2k-' . substr( md5( $field['id'] ), 0, 5 ),
                 );
 
                 if ( isset( $samples[ $field['pattern'] ] ) ) {

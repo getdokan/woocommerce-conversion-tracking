@@ -32,7 +32,7 @@ class WCCT_Integration_Twitter extends WCCT_Integration {
                 'name'        => 'pixel_id',
                 'label'       => __( 'Pixel ID', 'woocommerce-conversion-tracking' ),
                 'value'       => '',
-                'placeholder' => __( '5 letters and numbers, like o8x2k', 'woocommerce-conversion-tracking' ),
+                'placeholder' => __( 'Letters and numbers, usually 5, like o8x2k', 'woocommerce-conversion-tracking' ),
                 'help'        => __( 'The base tag on every page; it also sends the page views.', 'woocommerce-conversion-tracking' ),
             ),
             'events'    => array(
