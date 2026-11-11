@@ -2,6 +2,7 @@
 
 namespace StorePulse\ConversionTracking\Platforms;
 
+use StorePulse\ConversionTracking\Privacy\CustomerDetails;
 use StorePulse\ConversionTracking\Settings\Google;
 use StorePulse\ConversionTracking\Settings\Schema;
 use StorePulse\ConversionTracking\Settings\Store;
@@ -43,6 +44,13 @@ class PlatformSettings {
     private static $required = null;
 
     /**
+     * Platform ID => its fields keyed by ID, null until read.
+     *
+     * @var array|null
+     */
+    private static $fields = null;
+
+    /**
      * Whether the option hooks that forget $doc are added.
      *
      * @var bool
@@ -63,7 +71,34 @@ class PlatformSettings {
             return null;
         }
 
-        return isset( $doc['platforms'][ $platform ] ) && is_array( $doc['platforms'][ $platform ] ) ? $doc['platforms'][ $platform ] : array();
+        return self::with_defaults( $platform, isset( $doc['platforms'][ $platform ] ) && is_array( $doc['platforms'][ $platform ] ) ? $doc['platforms'][ $platform ] : array() );
+    }
+
+    /**
+     * Stored values plus the schema default of every field not stored, as the settings page shows them; stored keys the schema doesn't list are kept.
+     *
+     * @param string $platform Settings platform ID.
+     * @param array  $stored   The platform's stored values.
+     *
+     * @return array
+     */
+    public static function with_defaults( string $platform, array $stored ): array {
+        if ( null === self::$fields ) {
+            self::$fields = array();
+
+            foreach ( Schema::get()['platforms'] as $id => $schema ) {
+                self::$fields[ (string) $id ] = Schema::fields( $schema['schema'] );
+            }
+        }
+
+        foreach ( isset( self::$fields[ $platform ] ) ? self::$fields[ $platform ] : array() as $id => $field ) {
+            // Customer details keep their own 2.x default when not stored (CustomerDetails::v1_default()).
+            if ( ! array_key_exists( $id, $stored ) && ! ( CustomerDetails::PLATFORM === $platform && CustomerDetails::SETTING === $id ) ) {
+                $stored[ $id ] = Schema::default_value( $field );
+            }
+        }
+
+        return $stored;
     }
 
     /**
@@ -181,6 +216,7 @@ class PlatformSettings {
         self::$doc      = null;
         self::$read     = false;
         self::$required = null;
+        self::$fields   = null;
     }
 
     /**

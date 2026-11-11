@@ -39,7 +39,8 @@ class GoogleTag {
         if ( null === self::$platform ) {
             $doc = Store::load();
 
-            self::$platform = isset( $doc['platforms']['google'] ) && is_array( $doc['platforms']['google'] ) ? $doc['platforms']['google'] : array();
+            // Once the 3.0 settings exist, with the schema defaults as the settings page shows them (a save keeps only what changed); before, the 2.x view.
+            self::$platform = PlatformSettings::values( 'google' ) ?? ( isset( $doc['platforms']['google'] ) && is_array( $doc['platforms']['google'] ) ? $doc['platforms']['google'] : array() );
 
             // A save later in the same request is read again.
             if ( function_exists( 'add_action' ) ) {

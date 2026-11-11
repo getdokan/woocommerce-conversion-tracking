@@ -94,6 +94,17 @@ class GoogleTagTest extends TestCase {
         $this->assertTrue( GoogleTag::settings( 'adwords' )['enabled'] );
     }
 
+    public function test_a_3_0_google_saved_with_only_its_ids_sends_the_recommended_events() {
+        $GLOBALS['wcct_test_options']['wcct_settings_v3'] = array( 'platforms' => array( 'google' => array( 'mode' => 'analytics', 'measurement_id' => 'G-ABC1234567' ) ) );
+        \StorePulse\ConversionTracking\Platforms\PlatformSettings::reset();
+        GoogleTag::reset();
+
+        $this->assertTrue( GoogleTag::settings( 'ga4' )['enabled'] );
+        $this->assertContains( 'purchase', GoogleTag::settings( 'ga4' )['events'] );
+
+        \StorePulse\ConversionTracking\Platforms\PlatformSettings::reset();
+    }
+
     public function test_no_settings_enable_nothing() {
         $this->assertFalse( GoogleTag::settings( 'ga4' )['enabled'] );
         $this->assertSame( array(), GoogleTag::settings( 'adwords' )['events'] );

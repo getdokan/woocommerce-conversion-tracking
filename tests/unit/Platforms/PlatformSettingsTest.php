@@ -363,11 +363,53 @@ class PlatformSettingsTest extends TestCase {
         PlatformSettings::reset();
 
         $this->assertNull( PlatformSettings::values( 'facebook' ) );
-        $this->assertSame( array(), ( function () {
+        $this->assertSame( '', ( function () {
             $GLOBALS['wcct_test_options']['wcct_settings_v3'] = 'junk';
             PlatformSettings::reset();
 
-            return PlatformSettings::values( 'facebook' );
+            return PlatformSettings::values( 'facebook' )['pixel_id'];
         } )() );
+    }
+
+    public function test_fields_not_stored_read_as_their_schema_default_as_on_the_settings_page() {
+        // The Platforms pages save only the fields that changed: an ID typed with the recommended events left alone.
+        $GLOBALS['wcct_test_options']['wcct_settings_v3'] = array(
+            'platforms' => array(
+                'facebook' => array( 'pixel_id' => '111111111111111', 'unknown_key' => 'kept' ),
+                'twitter'  => array( 'pixel_id' => 'ct0x1', 'events' => array( 'purchase' ) ),
+            ),
+        );
+        PlatformSettings::reset();
+
+        $schema   = Schema::get();
+        $page     = Values::get( $schema, $GLOBALS['wcct_test_options']['wcct_settings_v3'] );
+        $facebook = PlatformSettings::values( 'facebook' );
+
+        $this->assertSame( $page['platforms']['facebook']['events'], $facebook['events'] );
+        $this->assertNotEmpty( $facebook['events'] );
+        $this->assertSame( '111111111111111', $facebook['pixel_id'] );
+        $this->assertSame( 'kept', $facebook['unknown_key'] );
+
+        // A stored list wins, even a short one, and an empty one stays empty (every event switched off).
+        $this->assertSame( array( 'purchase' ), PlatformSettings::values( 'twitter' )['events'] );
+        $GLOBALS['wcct_test_options']['wcct_settings_v3']['platforms']['twitter']['events'] = array();
+        PlatformSettings::reset();
+        $this->assertSame( array(), PlatformSettings::values( 'twitter' )['events'] );
+
+        // Customer details keep their 2.x default when not stored; the placements read as off.
+        $this->assertArrayNotHasKey( 'customer_details', PlatformSettings::values( 'custom' ) );
+        $this->assertFalse( PlatformSettings::values( 'custom' )['thankyou_enabled'] );
+
+        // A platform the schema doesn't know reads as stored.
+        $GLOBALS['wcct_test_options']['wcct_settings_v3']['platforms']['other'] = array( 'a' => 'b' );
+        PlatformSettings::reset();
+        $this->assertSame( array( 'a' => 'b' ), PlatformSettings::values( 'other' ) );
+
+        // A platform with nothing stored reads as its defaults, with no ID, so it stays off.
+        $this->assertSame( $page['platforms']['google']['events'], PlatformSettings::values( 'google' )['events'] );
+        $this->assertSame( '', PlatformSettings::values( 'google' )['measurement_id'] );
+
+        unset( $GLOBALS['wcct_test_options']['wcct_settings_v3'] );
+        PlatformSettings::reset();
     }
 }

@@ -52,15 +52,16 @@ class MetaSettingsTest extends TestCase {
         $this->assertSame( array( 'purchase', 'sign_up' ), $platform['events'] );
     }
 
-    public function test_a_3_0_store_without_meta_reads_empty() {
+    public function test_a_3_0_store_without_meta_reads_as_the_defaults_with_no_pixel() {
         $GLOBALS['wcct_test_options']['wcct_settings_v3'] = array( 'platforms' => array() );
 
-        $this->assertSame( array(), MetaSettings::platform() );
+        $this->assertSame( '', MetaSettings::platform()['pixel_id'] );
+        $this->assertContains( 'purchase', MetaSettings::platform()['events'] );
 
         PlatformSettings::reset();
         $GLOBALS['wcct_test_options']['wcct_settings_v3'] = 'broken';
 
-        $this->assertSame( array(), MetaSettings::platform() );
+        $this->assertSame( '', MetaSettings::platform()['pixel_id'] );
     }
 
     public function test_meta_event_names_map_to_platform_events_through_the_one_map() {

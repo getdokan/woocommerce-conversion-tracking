@@ -55,6 +55,29 @@ class V3OnlyOutputTest extends WCCT_Test_Page_Case {
         $this->assertStringContainsString( 'tw-ct0x1-ctpur', $output );
     }
 
+    public function test_a_store_saved_with_only_its_ids_sends_the_recommended_events() {
+        // What the Platforms pages store when a merchant types the IDs and leaves the recommended events alone.
+        $v3 = array(
+            'platforms' => array(
+                'facebook' => array( 'pixel_id' => '111111111111111' ),
+                // No mode: the schema default (Analytics and Ads) with only the Analytics ID.
+                'google'   => array( 'measurement_id' => 'G-CTTEST1234' ),
+                'twitter'  => array( 'pixel_id' => 'ct0x1', 'purchase_event_id' => 'tw-ct0x1-ctpur' ),
+            ),
+        );
+
+        $product = $this->output_of( $this->request_page( 'product-simple', null, array( 'wcct_settings_v3' => $v3 ) ) );
+
+        $this->assertMatchesRegularExpression( '/wcfbq\(\\\\?"111111111111111\\\\?", \\\\?"ViewContent/', $product );
+        $this->assertMatchesRegularExpression( '/\\\\?"view_item\\\\?",\{\\\\?"send_to\\\\?":\\\\?"G-CTTEST1234/', $product );
+
+        $thankyou = $this->output_of( $this->request_page( 'order-received-block', null, array( 'wcct_settings_v3' => $v3 ) ) );
+
+        $this->assertMatchesRegularExpression( '/wcfbq\(\\\\?"111111111111111\\\\?", \\\\?"Purchase/', $thankyou );
+        $this->assertMatchesRegularExpression( '/\\\\?"purchase\\\\?",\{\\\\?"send_to\\\\?":\\\\?"G-CTTEST1234/', $thankyou );
+        $this->assertStringContainsString( 'tw-ct0x1-ctpur', $thankyou );
+    }
+
     public function test_a_platform_without_its_id_in_the_3_0_settings_prints_nothing() {
         $settings = WCCT_Test_Settings::only( WCCT_Test_Settings::lite_all(), 'facebook' );
         $migrated = $this->migrated( $settings );
