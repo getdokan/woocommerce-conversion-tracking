@@ -1,0 +1,374 @@
+<!-- wcct-fixture: all/order-received-block -->
+<!-- page: is_checkout is_order_received_page -->
+<!-- head -->
+<script data-cfasync="false" data-no-defer="1" data-no-optimize="1" id="wcct-order-url">
+(function (window, document) {
+            var cleanUrl = function (url) {
+                    var names = ["key","order","order_id","order-pay","order_key"], numeric = ["order"];
+                    try {
+                        url = String(url);
+                        var hashPos = url.indexOf('#');
+                        var hash = hashPos > -1 ? url.substring(hashPos) : '';
+                        var base = hashPos > -1 ? url.substring(0, hashPos) : url;
+                        var queryPos = base.indexOf('?');
+                        if (queryPos == -1) return url;
+                        var pairs = base.substring(queryPos + 1).split('&'), kept = [];
+                        for (var i = 0; i < pairs.length; i++) {
+                            var pair = pairs[i];
+                            try { pair = decodeURIComponent(pair.replace(/\+/g, ' ')); } catch (e) {}
+                            pair = pair.toLowerCase();
+                            var name = pair.split('=')[0], value = pair.substring(name.length + 1);
+                            var drop = names.indexOf(name) > -1 && (numeric.indexOf(name) == -1 || /^\d+$/.test(value));
+                            if (!drop && pair.indexOf('wc_order_') == -1) kept.push(pairs[i]);
+                        }
+                        return base.substring(0, queryPos) + (kept.length ? '?' + kept.join('&') : '') + hash;
+                    } catch (e) {
+                        return String(url).split('?')[0];
+                    }
+                };
+            var decode = function (value) {
+                try { return decodeURIComponent(value.replace(/\+/g, ' ')); } catch (e) { return value; }
+            };
+            try {
+                var href = window.location.href, key = '';
+                var match = /[?&](?:key|order_key)=([^&#]*)/.exec(href);
+                if (match) {
+                    key = decode(match[1]);
+                } else {
+                    // Funnel pages may carry the key under another name.
+                    var any = /[?&][^=&#]*=([^&#]*wc_order_[^&#]*)/i.exec(href);
+                    key = any ? decode(any[1]) : '';
+                }
+                window.wcctOrder = { id: 3001, key: key };
+                var cleaned = cleanUrl(href);
+                if (cleaned == href || !window.history || !window.history.replaceState) return;
+                window.history.replaceState(window.history.state, '', cleaned);
+                // Forms that post back to this page (the create account block) still need the key.
+                document.addEventListener('submit', function (e) {
+                    var form = e.target, action = form && form.getAttribute ? form.getAttribute('action') : null;
+                    if (form && form.tagName == 'FORM' && (!action || action.charAt(0) == '#')) form.action = href.split('#')[0] + (action || '');
+                }, true);
+            } catch (e) {}
+        })(window, document);
+</script>
+
+<!-- Starting: Conversion Tracking for WooCommerce (https://wordpress.org/plugins/woocommerce-conversion-tracking/) -->
+        <script>
+            (function (window, document) {
+                if (window.wcfbq) return;
+                var version = '2.9.435';
+                var standard = ['AddPaymentInfo', 'AddToCart', 'AddToWishlist', 'CompleteRegistration', 'Contact', 'CustomizeProduct', 'Donate', 'FindLocation', 'InitiateCheckout', 'Lead', 'PageView', 'Purchase', 'Schedule', 'Search', 'StartTrial', 'SubmitApplication', 'Subscribe', 'ViewContent'];
+                var pending = [];
+                var ready = document.readyState === 'complete';
+                // When the base code ran (wcctMeta.start()); no image goes out before that.
+                var started = 0;
+                var loaded = function () {
+                    return !!(window.fbq && window.fbq.callMethod);
+                };
+                // A consent revoke waiting in the queue of a library that never loaded also holds back the fallback.
+                var revoked = function () {
+                    var queue = window.fbq && window.fbq.queue, state = '';
+                    for (var i = 0; queue && i < queue.length; i++) {
+                        if (queue[i] && queue[i][0] === 'consent') state = queue[i][1];
+                    }
+                    return state === 'revoke';
+                };
+                var cleanUrl = function (url) {
+                    var names = ["key","order","order_id","order-pay","order_key"], numeric = ["order"];
+                    try {
+                        url = String(url);
+                        var hashPos = url.indexOf('#');
+                        var hash = hashPos > -1 ? url.substring(hashPos) : '';
+                        var base = hashPos > -1 ? url.substring(0, hashPos) : url;
+                        var queryPos = base.indexOf('?');
+                        if (queryPos == -1) return url;
+                        var pairs = base.substring(queryPos + 1).split('&'), kept = [];
+                        for (var i = 0; i < pairs.length; i++) {
+                            var pair = pairs[i];
+                            try { pair = decodeURIComponent(pair.replace(/\+/g, ' ')); } catch (e) {}
+                            pair = pair.toLowerCase();
+                            var name = pair.split('=')[0], value = pair.substring(name.length + 1);
+                            var drop = names.indexOf(name) > -1 && (numeric.indexOf(name) == -1 || /^\d+$/.test(value));
+                            if (!drop && pair.indexOf('wc_order_') == -1) kept.push(pairs[i]);
+                        }
+                        return base.substring(0, queryPos) + (kept.length ? '?' + kept.join('&') : '') + hash;
+                    } catch (e) {
+                        return String(url).split('?')[0];
+                    }
+                };
+                var uuid = function () {
+                    if (window.crypto && window.crypto.randomUUID) return window.crypto.randomUUID();
+                    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+                        var r = Math.random() * 16 | 0;
+                        return (c == 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+                    });
+                };
+                // eid is the parameter Meta reads; event_id carries the same value.
+                var beacon = function (pixelId, eventName, params, eventId) {
+                    var query = [
+                        'id=' + encodeURIComponent(pixelId),
+                        'ev=' + encodeURIComponent(eventName),
+                        'eid=' + encodeURIComponent(eventId),
+                        'event_id=' + encodeURIComponent(eventId),
+                        'dl=' + encodeURIComponent(cleanUrl(document.location.href)),
+                        'if=false',
+                        'ts=' + new Date().getTime()
+                    ];
+                    if (document.referrer) query.push('rl=' + encodeURIComponent(cleanUrl(document.referrer)));
+                    for (var key in params) {
+                        if (Object.prototype.hasOwnProperty.call(params, key) && params[key] !== null && params[key] !== undefined) {
+                            query.push('cd[' + encodeURIComponent(key) + ']=' + encodeURIComponent(typeof params[key] == 'object' ? JSON.stringify(params[key]) : String(params[key])));
+                        }
+                    }
+                    query.push('v=' + encodeURIComponent(version));
+                    new Image(1, 1).src = 'https://www.facebook.com/tr/?' + query.join('&');
+                };
+                var flush = function () {
+                    var calls = pending;
+                    pending = [];
+                    if (loaded() || revoked()) return;
+                    for (var i = 0; i < calls.length; i++) beacon.apply(null, calls[i]);
+                };
+                // The library gets until the page has loaded and a second after the base code ran.
+                var schedule = function () {
+                    if (!started || !ready || !pending.length) return;
+                    window.setTimeout(flush, Math.max(0, started + 1000 - new Date().getTime()));
+                };
+                if (!ready) {
+                    window.addEventListener('load', function () {
+                        ready = true;
+                        schedule();
+                    });
+                }
+                window.wcfbq = function (pixelId, eventName, params, eventId) {
+                    if (typeof pixelId != 'string' || !pixelId.replace(/\s+/g, '') || typeof eventName != 'string' || !/^[A-Za-z0-9_]+$/.test(eventName)) return;
+                    params = params && typeof params == 'object' ? params : {};
+                    eventId = typeof eventId == 'string' && eventId ? eventId : window.wcctMeta.eventId();
+                    // Without the base code there is no Meta tag on the page, so nothing is sent.
+                    if (typeof window.fbq != 'function') return eventId;
+                    window.fbq(standard.indexOf(eventName) > -1 ? 'trackSingle' : 'trackSingleCustom', pixelId, eventName, params, { eventID: eventId });
+                    if (!loaded()) {
+                        pending.push([pixelId, eventName, params, eventId]);
+                        schedule();
+                    }
+                    return eventId;
+                };
+                // Outside wcfbq, which consent mode wraps.
+                window.wcctMeta = {
+                    eventId: function () {
+                        return 'wcct_' + uuid();
+                    },
+                    start: function () {
+                        if (started) return;
+                        started = new Date().getTime();
+                        schedule();
+                    }
+                };
+                window.wcfbq.eventId = window.wcctMeta.eventId;
+            })(window, document);
+        </script>
+                <script>
+            !function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+            n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;
+            n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;
+            t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,
+            document,'script','https://connect.facebook.net/en_US/fbevents.js');
+
+            fbq('init', '111111111111111', {
+    "em": "8c87b489ce35cf2e2f39f80e282cb2e804932a56a213983eeeb428407d43b52d",
+    "ph": "07e73d4c25449384f7c9ea83eb4802558df2a6ae9be7f6096fd4cb3a0debbaee",
+    "fn": "81f8f6dde88365f3928796ec7aa53f72820b06db8664f5fe76a7eb13e24546a2",
+    "ln": "799ef92a11af918e3fb741df42934f3b568ed2d93ac1df74f1b8d41a27932a6f",
+    "ct": "1a6bd4d9d79dc0a79b53795c70d3349fa9e38968a3fbefbfe8783efb1d2b6aac",
+    "st": "6959097001d10501ac7d54c0bdb8db61420f658f2922cc26e46d536119a31126",
+    "zp": "e73ac16e69f060ee98b0fda5f66f48c4648ee26950e9bab3a097389853fd859e",
+    "country": "79adb2a2fce5c6ba215fe5f27f532d4e7edbac4b6a5e09e1ef3a08084a904621"
+});fbq('track', 'PageView', {}, { eventID: wcctMeta.eventId() });window.wcctMeta && wcctMeta.start();        </script>
+        <script async data-no-optimize="1" data-cfasync="false" src="https://www.googletagmanager.com/gtag/js?id=G-CTTEST1234"></script>
+<script data-no-optimize="1" data-cfasync="false">
+window.dataLayer = window.dataLayer || [];
+window.wcctGtag = window.wcctGtag || function () { window.dataLayer.push(arguments); };
+window.gtag = window.gtag || window.wcctGtag;
+wcctGtag('js', new Date());
+(function (pageConfig) {
+    wcctGtag('config', "G-CTTEST1234", pageConfig());
+    wcctGtag('config', "AW-123456789", pageConfig());
+})(function () { return (function (cleanUrl) {
+                var config = {};
+                var pageLocation = cleanUrl(window.location.href);
+                if (pageLocation != window.location.href) config.page_location = pageLocation;
+                if (document.referrer) {
+                    var referrer = cleanUrl(document.referrer);
+                    if (referrer != document.referrer) config.page_referrer = referrer;
+                }
+                return config;
+            })(function (url) {
+                    var names = ["key","order","order_id","order-pay","order_key"], numeric = ["order"];
+                    try {
+                        url = String(url);
+                        var hashPos = url.indexOf('#');
+                        var hash = hashPos > -1 ? url.substring(hashPos) : '';
+                        var base = hashPos > -1 ? url.substring(0, hashPos) : url;
+                        var queryPos = base.indexOf('?');
+                        if (queryPos == -1) return url;
+                        var pairs = base.substring(queryPos + 1).split('&'), kept = [];
+                        for (var i = 0; i < pairs.length; i++) {
+                            var pair = pairs[i];
+                            try { pair = decodeURIComponent(pair.replace(/\+/g, ' ')); } catch (e) {}
+                            pair = pair.toLowerCase();
+                            var name = pair.split('=')[0], value = pair.substring(name.length + 1);
+                            var drop = names.indexOf(name) > -1 && (numeric.indexOf(name) == -1 || /^\d+$/.test(value));
+                            if (!drop && pair.indexOf('wc_order_') == -1) kept.push(pairs[i]);
+                        }
+                        return base.substring(0, queryPos) + (kept.length ? '?' + kept.join('&') : '') + hash;
+                    } catch (e) {
+                        return String(url).split('?')[0];
+                    }
+                }); });
+</script>
+        <script type="text/javascript">
+            !function(e,t,n,s,u,a){e.twq||(s=e.twq=function(){s.exe?s.exe.apply(s,arguments):s.queue.push(arguments);},s.version='1.1',s.queue=[],u=t.createElement(n),u.async=!0,u.src='https://static.ads-twitter.com/uwt.js',a=t.getElementsByTagName(n)[0],a.parentNode.insertBefore(u,a))}(window,document,'script');
+            twq('config', "ct0x1");
+        </script>
+        <!-- End: Conversion Tracking for WooCommerce Codes -->
+
+<!-- body -->
+
+<!-- footer -->
+<script>ctCustom('purchase', { id: '', email: '', first: '', last: '', number: '3001', total: '78.00', subtotal: '78', discount: '5', shipping: '5', currency: 'USD', payment: 'cod', coupons: 'ctsave5' });</script><script data-no-optimize="1">window.wcctPurchaseSent = window.wcctPurchaseSent || function (url, platform, orderId, key, eventId, category) {
+    var sent = window.wcctPurchaseSent, all = sent.all = sent.all || {}, id = platform + ":" + orderId;
+    if (all[id]) return all[id];
+    var order = window.wcctOrder, done = false, missed = "";
+    // One token per page load, sent with every check-in: the admin-ajax retry carries the same one, another load a new one.
+    var load = sent.load = sent.load || (Math.random().toString(36).slice(2, 12) + Date.now().toString(36));
+    // Funnel pages may not print the key; the head script kept it before it cleaned the address bar.
+    if (!key && order && order.key && (!+order.id || String(order.id) === String(orderId))) key = order.key;
+    var consentState = function () {
+        var consent = window.wcctConsent;
+        if (!consent || !consent.allows) return "off";
+        try { return consent.allows(category || "marketing") ? "granted" : "denied"; } catch (e) { return "off"; }
+    };
+    var post = function (target, body, retry) {
+        var fallback = function () { if (retry) post("{home}/wp-admin/admin-ajax.php", "action=wcct_events&" + body, false); };
+        try {
+            window.fetch(target, { method: "POST", body: body, keepalive: true, credentials: "same-origin", headers: { "Content-Type": "application/x-www-form-urlencoded" } })
+                .then(function (response) { if (response.status == 401 || response.status == 403 || response.status == 404) fallback(); })
+                .catch(fallback);
+        } catch (e) { fallback(); }
+    };
+    // While the page is alive fetch can see a host that blocks guest REST and retry once on admin-ajax; an unloading page only has sendBeacon.
+    var checkIn = function (loaded, reason, unloading) {
+        if (!key) {
+            if (window.console) console.warn("wcct: no order key on this page, the purchase check-in was skipped");
+            return;
+        }
+        var body = "order_id=" + encodeURIComponent(orderId) + "&key=" + encodeURIComponent(key) + "&platform=" + encodeURIComponent(platform) + "&loaded=" + (loaded ? 1 : 0) + "&consent=" + consentState() + "&event_id=" + encodeURIComponent(eventId || "") + "&reason=" + reason + "&load=" + load;
+        if (!unloading && window.fetch) return post(url, body, true);
+        try {
+            if (navigator.sendBeacon && navigator.sendBeacon(url, new Blob([body], { type: "application/x-www-form-urlencoded" }))) return;
+        } catch (e) {}
+        if (window.fetch) post(url, body, false);
+    };
+    var confirm = all[id] = function () {
+        if (done) return;
+        done = true;
+        checkIn(true, "", false);
+    };
+    // Not handed over yet: check in anyway, so the server knows the page ran; a later hand-over still checks in, and a timeout still follows a hidden page.
+    var miss = function (reason, unloading) {
+        if (done || missed === reason || missed === "timeout") return;
+        missed = reason;
+        checkIn(false, reason, unloading);
+    };
+    setTimeout(function () { miss("timeout", false); }, 10000);
+    window.addEventListener("pagehide", function () { miss("hidden", true); });
+    document.addEventListener("visibilitychange", function () { if (document.visibilityState === "hidden") miss("hidden", true); });
+    confirm.when = function (check, needs) {
+        var consent = window.wcctConsent, tries = Math.ceil(30000 / 250);
+        category = needs || category;
+        var allowed = function () { return !needs || !consent || !consent.allows || consent.allows(needs); };
+        (function poll() {
+            if (done) return;
+            var ready = false;
+            try { ready = allowed() && !!check(); } catch (e) {}
+            if (ready) return confirm();
+            if (!allowed() && consent.when) return consent.when(needs, function () { tries = Math.ceil(30000 / 250); poll(); });
+            if (--tries > 0) setTimeout(poll, 250);
+        })();
+    };
+    return confirm;
+};
+window.wcctPurchaseSent("{home}/wp-json/wcct/v1/events", "custom", 3001, "wc_order_ctguest0001", "wcct_3001_purchase", "")();</script>
+<!-- footer: wc_enqueue_js -->
+
+<!-- scripts -->
+{
+    "handle": "wcct-pending-events",
+    "src": "",
+    "ver": "{version}",
+    "deps": [],
+    "in_footer": true,
+    "printed": true,
+    "extra": {
+        "after": [
+            false,
+            "(function (window, document) {\n    var config = {\"endpoint\":\"\\/?wc-ajax=wcct_events\",\"fragment\":\"wcct_events\",\"pending\":\"wcct_events\",\"seen\":\"wcct_events_seen\",\"path\":\"\\/\",\"domain\":\"\",\"secure\":false};\n    // IDs already run in this tab session, shared across pages and tabs of the same session.\n    var ranKey = 'wcct_events_ran';\n    var readRan = function () {\n        try { return JSON.parse(window.sessionStorage.getItem(ranKey)) || []; } catch (e) { return []; }\n    };\n    var ran = readRan();\n    var cookie = function (name) {\n        var match = document.cookie.match(new RegExp('(?:^|; )' + name + '=([^;]*)'));\n        return match ? decodeURIComponent(match[1]) : '';\n    };\n    var markSeen = function (id) {\n        document.cookie = config.seen + '=' + encodeURIComponent(id) + '; path=' + config.path + (config.domain ? '; domain=' + config.domain : '') + (config.secure ? '; secure' : '') + '; SameSite=Lax';\n    };\n    // Runs each platform's code in its own script, so one failing platform doesn't stop the others.\n    var run = function (entries, pending) {\n        var last = '';\n        ran = ran.concat(readRan());\n        for (var i = 0; entries && i < entries.length; i++) {\n            if (!entries[i] || !entries[i].id || ran.indexOf(entries[i].id) > -1) continue;\n            ran.push(entries[i].id);\n            last = entries[i].id;\n            for (var platform in entries[i].scripts) {\n                var script = document.createElement('script');\n                script.setAttribute('data-no-optimize', '1');\n                script.text = entries[i].scripts[platform];\n                document.body.appendChild(script);\n            }\n        }\n        try { window.sessionStorage.setItem(ranKey, JSON.stringify(ran.slice(-50))); } catch (e) {}\n        // Nothing left on the server: stop asking until the next add.\n        if (!last && !(entries && entries.length)) last = pending;\n        if (last) markSeen(last);\n    };\n    // Events come from the session: in the add to cart fragment or from this uncached POST, never from the page HTML.\n    var check = function () {\n        var pending = cookie(config.pending);\n        if (!pending || pending === cookie(config.seen) || !window.fetch) return;\n        window.fetch(config.endpoint, { method: 'POST', credentials: 'same-origin', headers: { 'X-Requested-With': 'XMLHttpRequest' } })\n            .then(function (response) { return response.ok ? response.json() : null; })\n            .then(function (data) { if (data) run(data.events, pending); })\n            .catch(function () {});\n    };\n    // jQuery may load after this script (deferred or in the footer), so bind again once the page has loaded.\n    var bound = false;\n    var bindJQuery = function () {\n        if (bound || !window.jQuery) return;\n        bound = true;\n        window.jQuery(document.body).on('added_to_cart', function (e, fragments) {\n            if (fragments && fragments[config.fragment]) {\n                run(fragments[config.fragment], '');\n                delete fragments[config.fragment];\n            } else {\n                check();\n            }\n        });\n    };\n    bindJQuery();\n    document.addEventListener('DOMContentLoaded', bindJQuery);\n    window.addEventListener('load', bindJQuery);\n    document.body.addEventListener('wc-blocks_added_to_cart', check);\n    check();\n})(window, document);"
+        ]
+    }
+}
+{
+    "handle": "wcct-facebook-events",
+    "src": "",
+    "ver": "{version}",
+    "deps": [],
+    "in_footer": true,
+    "printed": true,
+    "extra": {
+        "after": [
+            false,
+            "window.wcctPurchaseSent = window.wcctPurchaseSent || function (url, platform, orderId, key, eventId, category) {\n    var sent = window.wcctPurchaseSent, all = sent.all = sent.all || {}, id = platform + \":\" + orderId;\n    if (all[id]) return all[id];\n    var order = window.wcctOrder, done = false, missed = \"\";\n    // One token per page load, sent with every check-in: the admin-ajax retry carries the same one, another load a new one.\n    var load = sent.load = sent.load || (Math.random().toString(36).slice(2, 12) + Date.now().toString(36));\n    // Funnel pages may not print the key; the head script kept it before it cleaned the address bar.\n    if (!key && order && order.key && (!+order.id || String(order.id) === String(orderId))) key = order.key;\n    var consentState = function () {\n        var consent = window.wcctConsent;\n        if (!consent || !consent.allows) return \"off\";\n        try { return consent.allows(category || \"marketing\") ? \"granted\" : \"denied\"; } catch (e) { return \"off\"; }\n    };\n    var post = function (target, body, retry) {\n        var fallback = function () { if (retry) post(\"{home}/wp-admin/admin-ajax.php\", \"action=wcct_events&\" + body, false); };\n        try {\n            window.fetch(target, { method: \"POST\", body: body, keepalive: true, credentials: \"same-origin\", headers: { \"Content-Type\": \"application/x-www-form-urlencoded\" } })\n                .then(function (response) { if (response.status == 401 || response.status == 403 || response.status == 404) fallback(); })\n                .catch(fallback);\n        } catch (e) { fallback(); }\n    };\n    // While the page is alive fetch can see a host that blocks guest REST and retry once on admin-ajax; an unloading page only has sendBeacon.\n    var checkIn = function (loaded, reason, unloading) {\n        if (!key) {\n            if (window.console) console.warn(\"wcct: no order key on this page, the purchase check-in was skipped\");\n            return;\n        }\n        var body = \"order_id=\" + encodeURIComponent(orderId) + \"&key=\" + encodeURIComponent(key) + \"&platform=\" + encodeURIComponent(platform) + \"&loaded=\" + (loaded ? 1 : 0) + \"&consent=\" + consentState() + \"&event_id=\" + encodeURIComponent(eventId || \"\") + \"&reason=\" + reason + \"&load=\" + load;\n        if (!unloading && window.fetch) return post(url, body, true);\n        try {\n            if (navigator.sendBeacon && navigator.sendBeacon(url, new Blob([body], { type: \"application/x-www-form-urlencoded\" }))) return;\n        } catch (e) {}\n        if (window.fetch) post(url, body, false);\n    };\n    var confirm = all[id] = function () {\n        if (done) return;\n        done = true;\n        checkIn(true, \"\", false);\n    };\n    // Not handed over yet: check in anyway, so the server knows the page ran; a later hand-over still checks in, and a timeout still follows a hidden page.\n    var miss = function (reason, unloading) {\n        if (done || missed === reason || missed === \"timeout\") return;\n        missed = reason;\n        checkIn(false, reason, unloading);\n    };\n    setTimeout(function () { miss(\"timeout\", false); }, 10000);\n    window.addEventListener(\"pagehide\", function () { miss(\"hidden\", true); });\n    document.addEventListener(\"visibilitychange\", function () { if (document.visibilityState === \"hidden\") miss(\"hidden\", true); });\n    confirm.when = function (check, needs) {\n        var consent = window.wcctConsent, tries = Math.ceil(30000 / 250);\n        category = needs || category;\n        var allowed = function () { return !needs || !consent || !consent.allows || consent.allows(needs); };\n        (function poll() {\n            if (done) return;\n            var ready = false;\n            try { ready = allowed() && !!check(); } catch (e) {}\n            if (ready) return confirm();\n            if (!allowed() && consent.when) return consent.when(needs, function () { tries = Math.ceil(30000 / 250); poll(); });\n            if (--tries > 0) setTimeout(poll, 250);\n        })();\n    };\n    return confirm;\n};\nwcfbq(\"111111111111111\", \"Purchase\", {\n    \"content_ids\": [\n        \"2001\",\n        \"2003\"\n    ],\n    \"content_type\": \"product\",\n    \"value\": \"78.00\",\n    \"currency\": \"USD\"\n}, \"wcct_3001_purchase\");\nwindow.wcctPurchaseSent(\"{home}/wp-json/wcct/v1/events\", \"facebook\", 3001, \"wc_order_ctguest0001\", \"wcct_3001_purchase\", \"marketing\").when(function () { return window.fbq && typeof window.fbq.callMethod === 'function'; }, \"marketing\");\n"
+        ]
+    }
+}
+{
+    "handle": "wcct-adwords-events",
+    "src": "",
+    "ver": "{version}",
+    "deps": [],
+    "in_footer": true,
+    "printed": true,
+    "extra": {
+        "after": [
+            false,
+            "window.wcctPurchaseSent = window.wcctPurchaseSent || function (url, platform, orderId, key, eventId, category) {\n    var sent = window.wcctPurchaseSent, all = sent.all = sent.all || {}, id = platform + \":\" + orderId;\n    if (all[id]) return all[id];\n    var order = window.wcctOrder, done = false, missed = \"\";\n    // One token per page load, sent with every check-in: the admin-ajax retry carries the same one, another load a new one.\n    var load = sent.load = sent.load || (Math.random().toString(36).slice(2, 12) + Date.now().toString(36));\n    // Funnel pages may not print the key; the head script kept it before it cleaned the address bar.\n    if (!key && order && order.key && (!+order.id || String(order.id) === String(orderId))) key = order.key;\n    var consentState = function () {\n        var consent = window.wcctConsent;\n        if (!consent || !consent.allows) return \"off\";\n        try { return consent.allows(category || \"marketing\") ? \"granted\" : \"denied\"; } catch (e) { return \"off\"; }\n    };\n    var post = function (target, body, retry) {\n        var fallback = function () { if (retry) post(\"{home}/wp-admin/admin-ajax.php\", \"action=wcct_events&\" + body, false); };\n        try {\n            window.fetch(target, { method: \"POST\", body: body, keepalive: true, credentials: \"same-origin\", headers: { \"Content-Type\": \"application/x-www-form-urlencoded\" } })\n                .then(function (response) { if (response.status == 401 || response.status == 403 || response.status == 404) fallback(); })\n                .catch(fallback);\n        } catch (e) { fallback(); }\n    };\n    // While the page is alive fetch can see a host that blocks guest REST and retry once on admin-ajax; an unloading page only has sendBeacon.\n    var checkIn = function (loaded, reason, unloading) {\n        if (!key) {\n            if (window.console) console.warn(\"wcct: no order key on this page, the purchase check-in was skipped\");\n            return;\n        }\n        var body = \"order_id=\" + encodeURIComponent(orderId) + \"&key=\" + encodeURIComponent(key) + \"&platform=\" + encodeURIComponent(platform) + \"&loaded=\" + (loaded ? 1 : 0) + \"&consent=\" + consentState() + \"&event_id=\" + encodeURIComponent(eventId || \"\") + \"&reason=\" + reason + \"&load=\" + load;\n        if (!unloading && window.fetch) return post(url, body, true);\n        try {\n            if (navigator.sendBeacon && navigator.sendBeacon(url, new Blob([body], { type: \"application/x-www-form-urlencoded\" }))) return;\n        } catch (e) {}\n        if (window.fetch) post(url, body, false);\n    };\n    var confirm = all[id] = function () {\n        if (done) return;\n        done = true;\n        checkIn(true, \"\", false);\n    };\n    // Not handed over yet: check in anyway, so the server knows the page ran; a later hand-over still checks in, and a timeout still follows a hidden page.\n    var miss = function (reason, unloading) {\n        if (done || missed === reason || missed === \"timeout\") return;\n        missed = reason;\n        checkIn(false, reason, unloading);\n    };\n    setTimeout(function () { miss(\"timeout\", false); }, 10000);\n    window.addEventListener(\"pagehide\", function () { miss(\"hidden\", true); });\n    document.addEventListener(\"visibilitychange\", function () { if (document.visibilityState === \"hidden\") miss(\"hidden\", true); });\n    confirm.when = function (check, needs) {\n        var consent = window.wcctConsent, tries = Math.ceil(30000 / 250);\n        category = needs || category;\n        var allowed = function () { return !needs || !consent || !consent.allows || consent.allows(needs); };\n        (function poll() {\n            if (done) return;\n            var ready = false;\n            try { ready = allowed() && !!check(); } catch (e) {}\n            if (ready) return confirm();\n            if (!allowed() && consent.when) return consent.when(needs, function () { tries = Math.ceil(30000 / 250); poll(); });\n            if (--tries > 0) setTimeout(poll, 250);\n        })();\n    };\n    return confirm;\n};\n(window.wcctGtag || function () { (window.dataLayer = window.dataLayer || []).push(arguments); })('event', 'conversion', {\n    \"send_to\": \"AW-123456789/CtPurchaseLabel\",\n    \"transaction_id\": 3001,\n    \"value\": 78,\n    \"currency\": \"USD\",\n    \"event_callback\": window.wcctPurchaseSent(\"{home}/wp-json/wcct/v1/events\", \"adwords\", 3001, \"wc_order_ctguest0001\", \"wcct_3001_purchase\", \"marketing\"),\n    \"event_timeout\": 60000\n});\n"
+        ]
+    }
+}
+{
+    "handle": "wcct-twitter-events",
+    "src": "",
+    "ver": "{version}",
+    "deps": [],
+    "in_footer": true,
+    "printed": true,
+    "extra": {
+        "after": [
+            false,
+            "window.wcctPurchaseSent = window.wcctPurchaseSent || function (url, platform, orderId, key, eventId, category) {\n    var sent = window.wcctPurchaseSent, all = sent.all = sent.all || {}, id = platform + \":\" + orderId;\n    if (all[id]) return all[id];\n    var order = window.wcctOrder, done = false, missed = \"\";\n    // One token per page load, sent with every check-in: the admin-ajax retry carries the same one, another load a new one.\n    var load = sent.load = sent.load || (Math.random().toString(36).slice(2, 12) + Date.now().toString(36));\n    // Funnel pages may not print the key; the head script kept it before it cleaned the address bar.\n    if (!key && order && order.key && (!+order.id || String(order.id) === String(orderId))) key = order.key;\n    var consentState = function () {\n        var consent = window.wcctConsent;\n        if (!consent || !consent.allows) return \"off\";\n        try { return consent.allows(category || \"marketing\") ? \"granted\" : \"denied\"; } catch (e) { return \"off\"; }\n    };\n    var post = function (target, body, retry) {\n        var fallback = function () { if (retry) post(\"{home}/wp-admin/admin-ajax.php\", \"action=wcct_events&\" + body, false); };\n        try {\n            window.fetch(target, { method: \"POST\", body: body, keepalive: true, credentials: \"same-origin\", headers: { \"Content-Type\": \"application/x-www-form-urlencoded\" } })\n                .then(function (response) { if (response.status == 401 || response.status == 403 || response.status == 404) fallback(); })\n                .catch(fallback);\n        } catch (e) { fallback(); }\n    };\n    // While the page is alive fetch can see a host that blocks guest REST and retry once on admin-ajax; an unloading page only has sendBeacon.\n    var checkIn = function (loaded, reason, unloading) {\n        if (!key) {\n            if (window.console) console.warn(\"wcct: no order key on this page, the purchase check-in was skipped\");\n            return;\n        }\n        var body = \"order_id=\" + encodeURIComponent(orderId) + \"&key=\" + encodeURIComponent(key) + \"&platform=\" + encodeURIComponent(platform) + \"&loaded=\" + (loaded ? 1 : 0) + \"&consent=\" + consentState() + \"&event_id=\" + encodeURIComponent(eventId || \"\") + \"&reason=\" + reason + \"&load=\" + load;\n        if (!unloading && window.fetch) return post(url, body, true);\n        try {\n            if (navigator.sendBeacon && navigator.sendBeacon(url, new Blob([body], { type: \"application/x-www-form-urlencoded\" }))) return;\n        } catch (e) {}\n        if (window.fetch) post(url, body, false);\n    };\n    var confirm = all[id] = function () {\n        if (done) return;\n        done = true;\n        checkIn(true, \"\", false);\n    };\n    // Not handed over yet: check in anyway, so the server knows the page ran; a later hand-over still checks in, and a timeout still follows a hidden page.\n    var miss = function (reason, unloading) {\n        if (done || missed === reason || missed === \"timeout\") return;\n        missed = reason;\n        checkIn(false, reason, unloading);\n    };\n    setTimeout(function () { miss(\"timeout\", false); }, 10000);\n    window.addEventListener(\"pagehide\", function () { miss(\"hidden\", true); });\n    document.addEventListener(\"visibilitychange\", function () { if (document.visibilityState === \"hidden\") miss(\"hidden\", true); });\n    confirm.when = function (check, needs) {\n        var consent = window.wcctConsent, tries = Math.ceil(30000 / 250);\n        category = needs || category;\n        var allowed = function () { return !needs || !consent || !consent.allows || consent.allows(needs); };\n        (function poll() {\n            if (done) return;\n            var ready = false;\n            try { ready = allowed() && !!check(); } catch (e) {}\n            if (ready) return confirm();\n            if (!allowed() && consent.when) return consent.when(needs, function () { tries = Math.ceil(30000 / 250); poll(); });\n            if (--tries > 0) setTimeout(poll, 250);\n        })();\n    };\n    return confirm;\n};\nwindow.twq && twq('event', \"tw-ct0x1-ctpur\", {\"value\":78,\"currency\":\"USD\",\"conversion_id\":\"3001\",\"contents\":[{\"content_id\":\"2001\",\"content_name\":\"Beanie\",\"content_price\":16.34,\"num_items\":2},{\"content_id\":\"2003\",\"content_name\":\"Hoodie - Blue\",\"content_price\":40.33,\"num_items\":1}]});\nwindow.wcctPurchaseSent(\"{home}/wp-json/wcct/v1/events\", \"twitter\", 3001, \"wc_order_ctguest0001\", \"wcct_3001_purchase\", \"marketing\").when(function () { return window.twq && typeof window.twq.exe === 'function'; }, \"marketing\");\n"
+        ]
+    }
+}
+{
+    "handle": "wcct-ga4-events",
+    "src": "",
+    "ver": "{version}",
+    "deps": [],
+    "in_footer": true,
+    "printed": true,
+    "extra": {
+        "after": [
+            false,
+            "window.wcctPurchaseSent = window.wcctPurchaseSent || function (url, platform, orderId, key, eventId, category) {\n    var sent = window.wcctPurchaseSent, all = sent.all = sent.all || {}, id = platform + \":\" + orderId;\n    if (all[id]) return all[id];\n    var order = window.wcctOrder, done = false, missed = \"\";\n    // One token per page load, sent with every check-in: the admin-ajax retry carries the same one, another load a new one.\n    var load = sent.load = sent.load || (Math.random().toString(36).slice(2, 12) + Date.now().toString(36));\n    // Funnel pages may not print the key; the head script kept it before it cleaned the address bar.\n    if (!key && order && order.key && (!+order.id || String(order.id) === String(orderId))) key = order.key;\n    var consentState = function () {\n        var consent = window.wcctConsent;\n        if (!consent || !consent.allows) return \"off\";\n        try { return consent.allows(category || \"marketing\") ? \"granted\" : \"denied\"; } catch (e) { return \"off\"; }\n    };\n    var post = function (target, body, retry) {\n        var fallback = function () { if (retry) post(\"{home}/wp-admin/admin-ajax.php\", \"action=wcct_events&\" + body, false); };\n        try {\n            window.fetch(target, { method: \"POST\", body: body, keepalive: true, credentials: \"same-origin\", headers: { \"Content-Type\": \"application/x-www-form-urlencoded\" } })\n                .then(function (response) { if (response.status == 401 || response.status == 403 || response.status == 404) fallback(); })\n                .catch(fallback);\n        } catch (e) { fallback(); }\n    };\n    // While the page is alive fetch can see a host that blocks guest REST and retry once on admin-ajax; an unloading page only has sendBeacon.\n    var checkIn = function (loaded, reason, unloading) {\n        if (!key) {\n            if (window.console) console.warn(\"wcct: no order key on this page, the purchase check-in was skipped\");\n            return;\n        }\n        var body = \"order_id=\" + encodeURIComponent(orderId) + \"&key=\" + encodeURIComponent(key) + \"&platform=\" + encodeURIComponent(platform) + \"&loaded=\" + (loaded ? 1 : 0) + \"&consent=\" + consentState() + \"&event_id=\" + encodeURIComponent(eventId || \"\") + \"&reason=\" + reason + \"&load=\" + load;\n        if (!unloading && window.fetch) return post(url, body, true);\n        try {\n            if (navigator.sendBeacon && navigator.sendBeacon(url, new Blob([body], { type: \"application/x-www-form-urlencoded\" }))) return;\n        } catch (e) {}\n        if (window.fetch) post(url, body, false);\n    };\n    var confirm = all[id] = function () {\n        if (done) return;\n        done = true;\n        checkIn(true, \"\", false);\n    };\n    // Not handed over yet: check in anyway, so the server knows the page ran; a later hand-over still checks in, and a timeout still follows a hidden page.\n    var miss = function (reason, unloading) {\n        if (done || missed === reason || missed === \"timeout\") return;\n        missed = reason;\n        checkIn(false, reason, unloading);\n    };\n    setTimeout(function () { miss(\"timeout\", false); }, 10000);\n    window.addEventListener(\"pagehide\", function () { miss(\"hidden\", true); });\n    document.addEventListener(\"visibilitychange\", function () { if (document.visibilityState === \"hidden\") miss(\"hidden\", true); });\n    confirm.when = function (check, needs) {\n        var consent = window.wcctConsent, tries = Math.ceil(30000 / 250);\n        category = needs || category;\n        var allowed = function () { return !needs || !consent || !consent.allows || consent.allows(needs); };\n        (function poll() {\n            if (done) return;\n            var ready = false;\n            try { ready = allowed() && !!check(); } catch (e) {}\n            if (ready) return confirm();\n            if (!allowed() && consent.when) return consent.when(needs, function () { tries = Math.ceil(30000 / 250); poll(); });\n            if (--tries > 0) setTimeout(poll, 250);\n        })();\n    };\n    return confirm;\n};\n(function () {\n                window.dataLayer = window.dataLayer || [];\n                var gtag = window.wcctGtag || function () { window.dataLayer.push(arguments); };\n                var events = [[\"purchase\",{\"send_to\":\"G-CTTEST1234\",\"currency\":\"USD\",\"value\":73,\"items\":[{\"item_id\":\"2001\",\"item_name\":\"Beanie\",\"item_category\":\"Clothing\",\"item_category2\":\"Accessories\",\"price\":16.34,\"discount\":1.67,\"quantity\":2},{\"item_id\":\"2003\",\"item_name\":\"Hoodie\",\"item_variant\":\"Blue\",\"item_category\":\"Clothing\",\"item_category2\":\"Hoodies\",\"price\":40.33,\"discount\":1.67,\"quantity\":1}],\"coupon\":\"ctsave5\",\"transaction_id\":\"3001\",\"tax\":0,\"shipping\":5}]];\n                // gtag.js calls event_callback once it has handled the purchase; the check-in writes the sent flag then.\n                // gtag also runs it when event_timeout passes, so the timeout is long enough that it in practice means the hit was sent.\n                var confirms = {0: window.wcctPurchaseSent(\"{home}/wp-json/wcct/v1/events\", \"ga4\", 3001, \"wc_order_ctguest0001\", \"wcct_3001_purchase\", \"statistics\")};\n                for (var i = 0; i < events.length; i++) {\n                    if (confirms[i]) {\n                        events[i][1].event_callback = confirms[i];\n                        events[i][1].event_timeout = 60000;\n                    }\n                    gtag('event', events[i][0], events[i][1]);\n                }\n            })();"
+        ]
+    }
+}

@@ -11,6 +11,15 @@ class GA4DataTest extends TestCase {
         $this->assertSame( 'G-ABC123XYZ', WCCT_GA4_Data::sanitize_measurement_id( '  g-abc123xyz ' ) );
     }
 
+    public function test_google_tag_ids_are_accepted() {
+        $this->assertSame( 'GT-ABCDEFG', WCCT_GA4_Data::sanitize_measurement_id( ' gt-abcdefg ' ) );
+    }
+
+    public function test_search_params_carry_send_to_and_a_capped_term() {
+        $this->assertSame( array( 'send_to' => 'G-ABC123', 'search_term' => 'cotton' ), WCCT_GA4_Data::search_params( 'G-ABC123', ' cotton ' ) );
+        $this->assertSame( 100, mb_strlen( WCCT_GA4_Data::search_params( 'G-ABC123', str_repeat( 'é', 150 ) )['search_term'] ) );
+    }
+
     /**
      * @dataProvider invalid_measurement_ids
      */
@@ -22,9 +31,10 @@ class GA4DataTest extends TestCase {
         return array(
             'empty'        => array( '' ),
             'google ads'   => array( 'AW-123456789' ),
-            'google tag'   => array( 'GT-ABCDEFG' ),
+            'tag manager'  => array( 'GTM-ABCDEFG' ),
             'universal'    => array( 'UA-12345-1' ),
-            'too short'    => array( 'G-ABC' ),
+            'too long'     => array( 'G-' . str_repeat( 'A', 39 ) ),
+            'no body'      => array( 'G-' ),
             'script'       => array( 'G-ABC123</script>' ),
             'quote'        => array( "G-ABC123'" ),
             'not a string' => array( array( 'G-ABC123' ) ),
@@ -169,24 +179,6 @@ class GA4DataTest extends TestCase {
             'spaces'       => array( '   ' ),
             'null'         => array( null ),
             'array'        => array( array() ),
-        );
-    }
-
-    /**
-     * @dataProvider order_statuses
-     */
-    public function test_trackable_statuses( $status, $expected ) {
-        $this->assertSame( $expected, WCCT_GA4_Data::is_trackable_status( $status ) );
-    }
-
-    public function order_statuses() {
-        return array(
-            'processing' => array( 'processing', true ),
-            'completed'  => array( 'completed', true ),
-            'on-hold'    => array( 'on-hold', true ),
-            'pending'    => array( 'pending', true ),
-            'failed'     => array( 'failed', false ),
-            'cancelled'  => array( 'cancelled', false ),
         );
     }
 }

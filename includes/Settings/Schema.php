@@ -1,0 +1,958 @@
+<?php
+
+namespace StorePulse\ConversionTracking\Settings;
+
+use InvalidArgumentException;
+use StorePulse\ConversionTracking\Access\CustomScripts;
+use StorePulse\ConversionTracking\Alerts\Alerts;
+use StorePulse\ConversionTracking\Events\SkipRoles;
+use StorePulse\ConversionTracking\Events\ValueMode;
+use StorePulse\ConversionTracking\Install;
+use StorePulse\ConversionTracking\Events\ProductId;
+
+/**
+ * The 3.0 settings schema: global fields plus one plugin-ui element list per platform.
+ */
+class Schema {
+
+    /**
+     * Filter Pro and extensions use to add platforms and fields.
+     */
+    const FILTER = 'wcct_settings_schema';
+
+    /**
+     * Variants that only display something and hold no value.
+     */
+    const DISPLAY_VARIANTS = array( 'html', 'notice', 'info', 'info_preview', 'base_field_label', 'copy_field' );
+
+    /**
+     * Keys used on the server only, never sent to the browser.
+     */
+    const SERVER_KEYS = array( 'capability', 'sanitize_callback', 'required_to_send' );
+
+    /**
+     * The filtered schema.
+     *
+     * @return array { global: array, platforms: array } with platforms keyed by ID and sorted by priority.
+     */
+    public static function get(): array {
+        $lite = self::lite();
+
+        /**
+         * Filter the settings schema.
+         *
+         * @since 3.0.0
+         *
+         * @param array $schema { global: plugin-ui elements, platforms: id => { id, label, integrations, pro, priority, credentials, schema } }.
+         */
+        $schema = apply_filters( self::FILTER, $lite );
+
+        return self::normalize( is_array( $schema ) ? $schema : $lite );
+    }
+
+    /**
+     * Drop malformed platforms and sort the rest by priority.
+     *
+     * @param array $schema Raw schema.
+     *
+     * @return array
+     */
+    public static function normalize( array $schema ): array {
+        $platforms = array();
+
+        foreach ( isset( $schema['platforms'] ) && is_array( $schema['platforms'] ) ? $schema['platforms'] : array() as $id => $platform ) {
+            if ( ! is_string( $id ) || '' === $id || ! is_array( $platform ) || ! isset( $platform['schema'] ) || ! is_array( $platform['schema'] ) ) {
+                continue;
+            }
+
+            $platforms[ $id ] = array_merge(
+                array(
+                    'label'        => $id,
+                    'integrations' => array( $id ),
+                    'pro'          => false,
+                    'priority'     => 100,
+                    'credentials'  => array(),
+                ),
+                $platform,
+                array( 'id' => $id )
+            );
+        }
+
+        uasort(
+            $platforms,
+            function ( $a, $b ) {
+                return (int) $a['priority'] - (int) $b['priority'];
+            }
+        );
+
+        return array(
+            'global'    => isset( $schema['global'] ) && is_array( $schema['global'] ) ? $schema['global'] : array(),
+            'platforms' => $platforms,
+        );
+    }
+
+    /**
+     * Fields that hold a value, keyed by ID.
+     *
+     * @param array $elements plugin-ui elements.
+     *
+     * @return array
+     */
+    public static function fields( array $elements ): array {
+        $fields = array();
+
+        foreach ( $elements as $element ) {
+            if ( ! is_array( $element ) || ! isset( $element['type'], $element['id'] ) || 'field' !== $element['type'] ) {
+                continue;
+            }
+
+            if ( in_array( isset( $element['variant'] ) ? $element['variant'] : '', self::DISPLAY_VARIANTS, true ) ) {
+                continue;
+            }
+
+            $fields[ $element['id'] ] = $element;
+        }
+
+        return $fields;
+    }
+
+    /**
+     * Default value of a field.
+     *
+     * @param array $field Field.
+     *
+     * @return mixed
+     */
+    public static function default_value( array $field ) {
+        return array_key_exists( 'default', $field ) ? $field['default'] : '';
+    }
+
+    /**
+     * The schema as sent to the browser: server-only keys removed, fields the user can't change read-only.
+     *
+     * @param array    $schema Normalized schema.
+     * @param callable $can    Receives a capability, returns whether the current user has it.
+     *
+     * @return array
+     */
+    public static function for_output( array $schema, callable $can ): array {
+        $platforms = array();
+
+        foreach ( $schema['platforms'] as $platform ) {
+            $platforms[] = array(
+                'id'           => $platform['id'],
+                'label'        => $platform['label'],
+                'integrations' => array_values( (array) $platform['integrations'] ),
+                'pro'          => (bool) $platform['pro'],
+                'credentials'  => self::output_elements( (array) $platform['credentials'], $can ),
+                'schema'       => self::output_elements( $platform['schema'], $can ),
+            );
+        }
+
+        return array(
+            'global'    => self::output_elements( $schema['global'], $can ),
+            'platforms' => $platforms,
+        );
+    }
+
+    /**
+     * Prepare a list of elements for the browser.
+     *
+     * @param array    $elements Elements.
+     * @param callable $can      Capability check.
+     *
+     * @return array
+     */
+    private static function output_elements( array $elements, callable $can ): array {
+        $output = array();
+
+        foreach ( $elements as $element ) {
+            if ( ! is_array( $element ) ) {
+                continue;
+            }
+
+            if ( ! empty( $element['capability'] ) && ! call_user_func( $can, $element['capability'] ) ) {
+                $element['readonly'] = true;
+                $element['disabled'] = true;
+            }
+
+            $output[] = array_diff_key( $element, array_flip( self::SERVER_KEYS ) );
+        }
+
+        return $output;
+    }
+
+    /**
+     * A section element for a platform page.
+     *
+     * @param string $platform Platform ID.
+     * @param string $id       Section ID, unique on the page.
+     * @param string $label    Title.
+     * @param array  $extra    More element keys.
+     *
+     * @return array
+     */
+    public static function section( string $platform, string $id, string $label, array $extra = array() ): array {
+        return array_merge(
+            array(
+                'id'      => $id,
+                'type'    => 'section',
+                'page_id' => $platform,
+                'label'   => $label,
+            ),
+            $extra
+        );
+    }
+
+    /**
+     * Whether an element with this ID exists.
+     *
+     * @param array  $elements Elements.
+     * @param string $id       Element ID.
+     *
+     * @return bool
+     */
+    public static function has_element( array $elements, string $id ): bool {
+        foreach ( $elements as $element ) {
+            if ( is_array( $element ) && isset( $element['id'] ) && $id === $element['id'] ) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Unlock the Pro options of a multicheck field; an events default is recomputed, so recommended events that were locked turn on.
+     *
+     * @param array  $elements Elements.
+     * @param string $field_id Field ID.
+     *
+     * @return array
+     */
+    public static function unlock_options( array $elements, string $field_id ): array {
+        foreach ( $elements as $index => $element ) {
+            if ( ! is_array( $element ) || ! isset( $element['id'], $element['options'] ) || $field_id !== $element['id'] ) {
+                continue;
+            }
+
+            foreach ( $element['options'] as $key => $option ) {
+                $elements[ $index ]['options'][ $key ]['locked'] = false;
+            }
+
+            // Recommended events Free locked are on by default once unlocked (X's Add to cart and Start checkout).
+            if ( isset( $element['default'] ) && is_array( $element['default'] ) ) {
+                $elements[ $index ]['default'] = self::recommended( $elements[ $index ]['options'] );
+            }
+        }
+
+        return $elements;
+    }
+
+    /**
+     * Unlock Pro fields: they become editable.
+     *
+     * @param array    $elements Elements.
+     * @param string[] $ids      Field IDs.
+     *
+     * @return array
+     */
+    public static function unlock_fields( array $elements, array $ids ): array {
+        foreach ( $elements as $index => $element ) {
+            if ( is_array( $element ) && isset( $element['id'] ) && in_array( $element['id'], $ids, true ) ) {
+                $elements[ $index ]['disabled'] = false;
+            }
+        }
+
+        return $elements;
+    }
+
+    /**
+     * Lite's schema, before the filter.
+     *
+     * @return array
+     */
+    public static function lite(): array {
+        return array(
+            'global'    => self::global_elements(),
+            'platforms' => array(
+                'facebook' => array(
+                    'label'        => __( 'Meta', 'woocommerce-conversion-tracking' ),
+                    'integrations' => array( 'facebook' ),
+                    'priority'     => 10,
+                    'schema'       => self::facebook(),
+                ),
+                'google'   => array(
+                    'label'        => __( 'Google', 'woocommerce-conversion-tracking' ),
+                    'integrations' => array( 'ga4', 'adwords' ),
+                    'priority'     => 20,
+                    'schema'       => self::google(),
+                ),
+                'twitter'  => array(
+                    'label'        => __( 'X', 'woocommerce-conversion-tracking' ),
+                    'integrations' => array( 'twitter' ),
+                    'priority'     => 30,
+                    'schema'       => self::twitter(),
+                ),
+                'custom'   => array(
+                    'label'        => __( 'Custom script', 'woocommerce-conversion-tracking' ),
+                    'integrations' => array( 'custom' ),
+                    'priority'     => 90,
+                    'schema'       => self::custom(),
+                ),
+            ),
+        );
+    }
+
+    /**
+     * Settings that apply to every platform.
+     *
+     * @return array
+     */
+    private static function global_elements(): array {
+        $elements = array(
+            array(
+                'id'    => 'general',
+                'type'  => 'page',
+                'label' => __( 'General', 'woocommerce-conversion-tracking' ),
+            ),
+            self::section( 'general', 'general_privacy', __( 'Privacy', 'woocommerce-conversion-tracking' ) ),
+            array(
+                'id'          => 'consent_mode',
+                'type'        => 'field',
+                'variant'     => 'switch',
+                'section_id'  => 'general_privacy',
+                'label'       => __( 'Respect cookie choices', 'woocommerce-conversion-tracking' ),
+                'description' => __( 'Required if you sell to Europe. Works with your cookie plugin.', 'woocommerce-conversion-tracking' ),
+                'default'     => false,
+            ),
+        );
+
+        // Settings > Alerts: a switch per registered alert type.
+        return array_merge( $elements, Alerts::schema_elements() );
+    }
+
+    /**
+     * Meta.
+     *
+     * @return array
+     */
+    private static function facebook(): array {
+        return array(
+            self::page( 'facebook', __( 'Meta', 'woocommerce-conversion-tracking' ) ),
+            self::section( 'facebook', 'facebook_connection', __( 'Connection', 'woocommerce-conversion-tracking' ) ),
+            self::id_field(
+                'facebook_connection',
+                'pixel_id',
+                __( 'Pixel ID', 'woocommerce-conversion-tracking' ),
+                __( 'Numbers only, usually 15 or 16 digits', 'woocommerce-conversion-tracking' ),
+                __( 'Numbers only, usually 15 or 16 digits. If it starts with "EAA", that\'s an access token, not a Pixel ID.', 'woocommerce-conversion-tracking' ),
+                self::id_pattern( '[0-9]+' ),
+                10,
+                array(
+                    'required_to_send' => true,
+                    'typical_length'   => array( 15, 16 ),
+                    'onboarding'       => array(
+                        'required' => true,
+                        'hint'     => __( 'In Meta Events Manager, open your data source, then Settings. The Pixel ID is the number at the top.', 'woocommerce-conversion-tracking' ),
+                        'invalid'  => __( 'Pixel IDs are numbers only. One that starts with "EAA" is an access token, not a Pixel ID.', 'woocommerce-conversion-tracking' ),
+                    ),
+                )
+            ),
+            self::section( 'facebook', 'facebook_events', __( 'Events', 'woocommerce-conversion-tracking' ) ),
+            self::events_field(
+                'facebook_events',
+                array(
+                    self::event( 'view_product', __( 'View product', 'woocommerce-conversion-tracking' ), __( 'Every product page.', 'woocommerce-conversion-tracking' ), array( 'recommended' => true ) ),
+                    self::event( 'add_to_cart', __( 'Add to cart', 'woocommerce-conversion-tracking' ), __( 'Classic buttons, quick adds on the shop page and block buttons.', 'woocommerce-conversion-tracking' ), array( 'recommended' => true ) ),
+                    self::event( 'begin_checkout', __( 'Start checkout', 'woocommerce-conversion-tracking' ), __( 'Classic and block checkout.', 'woocommerce-conversion-tracking' ), array( 'recommended' => true ) ),
+                    self::event( 'purchase', __( 'Purchase', 'woocommerce-conversion-tracking' ), __( 'Once per order. Failed and cancelled orders are skipped.', 'woocommerce-conversion-tracking' ), array( 'recommended' => true ) ),
+                    self::event( 'search', __( 'Search', 'woocommerce-conversion-tracking' ), __( 'Store search results.', 'woocommerce-conversion-tracking' ) ),
+                    self::event( 'sign_up', __( 'Sign up', 'woocommerce-conversion-tracking' ), __( 'A new WordPress or WooCommerce account.', 'woocommerce-conversion-tracking' ) ),
+                    self::event( 'view_category', __( 'View category', 'woocommerce-conversion-tracking' ), __( 'Product category pages.', 'woocommerce-conversion-tracking' ), array( 'pro' => true ) ),
+                    self::event( 'add_to_wishlist', __( 'Add to wishlist', 'woocommerce-conversion-tracking' ), __( 'When a shopper saves a product to a wishlist.', 'woocommerce-conversion-tracking' ), array( 'pro' => true ) ),
+                )
+            ),
+            self::section( 'facebook', 'facebook_advanced', __( 'Advanced settings', 'woocommerce-conversion-tracking' ), array( 'collapsible' => true, 'collapsed' => true ) ),
+            self::value_mode_field( 'facebook_advanced', 'facebook' ),
+            self::product_id_field( 'facebook_advanced' ),
+            self::skip_roles_field( 'facebook_advanced' ),
+        );
+    }
+
+    /**
+     * Google, one platform over the ga4 and adwords integrations.
+     *
+     * @return array
+     */
+    private static function google(): array {
+        $analytics = array( self::depends( 'mode', array( Google::MODE_ANALYTICS, Google::MODE_BOTH ) ) );
+        $ads       = array( self::depends( 'mode', array( Google::MODE_ADS, Google::MODE_BOTH ) ) );
+
+        return array(
+            self::page( 'google', __( 'Google', 'woocommerce-conversion-tracking' ) ),
+            self::section( 'google', 'google_connection', __( 'Connection', 'woocommerce-conversion-tracking' ) ),
+            array(
+                'id'         => 'mode',
+                'type'       => 'field',
+                'variant'    => 'radio_capsule',
+                'section_id' => 'google_connection',
+                'label'      => __( 'What do you use?', 'woocommerce-conversion-tracking' ),
+                'default'    => Google::MODE_BOTH,
+                'priority'   => 10,
+                'options'    => array(
+                    array(
+                        'value'       => Google::MODE_ANALYTICS,
+                        'label'       => __( 'Google Analytics', 'woocommerce-conversion-tracking' ),
+                        'description' => __( 'See where sales come from. Free.', 'woocommerce-conversion-tracking' ),
+                    ),
+                    array(
+                        'value'       => Google::MODE_ADS,
+                        'label'       => __( 'Google Ads', 'woocommerce-conversion-tracking' ),
+                        'description' => __( 'Count purchases as conversions for your campaigns.', 'woocommerce-conversion-tracking' ),
+                    ),
+                    array(
+                        'value'       => Google::MODE_BOTH,
+                        'label'       => __( 'Both', 'woocommerce-conversion-tracking' ),
+                        'description' => __( 'Most stores. One loader, no double counting.', 'woocommerce-conversion-tracking' ),
+                    ),
+                ),
+            ),
+            self::id_field(
+                'google_connection',
+                'measurement_id',
+                __( 'Analytics Measurement ID', 'woocommerce-conversion-tracking' ),
+                __( 'Starts with G-', 'woocommerce-conversion-tracking' ),
+                __( 'Measurement IDs start with G- followed by letters and numbers. Find it under Admin, then Data streams. A GT- Google tag ID works too. Avoid double counting: if this GA4 property is already a destination of your Google Ads tag, remove that destination or turn on "Ignore duplicate instances of on-page configuration" in your Google tag settings.', 'woocommerce-conversion-tracking' ),
+                self::id_pattern( 'GT?-[A-Z0-9]+' ),
+                20,
+                array(
+                    'case'         => 'upper',
+                    'dependencies' => $analytics,
+                    'onboarding'   => array( 'required' => true ),
+                )
+            ),
+            self::id_field(
+                'google_connection',
+                'ads_id',
+                __( 'Ads conversion ID', 'woocommerce-conversion-tracking' ),
+                __( 'AW- and numbers, or just the numbers', 'woocommerce-conversion-tracking' ),
+                __( 'Paste the Conversion ID. If it is only numbers, we add AW- in front.', 'woocommerce-conversion-tracking' ),
+                self::id_pattern( 'AW-[0-9]+' ),
+                30,
+                array(
+                    'case'         => 'upper',
+                    // Google Tag Manager setup shows the Conversion ID without AW-.
+                    'prefix'       => 'AW-',
+                    'dependencies' => $ads,
+                    'onboarding'   => array(
+                        'required' => false,
+                        'invalid'  => __( 'Numbers only, with or without AW- in front.', 'woocommerce-conversion-tracking' ),
+                    ),
+                )
+            ),
+            self::id_field(
+                'google_connection',
+                'purchase_label',
+                __( 'Ads conversion label', 'woocommerce-conversion-tracking' ),
+                __( 'Letters and numbers after the slash', 'woocommerce-conversion-tracking' ),
+                '',
+                self::id_pattern( '[A-Za-z0-9_-]+' ),
+                40,
+                array(
+                    'dependencies' => $ads,
+                    'onboarding'   => array(
+                        'required' => false,
+                        // Ads conversions need the label with the Ads ID.
+                        'with'     => 'ads_id',
+                        'invalid'  => __( 'Labels are letters, numbers, dashes and underscores: the part after the slash.', 'woocommerce-conversion-tracking' ),
+                        'missing'  => __( 'Add the conversion label to count Ads conversions.', 'woocommerce-conversion-tracking' ),
+                    ),
+                )
+            ),
+            // Pro unlocks it; Free shows the locked row and sets nothing.
+            array(
+                'id'           => 'enhanced_conversions',
+                'type'         => 'field',
+                'variant'      => 'switch',
+                'section_id'   => 'google_connection',
+                'label'        => __( 'Enhanced conversions', 'woocommerce-conversion-tracking' ),
+                'description'  => __( 'Hashed customer details so Ads matches more sales; with Respect cookie choices on, only after marketing consent. Turn on Enhanced conversions in Google Ads too. Google Analytics may also receive the hashed data if user-provided data collection is on in GA4.', 'woocommerce-conversion-tracking' ),
+                'default'      => false,
+                'priority'     => 50,
+                'pro'          => true,
+                'disabled'     => true,
+                'dependencies' => $ads,
+            ),
+            self::section( 'google', 'google_events', __( 'Events', 'woocommerce-conversion-tracking' ) ),
+            self::events_field(
+                'google_events',
+                array(
+                    self::event( 'view_product', __( 'View product', 'woocommerce-conversion-tracking' ), __( 'Analytics view_item on every product page.', 'woocommerce-conversion-tracking' ), array( 'recommended' => true ) ),
+                    self::event( 'add_to_cart', __( 'Add to cart', 'woocommerce-conversion-tracking' ), __( 'Analytics add_to_cart, classic and block buttons.', 'woocommerce-conversion-tracking' ), array( 'recommended' => true ) ),
+                    self::event( 'begin_checkout', __( 'Start checkout', 'woocommerce-conversion-tracking' ), __( 'Analytics begin_checkout, classic and block checkout.', 'woocommerce-conversion-tracking' ), array( 'recommended' => true ) ),
+                    self::event( 'purchase', __( 'Purchase', 'woocommerce-conversion-tracking' ), __( 'Analytics purchase and the Ads conversion, once per order.', 'woocommerce-conversion-tracking' ), array( 'recommended' => true ) ),
+                    self::event( 'search', __( 'Search', 'woocommerce-conversion-tracking' ), __( 'Analytics search on store search results.', 'woocommerce-conversion-tracking' ) ),
+                    self::event( 'sign_up', __( 'Registration', 'woocommerce-conversion-tracking' ), __( 'Analytics sign_up when a shopper creates an account; with a Registration conversion label (Pro), also an Ads conversion.', 'woocommerce-conversion-tracking' ) ),
+                )
+            ),
+            self::section( 'google', 'google_advanced', __( 'Advanced settings', 'woocommerce-conversion-tracking' ), array( 'collapsible' => true, 'collapsed' => true ) ),
+            self::id_field(
+                'google_advanced',
+                'tag_id',
+                __( 'Google tag ID (optional)', 'woocommerce-conversion-tracking' ),
+                __( 'Starts with GT-', 'woocommerce-conversion-tracking' ),
+                __( 'Only if your Analytics stream uses a combined Google tag. Leave empty to use the G- ID above. The Google tag must include this GA4 stream as a destination; events are still sent to the G- ID. Avoid double counting: don\'t also add this GA4 property as a destination of your Google Ads tag.', 'woocommerce-conversion-tracking' ),
+                self::id_pattern( 'GT-[A-Z0-9]+' ),
+                10,
+                array( 'case' => 'upper' )
+            ),
+            self::value_mode_field( 'google_advanced', 'adwords', $ads, __( 'Sent with the Ads conversion; there, fees count as items and tax is never part of items. Analytics always gets the product total, without fees, tax or shipping, as Google recommends.', 'woocommerce-conversion-tracking' ) ),
+            self::product_id_field( 'google_advanced' ),
+            self::skip_roles_field( 'google_advanced' ),
+        );
+    }
+
+    /**
+     * X.
+     *
+     * @return array
+     */
+    private static function twitter(): array {
+        $event_id = __( 'Starts with tw-', 'woocommerce-conversion-tracking' );
+        $optional = __( 'Optional. The event stays off until it has an ID.', 'woocommerce-conversion-tracking' );
+        $pattern  = self::id_pattern( 'tw-[a-z0-9]+-[a-z0-9]+' );
+        $lower    = array( 'case' => 'lower' );
+        // Free sends X Purchase only; Pro unlocks the other event IDs.
+        $pro      = array_merge( $lower, array( 'pro' => true, 'disabled' => true ) );
+        // The setup wizard asks for the Pixel ID and the Purchase event ID only.
+        $wizard = array(
+            'pixel_id'          => array(
+                'required' => true,
+                'invalid'  => __( 'X Pixel IDs are lowercase letters and numbers.', 'woocommerce-conversion-tracking' ),
+            ),
+            'purchase_event_id' => array(
+                'required' => true,
+                'invalid'  => __( 'Starts with tw-, then your Pixel ID and the event code, like tw-o8x2k-o8x3a.', 'woocommerce-conversion-tracking' ),
+            ),
+        );
+
+        return array(
+            self::page( 'twitter', __( 'X', 'woocommerce-conversion-tracking' ) ),
+            self::section( 'twitter', 'twitter_connection', __( 'Connection', 'woocommerce-conversion-tracking' ) ),
+            self::id_field( 'twitter_connection', 'pixel_id', __( 'Pixel ID', 'woocommerce-conversion-tracking' ), __( 'Letters and numbers, usually 5, like o8x2k', 'woocommerce-conversion-tracking' ), __( 'The base tag on every page.', 'woocommerce-conversion-tracking' ), self::id_pattern( '[a-z0-9]+' ), 10, array_merge( $lower, array( 'required_to_send' => true, 'typical_length' => array( 5, 5 ), 'onboarding' => $wizard['pixel_id'] ) ) ),
+            self::id_field( 'twitter_connection', 'purchase_event_id', __( 'Purchase event ID', 'woocommerce-conversion-tracking' ), $event_id, __( 'Starts with tw-, then your Pixel ID and the event code. Each event has its own ID in X Ads Manager.', 'woocommerce-conversion-tracking' ), $pattern, 20, array_merge( $lower, array( 'onboarding' => $wizard['purchase_event_id'] ) ) ),
+            self::id_field( 'twitter_connection', 'cart_event_id', __( 'Add to cart event ID (optional)', 'woocommerce-conversion-tracking' ), $event_id, $optional, $pattern, 30, $pro ),
+            self::id_field( 'twitter_connection', 'checkout_event_id', __( 'Start checkout event ID (optional)', 'woocommerce-conversion-tracking' ), $event_id, $optional, $pattern, 40, $pro ),
+            self::id_field( 'twitter_connection', 'signup_event_id', __( 'Registration event ID (optional)', 'woocommerce-conversion-tracking' ), $event_id, $optional, $pattern, 50, $pro ),
+            self::section( 'twitter', 'twitter_events', __( 'Events', 'woocommerce-conversion-tracking' ) ),
+            self::events_field(
+                'twitter_events',
+                array(
+                    self::event( 'page_view', __( 'Page view', 'woocommerce-conversion-tracking' ), __( 'The base tag on every page.', 'woocommerce-conversion-tracking' ), array( 'recommended' => true, 'always' => true ) ),
+                    self::event( 'add_to_cart', __( 'Add to cart', 'woocommerce-conversion-tracking' ), __( 'Classic and block buttons.', 'woocommerce-conversion-tracking' ), array( 'recommended' => true, 'pro' => true, 'needs' => 'cart_event_id' ) ),
+                    self::event( 'begin_checkout', __( 'Start checkout', 'woocommerce-conversion-tracking' ), __( 'Classic and block checkout.', 'woocommerce-conversion-tracking' ), array( 'recommended' => true, 'pro' => true, 'needs' => 'checkout_event_id' ) ),
+                    self::event( 'purchase', __( 'Purchase', 'woocommerce-conversion-tracking' ), __( 'Uses the Purchase event ID above. Once per order.', 'woocommerce-conversion-tracking' ), array( 'recommended' => true, 'needs' => 'purchase_event_id' ) ),
+                    self::event( 'sign_up', __( 'Registration', 'woocommerce-conversion-tracking' ), __( 'A new account on your store.', 'woocommerce-conversion-tracking' ), array( 'pro' => true, 'needs' => 'signup_event_id' ) ),
+                )
+            ),
+            self::section( 'twitter', 'twitter_advanced', __( 'Advanced settings', 'woocommerce-conversion-tracking' ), array( 'collapsible' => true, 'collapsed' => true ) ),
+            self::value_mode_field( 'twitter_advanced', 'twitter' ),
+            self::product_id_field( 'twitter_advanced' ),
+            self::skip_roles_field( 'twitter_advanced' ),
+        );
+    }
+
+    /**
+     * Custom scripts; only users with unfiltered_html can change them.
+     *
+     * @return array
+     */
+    private static function custom(): array {
+        $elements = array(
+            self::page( 'custom', __( 'Custom script', 'woocommerce-conversion-tracking' ) ),
+        );
+
+        $placements = array(
+            'thankyou' => array( __( 'Thank-you page', 'woocommerce-conversion-tracking' ), __( 'Script for thank-you page', 'woocommerce-conversion-tracking' ) ),
+            'header'   => array( __( 'Every page, in the header', 'woocommerce-conversion-tracking' ), __( 'Script for every page, in the header', 'woocommerce-conversion-tracking' ) ),
+            'signup'   => array( __( 'Sign-up', 'woocommerce-conversion-tracking' ), __( 'Script for sign-up', 'woocommerce-conversion-tracking' ) ),
+        );
+
+        foreach ( $placements as $placement => $labels ) {
+            $section    = 'custom_' . $placement;
+            $elements[] = self::section( 'custom', $section, $labels[0] );
+            $elements[] = array(
+                'id'         => $placement . '_enabled',
+                'type'       => 'field',
+                'variant'    => 'switch',
+                'section_id' => $section,
+                'label'      => $labels[0],
+                'default'    => false,
+                'priority'   => 10,
+                'capability' => CustomScripts::CAPABILITY,
+            );
+            $elements[] = array(
+                'id'          => $placement . '_script',
+                'type'        => 'field',
+                'variant'     => 'textarea',
+                'format'      => 'script',
+                'section_id'  => $section,
+                'label'       => $labels[1],
+                'placeholder' => __( 'Paste your tag here', 'woocommerce-conversion-tracking' ),
+                'default'     => '',
+                'priority'    => 20,
+                'capability'  => CustomScripts::CAPABILITY,
+            );
+        }
+
+        $elements[] = self::section( 'custom', 'custom_privacy', __( 'Customer details', 'woocommerce-conversion-tracking' ) );
+        $elements[] = array(
+            'id'          => 'customer_details',
+            'type'        => 'field',
+            'variant'     => 'switch',
+            'section_id'  => 'custom_privacy',
+            'label'       => __( 'Include customer details in scripts', 'woocommerce-conversion-tracking' ),
+            'description' => __( 'Shares the shopper\'s ID, email and name with your scripts on a verified order, and they wait for consent when Respect cookie choices is on. Only administrators can edit scripts.', 'woocommerce-conversion-tracking' ),
+            'default'     => false,
+            'capability'  => CustomScripts::CAPABILITY,
+        );
+
+        return $elements;
+    }
+
+    /**
+     * A platform page element.
+     *
+     * @param string $id    Platform ID.
+     * @param string $label Title.
+     *
+     * @return array
+     */
+    private static function page( string $id, string $label ): array {
+        return array(
+            'id'    => $id,
+            'type'  => 'page',
+            'label' => $label,
+        );
+    }
+
+    /**
+     * A text field that holds a platform ID or label.
+     *
+     * @param string $section     Section ID.
+     * @param string $id          Field ID.
+     * @param string $label       Label.
+     * @param string $placeholder Placeholder.
+     * @param string $description Help text.
+     * @param string $pattern     Format the value must match once cleaned (empty clears the field), see id_pattern(); extra 'case' (upper, lower) and 'prefix' are applied first.
+     * @param int    $priority    Order in the section.
+     * @param array  $extra       More element keys; 'onboarding' { required, with, hint, valid, invalid, missing } puts the field in the setup wizard; 'required_to_send' marks an ID the platform needs to be on (Platforms\PlatformSettings); 'typical_length' [ min, max ] warns, never blocks, outside it.
+     *
+     * @return array
+     */
+    public static function id_field( string $section, string $id, string $label, string $placeholder, string $description, string $pattern, int $priority, array $extra = array() ): array {
+        return array_merge(
+            array(
+                'id'          => $id,
+                'type'        => 'field',
+                'variant'     => 'text',
+                'format'      => 'id',
+                'section_id'  => $section,
+                'label'       => $label,
+                'placeholder' => $placeholder,
+                'description' => $description,
+                'pattern'     => $pattern,
+                'default'     => '',
+                'priority'    => $priority,
+            ),
+            $extra
+        );
+    }
+
+    /**
+     * An ID pattern: the type check, up to Sanitizer::MAX_ID_LENGTH characters in all.
+     *
+     * @param string $type Regex for the whole value, without anchors.
+     *
+     * @return string
+     */
+    public static function id_pattern( string $type ): string {
+        return '^(?=.{1,' . Sanitizer::MAX_ID_LENGTH . '}$)' . $type . '$';
+    }
+
+    /**
+     * Product ID sent: the product ID or the SKU, read through ProductId::mode_for().
+     *
+     * @param string $section Section ID.
+     *
+     * @return array
+     */
+    public static function product_id_field( string $section ): array {
+        return array(
+            'id'          => ProductId::FIELD,
+            'type'        => 'field',
+            'variant'     => 'select',
+            'section_id'  => $section,
+            'label'       => __( 'Product ID sent', 'woocommerce-conversion-tracking' ),
+            'description' => __( 'Must match the IDs in your catalog feed, or dynamic ads can\'t find the product. Variations send their own ID; a product without a SKU sends its Product ID.', 'woocommerce-conversion-tracking' ),
+            'default'     => ProductId::ID,
+            'priority'    => 55,
+            'options'     => array(
+                array(
+                    'value' => ProductId::ID,
+                    'label' => __( 'Product ID (recommended)', 'woocommerce-conversion-tracking' ),
+                ),
+                array(
+                    'value' => ProductId::SKU,
+                    'label' => __( 'SKU', 'woocommerce-conversion-tracking' ),
+                ),
+            ),
+        );
+    }
+
+    /**
+     * The events multicheck; Recommended events are on by default.
+     *
+     * @param string $section Section ID.
+     * @param array  $events  Options from event().
+     *
+     * @return array
+     */
+    public static function events_field( string $section, array $events ): array {
+        return array(
+            'id'         => 'events',
+            'type'       => 'field',
+            'variant'    => 'multicheck',
+            'section_id' => $section,
+            'label'      => __( 'Events', 'woocommerce-conversion-tracking' ),
+            'default'    => self::recommended( $events ),
+            'options'    => $events,
+        );
+    }
+
+    /**
+     * Values of the recommended events that aren't locked.
+     *
+     * @param array $events Options from event().
+     *
+     * @return string[]
+     */
+    private static function recommended( array $events ): array {
+        $defaults = array();
+
+        foreach ( $events as $event ) {
+            if ( is_array( $event ) && ! empty( $event['recommended'] ) && empty( $event['locked'] ) && isset( $event['value'] ) ) {
+                $defaults[] = $event['value'];
+            }
+        }
+
+        return $defaults;
+    }
+
+    /**
+     * One events option.
+     *
+     * @param string $id          Event ID shared by every platform, as the event pipeline names it.
+     * @param string $label       Label.
+     * @param string $description Description.
+     * @param array  $flags       recommended, pro (locked until Pro unlocks it), always (no switch), needs (field holding its event ID).
+     *
+     * @return array
+     */
+    public static function event( string $id, string $label, string $description, array $flags = array() ): array {
+        $pro = ! empty( $flags['pro'] );
+
+        return array(
+            'value'       => $id,
+            'label'       => $label,
+            'description' => $description,
+            'recommended' => ! empty( $flags['recommended'] ),
+            'pro'         => $pro,
+            'locked'      => $pro,
+            'always'      => ! empty( $flags['always'] ),
+            'needs'       => isset( $flags['needs'] ) ? $flags['needs'] : '',
+        );
+    }
+
+    /**
+     * "Order value includes" for a platform's Purchase; the default follows the install type (D8).
+     *
+     * @param string $section      Section ID.
+     * @param string $integration  Integration ID the mode is for.
+     * @param array  $dependencies Field dependencies.
+     * @param string $description  Help text; the Purchase one by default.
+     *
+     * @return array
+     */
+    public static function value_mode_field( string $section, string $integration, array $dependencies = array(), string $description = '' ): array {
+        $default = ValueMode::default_for( $integration, Install::is_upgrade() );
+        $field   = array(
+            'id'          => 'value_mode',
+            'type'        => 'field',
+            'variant'     => 'select',
+            'section_id'  => $section,
+            'label'       => __( 'Order value includes', 'woocommerce-conversion-tracking' ),
+            'description' => '' !== $description ? $description : __( 'Sent with Purchase. Items only keeps ad results in line with product revenue. Fees count as items; tax is never part of items.', 'woocommerce-conversion-tracking' ),
+            'default'     => $default,
+            'priority'    => 50,
+            'options'     => array(
+                array(
+                    'value' => ValueMode::ITEMS,
+                    'label' => __( 'Items only (recommended)', 'woocommerce-conversion-tracking' ),
+                ),
+                array(
+                    'value' => ValueMode::SHIPPING,
+                    'label' => __( 'Items and shipping', 'woocommerce-conversion-tracking' ),
+                ),
+                array(
+                    'value' => ValueMode::ALL,
+                    'label' => __( 'Items, tax and shipping', 'woocommerce-conversion-tracking' ),
+                ),
+            ),
+        );
+
+        // Upgraders keep the order total they sent in 2.x; the page says why while it is selected.
+        if ( ValueMode::ALL === $default ) {
+            $field['kept_note'] = __( 'Set to Items, tax and shipping because that is what you sent before the update, so your reported values don\'t change.', 'woocommerce-conversion-tracking' );
+        }
+
+        if ( $dependencies ) {
+            $field['dependencies'] = $dependencies;
+        }
+
+        return $field;
+    }
+
+    /**
+     * "Skip these roles" (skip_roles): a preset, read by SkipRoles; the default follows the install type.
+     *
+     * @param string $section Section ID.
+     *
+     * @return array
+     */
+    public static function skip_roles_field( string $section ): array {
+        return array(
+            'id'                => 'skip_roles',
+            'type'              => 'field',
+            'variant'           => 'select',
+            'section_id'        => $section,
+            'label'             => __( 'Skip these roles', 'woocommerce-conversion-tracking' ),
+            'description'       => __( 'Your own visits won\'t count as shoppers.', 'woocommerce-conversion-tracking' ),
+            'default'           => SkipRoles::default_preset( Install::is_upgrade() ),
+            'priority'          => 60,
+            // A preset, or a list of the site's roles picked one by one.
+            'roles'             => self::site_roles(),
+            'sanitize_callback' => array( self::class, 'sanitize_skip_roles' ),
+            'options'           => array(
+                array(
+                    'value' => 'admin-shop',
+                    'label' => __( 'Administrator, Shop manager', 'woocommerce-conversion-tracking' ),
+                ),
+                array(
+                    'value' => 'admin',
+                    'label' => __( 'Administrator only', 'woocommerce-conversion-tracking' ),
+                ),
+                array(
+                    'value' => 'none',
+                    'label' => __( 'Track everyone', 'woocommerce-conversion-tracking' ),
+                ),
+            ),
+        );
+    }
+
+    /**
+     * The site's roles for "Skip these roles": value (slug) and translated label.
+     *
+     * @return array
+     */
+    public static function site_roles(): array {
+        if ( ! function_exists( 'wp_roles' ) ) {
+            return array();
+        }
+
+        $roles = array();
+
+        foreach ( wp_roles()->get_names() as $slug => $name ) {
+            $roles[] = array(
+                'value' => (string) $slug,
+                'label' => function_exists( 'translate_user_role' ) ? translate_user_role( $name ) : (string) $name,
+            );
+        }
+
+        return $roles;
+    }
+
+    /**
+     * Clean "Skip these roles": a preset name, or role slugs that are one of the site's roles.
+     *
+     * @param mixed $value   Posted value.
+     * @param array $field   Field with options (presets) and roles.
+     * @param mixed $current Stored value.
+     *
+     * @throws InvalidArgumentException When it is neither.
+     *
+     * @return string|string[] A preset when the roles match one, else the role slugs.
+     */
+    public static function sanitize_skip_roles( $value, $field, $current ) {
+        $presets = array_column( isset( $field['options'] ) ? (array) $field['options'] : array(), 'value' );
+
+        if ( is_string( $value ) && in_array( $value, $presets, true ) ) {
+            return $value;
+        }
+
+        if ( ! is_array( $value ) ) {
+            throw new InvalidArgumentException( __( 'Not one of the choices.', 'woocommerce-conversion-tracking' ) );
+        }
+
+        $known  = array_column( isset( $field['roles'] ) ? (array) $field['roles'] : array(), 'value' );
+        $stored = is_array( $current ) ? $current : array();
+        $roles  = array();
+
+        foreach ( $value as $role ) {
+            if ( ! is_string( $role ) || ! preg_match( '/^[a-z0-9_\-]+$/', $role ) ) {
+                throw new InvalidArgumentException( __( 'Not one of the site\'s roles.', 'woocommerce-conversion-tracking' ) );
+            }
+
+            if ( $known && ! in_array( $role, $known, true ) ) {
+                // A saved role the site no longer has is dropped; a new unknown one is refused.
+                if ( in_array( $role, $stored, true ) ) {
+                    continue;
+                }
+
+                throw new InvalidArgumentException( __( 'Not one of the site\'s roles.', 'woocommerce-conversion-tracking' ) );
+            }
+
+            $roles[] = $role;
+        }
+
+        $roles = array_values( array_unique( $roles ) );
+
+        // A pick that matches a preset is saved as that preset.
+        foreach ( $presets as $preset ) {
+            $preset_roles = SkipRoles::normalise( $preset );
+
+            if ( null !== $preset_roles && ! array_diff( $roles, $preset_roles ) && ! array_diff( $preset_roles, $roles ) ) {
+                return $preset;
+            }
+        }
+
+        return $roles;
+    }
+
+    /**
+     * Show a field only while another field's value is one of these.
+     *
+     * @param string $key    Field ID.
+     * @param array  $values Values.
+     *
+     * @return array
+     */
+    public static function depends( string $key, array $values ): array {
+        return array(
+            'key'        => $key,
+            'value'      => $values,
+            'comparison' => 'in',
+        );
+    }
+}

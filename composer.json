@@ -13,11 +13,12 @@
     "prefer-stable": true,
     "autoload": {
         "psr-4": {
-            "WeDevs_WC_Conversion_Tracking\\Dependencies\\": "dependencies/"
+            "WeDevs_WC_Conversion_Tracking\\Dependencies\\": "dependencies/",
+            "StorePulse\\ConversionTracking\\": "includes/"
         }
     },
     "require": {
-        "php": ">=7.0",
+        "php": ">=7.4",
         "composer/installers": "^2.3"
     },
 
@@ -32,6 +33,12 @@
         "phpcs": [
           "phpcs -p -s"
         ],
+        "test": [
+          "@test:unit",
+          "@test:integration"
+        ],
+        "test:unit": "phpunit",
+        "test:integration": "phpunit -c phpunit.integration.xml.dist",
         "post-install-cmd": [
            "[ $COMPOSER_DEV_MODE -eq 0 ] || \"vendor/bin/mozart\" compose",
            "composer dump-autoload"

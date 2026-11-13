@@ -1,0 +1,100 @@
+name: PHPUnit
+
+# Unit tests (tests/unit) and characterisation tests (tests/integration), run by `composer test` inside the
+# wp-env store from tests/integration/.wp-env.json, the same way as locally.
+on:
+    pull_request:
+    push:
+        branches: [develop, master, feature/ct-revamp]
+    workflow_dispatch:
+
+# A newer run cancels the older one: per PR, else per branch.
+concurrency:
+    group: phpunit-${{ github.event.pull_request.number && format('pr-{0}', github.event.pull_request.number) || github.ref }}
+    cancel-in-progress: true
+
+permissions:
+    contents: read
+
+jobs:
+    phpunit:
+        name: PHPUnit
+        runs-on: ubuntu-latest
+        timeout-minutes: 30
+        steps:
+            - name: Check out
+              uses: actions/checkout@v4
+              with:
+                  persist-credentials: false
+
+            - name: Set up PHP
+              uses: shivammathur/setup-php@v2
+              with:
+                  php-version: '7.4'
+                  coverage: none
+                  tools: composer:v2
+
+            # Dev packages for PHPUnit; the install also runs Mozart for dependencies/.
+            - name: Install Composer packages
+              run: composer install --no-interaction --no-progress
+
+            - name: Set up Node
+              uses: actions/setup-node@v4
+              with:
+                  node-version: 22
+                  cache: npm
+                  cache-dependency-path: |
+                      package-lock.json
+                      tests/integration/package-lock.json
+
+            # The ID-format tests import src/data, which needs @wordpress/i18n.
+            - name: Install JS packages
+              run: npm ci --no-audit --no-fund
+
+            - name: Run JS unit tests
+              run: npm run test:js
+
+            - name: Install wp-env
+              working-directory: tests/integration
+              run: npm ci --no-audit --no-fund
+
+            # Docker Hub's anonymous pull limits can fail wp-env start; Google's public mirror avoids them.
+            - name: Route Docker Hub pulls through a mirror
+              run: |
+                  sudo mkdir -p /etc/docker
+                  if [ -s /etc/docker/daemon.json ]; then
+                      sudo jq '. + {"registry-mirrors": ["https://mirror.gcr.io"]}' /etc/docker/daemon.json | sudo tee /etc/docker/daemon.json.tmp >/dev/null
+                      sudo mv /etc/docker/daemon.json.tmp /etc/docker/daemon.json
+                  else
+                      echo '{ "registry-mirrors": ["https://mirror.gcr.io"] }' | sudo tee /etc/docker/daemon.json >/dev/null
+                  fi
+                  sudo systemctl restart docker
+                  for _ in $(seq 1 15); do docker info >/dev/null 2>&1 && break; sleep 1; done
+
+            - name: Start WordPress
+              uses: nick-fields/retry@v3
+              with:
+                  timeout_minutes: 8
+                  max_attempts: 3
+                  retry_wait_seconds: 60
+                  command: cd tests/integration && npx wp-env start
+
+            # No retry: the tests are deterministic, so a retry would only hide a real failure.
+            - name: Run PHPUnit
+              working-directory: tests/integration
+              run: npm test
+
+            # Deletes the plugin with wp plugin uninstall on throwaway sites and checks nothing is left (#121).
+            - name: Run uninstall test
+              working-directory: tests/integration
+              run: npm run test:uninstall
+
+            # The actual output of every fixture that did not match, to diff against tests/fixtures.
+            - name: Upload changed output
+              if: failure()
+              uses: actions/upload-artifact@v4
+              with:
+                  name: phpunit-output
+                  path: tests/.output
+                  if-no-files-found: ignore
+                  retention-days: 7

@@ -1,23 +1,27 @@
 <?php
 /*
 Plugin Name: Conversion Tracking for WooCommerce
-Plugin URI: https://wedevs.com/woocommerce-conversion-tracking/
-Description: Adds various conversion tracking codes to cart, checkout, registration success and product page on WooCommerce
-Version: 2.1.6
+Plugin URI: https://wordpress.org/plugins/woocommerce-conversion-tracking/
+Description: Sends WooCommerce purchases and shopper events to Meta, Google Analytics 4, Google Ads and X, each purchase counted once, plus your own scripts.
+Version: 3.0.0
 Author: weDevs
 Author URI: https://wedevs.com/?utm_source=ORG_Author_URI_WCCT
 License: GPL2
+License URI: https://www.gnu.org/licenses/gpl-2.0.html
+Requires at least: 7.0
 Requires PHP: 7.4
 Requires Plugins: woocommerce
-WC requires at least: 5.0.0
+WC requires at least: 8.5.0
 WC tested up to: 11.1
+Text Domain: woocommerce-conversion-tracking
+Domain Path: /languages
 */
 
 /**
  * Copyright (c) 2020 Tareq Hasan (email: tareq@wedevs.com). All rights reserved.
  *
  * Released under the GPL license
- * http://www.opensource.org/licenses/gpl-license.php
+ * https://www.gnu.org/licenses/gpl-2.0.html
  *
  * This is an add-on for WordPress
  * http://wordpress.org/
@@ -56,7 +60,7 @@ class WeDevs_WC_Conversion_Tracking {
      *
      * @var string
      */
-    public $version = '2.1.6';
+    public $version = '3.0.0';
 
     /**
      * Holds various class instances
@@ -82,6 +86,7 @@ class WeDevs_WC_Conversion_Tracking {
         $this->init_tracker();
 
         register_activation_hook( __FILE__, array( $this, 'activate' ) );
+        register_deactivation_hook( __FILE__, array( \StorePulse\ConversionTracking\Log\Prune::class, 'unschedule' ) );
 
         // Add High Performance Order Storage Support
         add_action( 'before_woocommerce_init', [ $this, 'declare_woocommerce_feature_compatibility' ] );
@@ -140,10 +145,8 @@ class WeDevs_WC_Conversion_Tracking {
         require_once WCCT_INCLUDES . '/class-abstract-integration.php';
         require_once WCCT_INCLUDES . '/class-integration-manager.php';
         require_once WCCT_INCLUDES . '/class-event-dispatcher.php';
-        require_once WCCT_INCLUDES . '/class-integration-pro-features.php';
-        require_once WCCT_INCLUDES . '/class-ajax.php';
         require_once WCCT_INCLUDES . '/class-admin.php';
-        require_once WCCT_INCLUDES . '/class-welcome-20.php';
+        require_once WCCT_INCLUDES . '/consent-functions.php';
     }
 
     /**
@@ -167,9 +170,11 @@ class WeDevs_WC_Conversion_Tracking {
      *
      * @since 1.2.5
      *
+     * @param bool $network_wide Network activation.
+     *
      * @return void
      */
-    public function activate() {
+    public function activate( $network_wide = false ) {
         $installed = get_option( 'wcct_installed' );
 
         if ( ! $installed ) {
@@ -177,6 +182,10 @@ class WeDevs_WC_Conversion_Tracking {
         }
 
         update_option( 'wcct_version', WCCT_VERSION );
+
+        \StorePulse\ConversionTracking\Log\OrderLog::install();
+        \StorePulse\ConversionTracking\Log\Prune::schedule();
+        \StorePulse\ConversionTracking\Onboarding\Redirect::on_activation( $network_wide );
     }
 
     /**
@@ -185,6 +194,35 @@ class WeDevs_WC_Conversion_Tracking {
      * @return void
      */
     public function init_hooks() {
+        // Before wcct_loaded, so a Pro older than 3.0 never loads its classes.
+        \StorePulse\ConversionTracking\Compat\ProGuard::register();
+
+        $this->container['capability'] = new \StorePulse\ConversionTracking\Access\Capability();
+        $this->container['capability']->register();
+
+        $this->container['rest'] = new \StorePulse\ConversionTracking\REST\Routes();
+        $this->container['rest']->register();
+
+        \StorePulse\ConversionTracking\Privacy\PolicyText::register();
+
+        $this->container['doctor_recheck'] = new \StorePulse\ConversionTracking\Doctor\Recheck();
+        $this->container['doctor_recheck']->register();
+
+        \StorePulse\ConversionTracking\Log\Prune::init_hooks();
+        \StorePulse\ConversionTracking\Log\Activity::init_hooks();
+
+        // The menu badge and the alert switches (Settings > Alerts); the dashboard's "Connected 5 minutes ago".
+        \StorePulse\ConversionTracking\Alerts\Alerts::register();
+        \StorePulse\ConversionTracking\Dashboard\ConnectedAt::register();
+
+        // Every settings save and pause purges the known page caches.
+        \StorePulse\ConversionTracking\Cache\PageCache::register();
+
+        $this->container['onboarding_redirect'] = new \StorePulse\ConversionTracking\Onboarding\Redirect();
+        $this->container['onboarding_redirect']->register();
+
+        // After a failed settings migration, admins get "Retry migration".
+        \StorePulse\ConversionTracking\Migration\RetryNotice::register();
 
         add_action( 'plugins_loaded', array( $this, 'plugin_upgrades' ) );
         add_action( 'init', array( $this, 'localization_setup' ) );
@@ -192,7 +230,6 @@ class WeDevs_WC_Conversion_Tracking {
 
         add_action( 'admin_notices', array( $this, 'check_woocommerce_exist' ) );
         add_filter( 'plugin_action_links_' . plugin_basename( __FILE__ ), array( $this, 'plugin_action_links' ) );
-        add_action( 'admin_notices', array( $this, 'happy_addons_ads_banner' ) );
     }
 
     /**
@@ -203,15 +240,11 @@ class WeDevs_WC_Conversion_Tracking {
     public function init_classes() {
         // Manager must exist before the dispatcher, which reads active integrations on construct.
         $this->container['manager']             = new WCCT_Integration_Manager();
-        $this->container['ajax']                = new WCCT_Ajax();
         $this->container['event_dispatcher']    = new WCCT_Event_Dispatcher();
         $this->container['admin']               = new WCCT_Admin();
-
-        new WCCT_Welcome_20();
-
-        if ( ! class_exists( 'WeDevs_WC_Conversion_Tracking_Pro') ) {
-            $this->container['pro_feature'] = new WCCT_Pro_Features();
-        }
+        $this->container['admin_assets']        = new \StorePulse\ConversionTracking\Admin\Assets();
+        $this->container['consent']             = new \StorePulse\ConversionTracking\Consent\ConsentMode();
+        $this->container['consent']->register();
     }
 
     /**
@@ -224,23 +257,20 @@ class WeDevs_WC_Conversion_Tracking {
     }
 
     /**
-     * Do plugin upgrade
+     * Run the 3.0 settings migration on any request where the stored settings need it
      *
      * @since  2.0
      * @return void
      */
     public function plugin_upgrades() {
-        if ( ! is_admin() && ! current_user_can( 'manage_options' ) ) {
-            return;
-        }
+        // Before the migration, so 2.x settings still tell an upgrade from a new install.
+        \StorePulse\ConversionTracking\Install::record();
+        \StorePulse\ConversionTracking\Migration\SettingsMigration::maybe_run();
 
-        require_once WCCT_INCLUDES . '/class-upgrades.php';
-
-        $upgrader   = new WCCT_Upgrades();
-
-        if ( $upgrader->needs_update() ) {
-            $upgrader->perform_updates();
-        }
+        // Orders created before 3.0 first ran count as already sent.
+        \StorePulse\ConversionTracking\Events\PurchaseGate::ensure_since();
+        // The order log table, created or updated when its schema version changes.
+        \StorePulse\ConversionTracking\Log\OrderLog::maybe_install();
     }
 
     /**
@@ -278,15 +308,12 @@ class WeDevs_WC_Conversion_Tracking {
 	}
 
     /**
-     * Check the pro version
+     * Whether Pro 3.0 or later is running; an older Pro is paused and counts as Free
      *
      * @return boolean
      */
     public function is_pro() {
-        if ( class_exists( 'WeDevs_WC_Conversion_Tracking_Pro' ) ) {
-            return true;
-        }
-        return false;
+        return \StorePulse\ConversionTracking\Compat\ProVersion::is_active();
     }
 
     /**
@@ -298,7 +325,7 @@ class WeDevs_WC_Conversion_Tracking {
      */
     function plugin_action_links( $links ) {
         if ( ! $this->is_pro() ) {
-            $links[] = '<a href="https://wedevs.com/woocommerce-conversion-tracking/upgrade-to-pro/?utm_source=wp-admin&utm_medium=pro-upgrade&utm_campaign=wcct_upgrade&utm_content=Get_Premium" target="_blank" style="color: #389e38;font-weight: bold;">' . __( 'Get PRO', 'woocommerce-conversion-tracking' ) . '</a>';
+            $links[] = '<a href="' . esc_url( \StorePulse\ConversionTracking\Admin\Upgrade::url() ) . '" target="_blank" rel="noopener noreferrer" style="color: #389e38;font-weight: bold;">' . __( 'Get PRO', 'woocommerce-conversion-tracking' ) . '</a>';
         }
 
         $links[] = '<a href="https://wedevs.com/docs/woocommerce-conversion-tracking/?utm_source=wp-admin&utm_medium=action-link&utm_campaign=wcct_docs&utm_content=Docs" target="_blank">' . __( 'Docs', 'woocommerce-conversion-tracking' ) . '</a>';
@@ -315,49 +342,10 @@ class WeDevs_WC_Conversion_Tracking {
         if ( ! function_exists( 'WC' ) ) {
             ?>
                 <div class="error notice is-dismissible">
-                    <p><?php echo __( '<b>Conversion Tracking for WooCommerce</b> requires <a target="_blank" href="https://wordpress.org/plugins/woocommerce/">Woocommerce</a>', 'woocommerce-conversion-tracking' ); ?></p>
+                    <p><?php echo wp_kses_post( __( '<b>Conversion Tracking for WooCommerce</b> requires <a target="_blank" href="https://wordpress.org/plugins/woocommerce/">Woocommerce</a>', 'woocommerce-conversion-tracking' ) ); ?></p>
                 </div>
             <?php
         }
-    }
-
-    /**
-     * Add happy addons ads banner
-     *
-     * @return void
-     */
-    public function happy_addons_ads_banner() {
-        if ( ! class_exists( '\Elementor\Plugin' ) ) {
-            return;
-        }
-
-        if ( class_exists( '\Happy_Addons\Elementor\Base' ) ) {
-            return;
-        }
-        $dismissable = get_option( 'wcct_dismissable_notice' );
-
-        if ( $dismissable == 'closed' ) {
-            return;
-        }
-
-        ?>
-            <div id="wcct_remote_notice" class="notice notice-success">
-            </div>
-            <div class="notice is-dismissible wcct-notice-wrap">
-                <div class="wcct-message-icon">
-                    <img src="<?php echo esc_attr( WCCT_ASSETS . '/images/happy-addons.png' )?>" alt="">
-                </div>
-                <div class="wcct-message-content">
-                    <p><?php echo __( 'Reach beyond your imagination in creating web pages. <strong> Try Happy Addons for Elementor to shape your dream.</strong> 😊' ); ?></p>
-                </div>
-                <div class="wcct-message-action">
-                    <a href="" id="wcct-install-happ-addons" class="button button-primary"> <i class="dashicons dashicons-update wcct-update-icon"></i> Install Now For FREE</a>
-                    <p><a target="_blank" href="https://wordpress.org/plugins/happy-elementor-addons/">Read more details ➔</a>
-                    </p>
-                </div>
-            </div>
-
-        <?php
     }
 }
 
@@ -369,10 +357,10 @@ function wcct_init() {
 wcct_init();
 
 /**
- * Manage Capability
+ * Capability that opens the settings; manage_wcct unless filtered
  *
  * @return string
  */
 function wcct_manage_cap() {
-    return apply_filters( 'wcct_capability', 'manage_options' );
+    return apply_filters( 'wcct_capability', \StorePulse\ConversionTracking\Access\Capability::NAME );
 }
