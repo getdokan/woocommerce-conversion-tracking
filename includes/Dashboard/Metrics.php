@@ -330,7 +330,7 @@ class Metrics {
 
         $working = count( wp_list_filter( $platforms, array( 'state' => self::WORKING ) ) );
 
-        // The menu badge reads the same count until the next check-in.
+        // The menu badge reads the same count for 60 seconds, or until a pause or settings save.
         if ( ! empty( $alerts[ Types::NOT_CONFIRMED ] ) ) {
             Badge::remember( $tally['not_confirmed'], Activity::truncated(), $now );
         }

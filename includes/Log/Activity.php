@@ -27,6 +27,11 @@ class Activity {
     const CACHE_TTL = 60;
 
     /**
+     * Settings options whose saves drop the cached list.
+     */
+    const SETTINGS_OPTIONS = array( 'wcct_settings_v3', 'wcct_settings' );
+
+    /**
      * Results per Unix time (or 'now'), for the rest of the request.
      *
      * @var array[]
@@ -48,7 +53,7 @@ class Activity {
     public static function init_hooks() {
         add_action( Pause::CHANGED_ACTION, array( self::class, 'flush' ) );
 
-        foreach ( array( 'wcct_settings_v3', 'wcct_settings' ) as $option ) {
+        foreach ( self::SETTINGS_OPTIONS as $option ) {
             add_action( 'add_option_' . $option, array( self::class, 'flush' ) );
             add_action( 'update_option_' . $option, array( self::class, 'flush' ) );
         }
@@ -147,7 +152,7 @@ class Activity {
         }
 
         /**
-         * Fires after the cached Activity list is dropped (a check-in, a pause or a settings save).
+         * Fires after the cached Activity list is dropped (a check-in, a pause or a settings save). The menu badge doesn't listen: busy stores check in every few seconds.
          *
          * @since 3.0.0
          */

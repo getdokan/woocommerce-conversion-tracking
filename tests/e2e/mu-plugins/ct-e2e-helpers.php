@@ -375,6 +375,7 @@ add_action(
 
                     // The dashboard's cached list and the menu badge read the moved order at once.
                     \StorePulse\ConversionTracking\Log\Activity::flush();
+                    \StorePulse\ConversionTracking\Alerts\Badge::flush();
 
                     return array( 'id' => $order->get_id() );
                 },

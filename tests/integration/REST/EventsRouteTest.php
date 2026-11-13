@@ -59,6 +59,28 @@ class EventsRouteTest extends WCCT_Test_Rest_Case {
         $this->assertLessThan( 60, abs( time() - $results[4]['last_purchase_at'] ) );
     }
 
+    public function test_a_check_in_keeps_the_badge_count_and_a_pause_drops_it() {
+        $badge   = array( 'option', '_transient_wcct_alert_badge' );
+        $results = $this->rest(
+            array(
+                self::settings(),
+                array( 'call', 'set_transient', array( 'wcct_alert_badge', array( 'count' => 2 ), 60 ) ),
+                array( 'call', 'set_transient', array( 'wcct_log_activity', array( 'cached' ), 60 ) ),
+                self::check_in( 'facebook', array( 'loaded' => true, 'consent' => 'granted', 'event_id' => 'wcct_3001_purchase' ) ),
+                $badge,
+                array( 'option', '_transient_wcct_log_activity' ),
+                array( 'request', 'POST', '/wcct/v1/settings/pause', array( 'platform' => 'facebook', 'paused' => true ), 'admin' ),
+                $badge,
+            )
+        );
+
+        $this->assertSame( array( 'result' => 'recorded' ), $results[3]['data'] );
+        $this->assertSame( array( 'count' => 2 ), $results[4], 'A check-in leaves the cached badge count' );
+        $this->assertNull( $results[5], 'A check-in still drops the cached Activity list' );
+        $this->assertSame( 200, $results[6]['status'] );
+        $this->assertNull( $results[7], 'A pause drops the badge count' );
+    }
+
     public function test_each_rejection_writes_nothing() {
         $results = $this->rest(
             array(

@@ -5,6 +5,7 @@ namespace StorePulse\ConversionTracking\Alerts;
 use StorePulse\ConversionTracking\Log\Activity;
 use StorePulse\ConversionTracking\Log\OrderLog;
 use StorePulse\ConversionTracking\Log\Statuses;
+use StorePulse\ConversionTracking\Platforms\Pause;
 
 /**
  * The count bubble on the Conversion Tracking menu item: orders a platform didn't confirm in the last 24 hours.
@@ -18,7 +19,7 @@ class Badge {
     const CACHE = 'wcct_alert_badge';
 
     /**
-     * Seconds the count is cached; check-ins, pauses and settings saves drop it sooner.
+     * Seconds the count is cached; pauses and settings saves drop it sooner. Check-ins don't: one changes the count by at most one order, and busy stores check in every few seconds.
      */
     const CACHE_TTL = 60;
 
@@ -39,7 +40,12 @@ class Badge {
      */
     public static function register() {
         add_action( 'admin_menu', array( self::class, 'add_to_menu' ), 20 );
-        add_action( 'wcct_activity_flushed', array( self::class, 'flush' ) );
+        add_action( Pause::CHANGED_ACTION, array( self::class, 'flush' ) );
+
+        foreach ( Activity::SETTINGS_OPTIONS as $option ) {
+            add_action( 'add_option_' . $option, array( self::class, 'flush' ) );
+            add_action( 'update_option_' . $option, array( self::class, 'flush' ) );
+        }
     }
 
     /**
