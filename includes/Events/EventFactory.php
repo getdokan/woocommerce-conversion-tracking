@@ -117,27 +117,32 @@ class EventFactory {
      *
      * @param \WC_Product $product  Product or variation added.
      * @param int|float   $quantity Quantity added.
-     * @param array       $lines    The click's lines, [ cart line product, quantity added ], shopper's first; a line's product carries the cart price. Empty for the product alone.
+     * @param array       $lines    The click's lines, [ 'product' => cart line product, 'quantity' => quantity added ], shopper's first; a line's product carries the cart price. Empty for the product alone.
      *
      * @return Event
      */
     public static function add_to_cart( $product, $quantity = 1, $lines = array() ) {
         $quantity = self::quantity( $quantity );
-        $lines    = is_array( $lines ) && $lines ? $lines : array( array( $product, $quantity ) );
+        $lines    = is_array( $lines ) && $lines ? $lines : array(
+            array(
+                'product'  => $product,
+                'quantity' => $quantity,
+            ),
+        );
         $value    = 0.0;
         $ids      = array();
         $items    = array();
 
         foreach ( $lines as $line ) {
-            if ( ! isset( $line[0] ) || ! $line[0] instanceof \WC_Product ) {
+            if ( ! isset( $line['product'] ) || ! $line['product'] instanceof \WC_Product ) {
                 continue;
             }
 
-            $line_quantity = self::quantity( isset( $line[1] ) ? $line[1] : 1 );
-            $value        += (float) wc_get_price_to_display( $line[0], array( 'qty' => $line_quantity ) );
-            $ids[]         = $line[0]->get_id();
+            $line_quantity = self::quantity( isset( $line['quantity'] ) ? $line['quantity'] : 1 );
+            $value        += (float) wc_get_price_to_display( $line['product'], array( 'qty' => $line_quantity ) );
+            $ids[]         = $line['product']->get_id();
             $items[]       = array(
-                'product'  => $line[0],
+                'product'  => $line['product'],
                 'quantity' => $line_quantity,
             );
         }

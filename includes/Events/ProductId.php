@@ -250,11 +250,8 @@ class ProductId {
             $id = self::for_order_item( $item, $mode );
 
             if ( $id ) {
-                // Keyed by the product (a deleted one by its stored ID), so each is listed once.
-                $product = $item->get_product();
-                $key     = is_object( $product ) ? self::product_key( $product ) : 'p' . (int) ( $item->get_variation_id() ? $item->get_variation_id() : $item->get_product_id() );
-
-                $ids[ $key ] = $id;
+                // Keyed by the item's product (its variation's own ID), as product_key() keys a loaded one, so each is listed once.
+                $ids[ 'p' . (int) ( $item->get_variation_id() ? $item->get_variation_id() : $item->get_product_id() ) ] = $id;
             }
         }
 

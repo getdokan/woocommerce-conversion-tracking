@@ -69,14 +69,14 @@ class Pipeline {
      *
      * @var array
      */
-    private static $rest_requests = array();
+    private $rest_requests = array();
 
     /**
-     * Products a request named that a $0 shopper's add already used, per request: one free add each.
+     * Product IDs the request named that an add already used, per request or REST request.
      *
      * @var array[]
      */
-    private static $named_used = array();
+    private $named_used = array();
 
     /**
      * Code waiting for the footer, per platform ID.
@@ -140,6 +140,7 @@ class Pipeline {
         add_action( 'woocommerce_add_to_cart', array( $this, 'added_to_cart' ), PHP_INT_MAX, 4 );
         add_filter( 'rest_request_before_callbacks', array( $this, 'rest_started' ), 10, 3 );
         add_filter( 'rest_request_after_callbacks', array( $this, 'rest_finished' ), 10, 3 );
+        add_filter( 'wcct_track_add_to_cart', array( self::class, 'skip_storegrowth_gifts' ), 5, 4 );
         add_filter( 'woocommerce_add_to_cart_fragments', array( $this, 'cart_fragments' ) );
         add_action( 'wc_ajax_' . self::AJAX_ACTION, array( $this, 'send_pending_events' ) );
         add_action( 'woocommerce_thankyou', array( $this, 'thankyou_fallback' ) );
@@ -162,11 +163,12 @@ class Pipeline {
     }
 
     /**
-     * A shopper's add starts: forget lines from earlier adds, added after their event was queued or inside an add that threw.
+     * An add starts with no other add running: forget lines left from earlier adds (added after their event, or inside one that threw).
      *
      * @return void
      */
     public function add_started() {
+        // Not the count alone: after a hook threw it stays high, and leftovers would join a later add of the same line.
         if ( null === self::outer_add_key() ) {
             $this->nested_lines = array();
         }
@@ -175,7 +177,7 @@ class Pipeline {
     /**
      * Queue add to cart for the visitor's browser; covers forms, AJAX buttons and Store API (block) buttons.
      *
-     * One click sends one AddToCart: lines other plugins add inside it (bundle items, ticked add-ons) join the shopper's event.
+     * One add sends one AddToCart: lines other plugins add inside it (bundle items, ticked add-ons) join it. See the readme FAQ.
      *
      * @param string    $cart_item_key Cart item key.
      * @param int       $product_id    Product ID.
@@ -185,35 +187,76 @@ class Pipeline {
      * @return void
      */
     public function added_to_cart( $cart_item_key = '', $product_id = 0, $quantity = 1, $variation_id = 0 ) {
-        $cart  = WC()->cart;
-        $outer = self::outer_add_key();
+        $cart          = WC()->cart;
+        $cart_item_key = (string) $cart_item_key;
+        $outer         = self::outer_add_key();
 
         // Lines added inside the shopper's add are judged when it is done, once plugins have set their cart prices.
         if ( null !== $outer ) {
-            $this->nested_lines[ $outer ][] = array( (string) $cart_item_key, $quantity );
+            $this->nested_lines[ $outer ][] = array( $cart_item_key, $quantity );
 
             return;
         }
 
-        // Lines under '' were added inside an add whose key the call stack could not give.
-        $nested    = array_merge( isset( $this->nested_lines[ $cart_item_key ] ) ? $this->nested_lines[ $cart_item_key ] : array(), isset( $this->nested_lines[''] ) ? $this->nested_lines[''] : array() );
-        $cart_item = $cart ? $cart->get_cart_item( $cart_item_key ) : array();
-
-        unset( $this->nested_lines[ $cart_item_key ], $this->nested_lines[''] );
+        // The first add of a product the request names uses the name, whatever happens to it.
+        $first_named = $this->use_request_name( $product_id, $variation_id );
+        $cart_item   = $cart ? $cart->get_cart_item( $cart_item_key ) : array();
 
         if ( ! self::tracks_line( $cart_item_key, $cart_item, false ) ) {
+            $this->take_nested_lines( $cart_item_key );
+
             return;
         }
 
-        // The grouped form detaches the recalculation, which is where plugins set gift prices.
-        if ( $nested && $cart && false === has_action( 'woocommerce_add_to_cart', array( $cart, 'calculate_totals' ) ) ) {
+        // The grouped form detaches the recalculation, which is where plugins set gift prices; lines they add while it runs join too.
+        if ( $cart && $this->has_nested_lines( $cart_item_key ) && false === has_action( 'woocommerce_add_to_cart', array( $cart, 'calculate_totals' ) ) ) {
             $cart->calculate_totals();
         }
 
-        // Quantity added per line, the shopper's first; a line added again (removed and re-added, or more of it) is one line.
-        $added = array( (string) $cart_item_key => EventFactory::quantity( $quantity ) );
+        $lines = $this->lines( $cart, $cart_item_key, $quantity, $this->take_nested_lines( $cart_item_key ) );
+
+        // Nothing it added is left in the cart.
+        if ( ! $lines ) {
+            return;
+        }
+
+        $event = EventFactory::add_to_cart( $lines[0]['product'], $lines[0]['quantity'], $lines );
+
+        /**
+         * Filters whether a $0 add is the shopper's own and sends AddToCart; otherwise it is a gift.
+         *
+         * @since 3.0.0
+         *
+         * @param bool $track        Whether it is: the request names the product and no earlier add used that name.
+         * @param int  $product_id   Product ID.
+         * @param int  $variation_id Variation ID.
+         */
+        if ( $event->get_value() <= 0 && ! apply_filters( 'wcct_track_free_add_to_cart', $first_named, (int) $product_id, (int) $variation_id ) ) {
+            return;
+        }
+
+        $this->queue( $event );
+    }
+
+    /**
+     * The click's lines: the shopper's line (if still there), then the counted lines added inside it, each once.
+     *
+     * @param \WC_Cart|null $cart          Cart.
+     * @param string        $cart_item_key Shopper's cart item key.
+     * @param int|float     $quantity      Quantity the shopper added.
+     * @param array         $nested        Lines added inside it, [ cart item key, quantity ].
+     *
+     * @return array[] [ 'product' => cart line product, 'quantity' => quantity added ].
+     */
+    private function lines( $cart, $cart_item_key, $quantity, array $nested ) {
+        $added = array( $cart_item_key => EventFactory::quantity( $quantity ) );
 
         foreach ( $nested as $line ) {
+            // Merged into the shopper's own line (more of the same, or removed and added again): the shopper's quantity stands.
+            if ( $line[0] === $cart_item_key ) {
+                continue;
+            }
+
             $added[ $line[0] ] = ( isset( $added[ $line[0] ] ) ? $added[ $line[0] ] : 0 ) + EventFactory::quantity( $line[1] );
         }
 
@@ -227,38 +270,44 @@ class Pipeline {
                 continue;
             }
 
-            if ( (string) $key !== (string) $cart_item_key && ! self::tracks_line( (string) $key, $item, true ) ) {
+            if ( (string) $key !== $cart_item_key && ! self::tracks_line( (string) $key, $item, true ) ) {
                 continue;
             }
 
-            // Each line's product carries the price plugins set in the cart (a $0 gift).
-            $lines[] = array( $item['data'], isset( $item['quantity'] ) ? min( $added_quantity, EventFactory::quantity( $item['quantity'] ) ) : $added_quantity );
+            // The line's product carries the price plugins set in the cart (a $0 gift).
+            $lines[] = array(
+                'product'  => $item['data'],
+                'quantity' => isset( $item['quantity'] ) ? min( $added_quantity, EventFactory::quantity( $item['quantity'] ) ) : $added_quantity,
+            );
         }
 
-        // Nothing it added is left in the cart.
-        if ( ! $lines ) {
-            return;
-        }
+        return $lines;
+    }
 
-        $event = EventFactory::add_to_cart( $lines[0][0], $quantity, $lines );
+    /**
+     * Whether lines were added inside an add, including those whose key the call stack could not give.
+     *
+     * @param string $cart_item_key Cart item key.
+     *
+     * @return bool
+     */
+    private function has_nested_lines( $cart_item_key ) {
+        return ! empty( $this->nested_lines[ $cart_item_key ] ) || ! empty( $this->nested_lines[''] );
+    }
 
-        // Every shopper's add uses up the request's name for its product, so a same-product gift after it is not taken for the shopper's.
-        $first_named = self::use_request_name( $product_id, $variation_id );
+    /**
+     * Take the lines added inside an add, including those under '' (no call stack).
+     *
+     * @param string $cart_item_key Cart item key.
+     *
+     * @return array [ cart item key, quantity ] pairs.
+     */
+    private function take_nested_lines( $cart_item_key ) {
+        $lines = array_merge( isset( $this->nested_lines[ $cart_item_key ] ) ? $this->nested_lines[ $cart_item_key ] : array(), isset( $this->nested_lines[''] ) ? $this->nested_lines[''] : array() );
 
-        /**
-         * Filters whether a $0 add is the shopper's own and sends AddToCart; otherwise it is a gift.
-         *
-         * @since 3.0.0
-         *
-         * @param bool $track        Whether it is: the request names the product and no add used that name yet.
-         * @param int  $product_id   Product ID.
-         * @param int  $variation_id Variation ID.
-         */
-        if ( $event->get_value() <= 0 && ! apply_filters( 'wcct_track_free_add_to_cart', $first_named, (int) $product_id, (int) $variation_id ) ) {
-            return;
-        }
+        unset( $this->nested_lines[ $cart_item_key ], $this->nested_lines[''] );
 
-        $this->queue( $event );
+        return $lines;
     }
 
     /**
@@ -271,13 +320,13 @@ class Pipeline {
      * @return mixed The response, unchanged.
      */
     public function rest_started( $response, $handler, $request ) {
-        self::$rest_requests[] = $request instanceof \WP_REST_Request ? $request : null;
+        $this->rest_requests[] = $request instanceof \WP_REST_Request ? $request : null;
 
         return $response;
     }
 
     /**
-     * Forget the REST request that just ran.
+     * Forget the REST request that just ran, and the names it used: object IDs are reused.
      *
      * @param mixed            $response Response.
      * @param array            $handler  Route handler.
@@ -286,11 +335,10 @@ class Pipeline {
      * @return mixed The response, unchanged.
      */
     public function rest_finished( $response, $handler, $request ) {
-        $done = array_pop( self::$rest_requests );
+        $done = array_pop( $this->rest_requests );
 
-        // Object IDs are reused once a request is gone.
         if ( $done instanceof \WP_REST_Request ) {
-            unset( self::$named_used[ 'rest-' . spl_object_id( $done ) ] );
+            unset( $this->named_used[ 'rest-' . spl_object_id( $done ) ] );
         }
 
         return $response;
@@ -306,8 +354,8 @@ class Pipeline {
      *
      * @return bool
      */
-    private static function use_request_name( $product_id, $variation_id ) {
-        $rest = self::$rest_requests ? end( self::$rest_requests ) : null;
+    private function use_request_name( $product_id, $variation_id ) {
+        $rest = $this->rest_requests ? end( $this->rest_requests ) : null;
 
         if ( $rest instanceof \WP_REST_Request ) {
             $scope = 'rest-' . spl_object_id( $rest );
@@ -323,9 +371,9 @@ class Pipeline {
                 isset( $_REQUEST['id'] ) ? wp_unslash( $_REQUEST['id'] ) : null,
             );
 
-            // The grouped form names its children as quantity[ id ].
+            // The grouped form names its children as quantity[ id ]; only those the shopper picked.
             if ( isset( $_REQUEST['quantity'] ) && is_array( $_REQUEST['quantity'] ) ) {
-                $named = array_merge( $named, array_keys( $_REQUEST['quantity'] ) );
+                $named = array_merge( $named, array_keys( array_filter( wp_unslash( $_REQUEST['quantity'] ), function ( $picked ) { return is_numeric( $picked ) && $picked > 0; } ) ) );
             }
             // phpcs:enable
         }
@@ -336,8 +384,8 @@ class Pipeline {
         // The variation and its parent: a sibling variation's gift then finds the parent used.
         foreach ( array_filter( array( absint( $variation_id ), absint( $product_id ) ) ) as $id ) {
             if ( in_array( $id, $named, true ) ) {
-                $first                             = $first || empty( self::$named_used[ $scope ][ $id ] );
-                self::$named_used[ $scope ][ $id ] = true;
+                $first                            = $first || empty( $this->named_used[ $scope ][ $id ] );
+                $this->named_used[ $scope ][ $id ] = true;
             }
         }
 
@@ -357,12 +405,11 @@ class Pipeline {
      */
     public static function tracks_line( $cart_item_key, $cart_item, $nested ) {
         $cart_item = is_array( $cart_item ) ? $cart_item : array();
+        $track     = empty( $cart_item[ self::AUTO_ADDED ] );
 
-        if ( $nested ) {
-            // A $0 line is a gift; a priced one (bundle item, ticked add-on, discounted BOGO item) is part of what the shopper pays.
-            $track = empty( $cart_item[ self::AUTO_ADDED ] ) && ! empty( $cart_item['data'] ) && is_object( $cart_item['data'] ) && method_exists( $cart_item['data'], 'get_price' ) && (float) $cart_item['data']->get_price() > 0;
-        } else {
-            $track = ! self::is_auto_added( $cart_item );
+        // A $0 line added inside an add is a gift; a priced one (bundle item, ticked add-on, discounted BOGO item) is part of what the shopper pays.
+        if ( $track && $nested ) {
+            $track = ! empty( $cart_item['data'] ) && is_object( $cart_item['data'] ) && method_exists( $cart_item['data'], 'get_price' ) && (float) $cart_item['data']->get_price() > 0;
         }
 
         /**
@@ -379,18 +426,32 @@ class Pipeline {
     }
 
     /**
-     * Whether the shopper's add is flagged as auto-added: our key, or a StoreGrowth BOGO gift, which it also adds on quantity changes.
+     * StoreGrowth BOGO gifts send no AddToCart of their own; it also adds them on quantity changes, outside the shopper's add.
      *
-     * @param array $cart_item Cart item.
+     * @param bool   $track         Whether the line counts.
+     * @param string $cart_item_key Cart item key.
+     * @param array  $cart_item     Cart item.
+     * @param bool   $nested        Whether it was added inside another add.
      *
      * @return bool
      */
-    private static function is_auto_added( $cart_item ) {
-        if ( ! empty( $cart_item[ self::AUTO_ADDED ] ) ) {
-            return true;
+    public static function skip_storegrowth_gifts( $track, $cart_item_key, $cart_item, $nested ) {
+        if ( $nested || empty( $cart_item['bogo_offer'] ) ) {
+            return $track;
         }
 
-        return ! empty( $cart_item['bogo_offer'] ) && class_exists( 'StorePulse\\StoreGrowth\\Modules\\BoGo\\OrderBogo' );
+        return class_exists( 'StorePulse\\StoreGrowth\\Modules\\BoGo\\OrderBogo' ) ? false : $track;
+    }
+
+    /**
+     * How many woocommerce_add_to_cart actions are running; a hook that threw stays counted.
+     *
+     * @return int
+     */
+    private static function running_adds() {
+        $running = isset( $GLOBALS['wp_current_filter'] ) ? (array) $GLOBALS['wp_current_filter'] : array();
+
+        return count( array_keys( $running, 'woocommerce_add_to_cart', true ) );
     }
 
     /**
@@ -403,9 +464,7 @@ class Pipeline {
      */
     private static function outer_add_key() {
         // A stale entry only adds to this count, so one or none means no add is running around this one.
-        $running = isset( $GLOBALS['wp_current_filter'] ) ? (array) $GLOBALS['wp_current_filter'] : array();
-
-        if ( count( array_keys( $running, 'woocommerce_add_to_cart', true ) ) < 2 ) {
+        if ( self::running_adds() < 2 ) {
             return null;
         }
 

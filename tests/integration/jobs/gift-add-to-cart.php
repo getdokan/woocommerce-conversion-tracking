@@ -41,6 +41,14 @@ add_action(
             WC()->cart->add_to_cart( 2005, 1, 0, array(), array( 'ct_gift' => true, 'ct_round' => 2 ) );
         }
 
+        // A plugin that adds one more of the shopper's product with the same cart data, so it merges into their line, once.
+        static $merged = false;
+
+        if ( ! empty( $GLOBALS['ct_merge'] ) && ! $merged && 2001 === (int) $product_id && empty( $item['ct_gift'] ) ) {
+            $merged = true;
+            WC()->cart->add_to_cart( 2001, 1 );
+        }
+
         // A bundle plugin whose item carries the given cart item data.
         if ( ! empty( $item['ct_child_data'] ) ) {
             WC()->cart->add_to_cart( 2001, 1, 0, array(), $item['ct_child_data'] );
@@ -119,6 +127,14 @@ add_action(
                 $item['data']->set_price( 9 );
             }
         }
+
+        // A plugin that adds an add-on while totals are calculated, once.
+        static $calc_added = false;
+
+        if ( ! empty( $GLOBALS['ct_calc_addon'] ) && ! $calc_added ) {
+            $calc_added = true;
+            $cart->add_to_cart( 2001, 1, 0, array(), array( 'ct_calc_child' => true ) );
+        }
     }
 );
 add_filter(
@@ -139,7 +155,7 @@ $steps = array();
 $names = new ReflectionProperty( Pipeline::class, 'named_used' );
 $names->setAccessible( true );
 $step  = function ( $name, $callback ) use ( $pipeline, &$steps, $names ) {
-    $names->setValue( null, array() );
+    $names->setValue( $pipeline, array() );
 
     // The browser ran the earlier steps' events; the queue keeps only the last PendingEvents::MAX.
     WC()->session->set( PendingEvents::SESSION_KEY, array() );
@@ -205,6 +221,58 @@ $step(
 // Bundle items a plugin flags, or leaves out through the filter, stay out of the event.
 $step( 'bundle_flagged_child', function () { WC()->cart->add_to_cart( 2005, 1, 0, array(), array( 'ct_child_data' => array( Pipeline::AUTO_ADDED => true ) ) ); } );
 $step( 'bundle_filtered_child', function () { WC()->cart->add_to_cart( 2005, 1, 0, array(), array( 'ct_child_data' => array( 'ct_skip' => true ) ) ); } );
+// A plugin merges a copy into the shopper's own line: the shopper added one.
+$step(
+    'merge_into_shoppers_line',
+    function () {
+        $GLOBALS['ct_merge'] = true;
+        WC()->cart->add_to_cart( 2001, 1 );
+        unset( $GLOBALS['ct_merge'] );
+    }
+);
+// The shopper's line is removed, then a $0 copy is added in the same request: the removed add used the name.
+$step(
+    'vanish_then_free_copy',
+    function () {
+        $_REQUEST['add-to-cart'] = 2005;
+        WC()->cart->add_to_cart( 2005, 1, 0, array(), array( 'ct_vanish' => true ) );
+        WC()->cart->add_to_cart( 2005, 1, 0, array(), array( 'ct_gift' => true, 'ct_round' => 9 ) );
+        unset( $_REQUEST['add-to-cart'] );
+    }
+);
+// The grouped form's way, with an add-on a plugin adds while CT recalculates the totals.
+$step(
+    'grouped_calc_addon',
+    function () {
+        remove_action( 'woocommerce_add_to_cart', array( WC()->cart, 'calculate_totals' ), 20 );
+        $GLOBALS['ct_calc_addon'] = true;
+        WC()->cart->add_to_cart( 2002, 1, 2003, array( 'attribute_color' => 'Blue' ), array( 'ct_gift_new' => true, 'ct_round' => 10 ) );
+        unset( $GLOBALS['ct_calc_addon'] );
+        add_action( 'woocommerce_add_to_cart', array( WC()->cart, 'calculate_totals' ), 20, 0 );
+        WC()->cart->calculate_totals();
+    }
+);
+// A flagged add of a named product uses the name: a $0 copy after it is a gift.
+$step(
+    'flagged_then_free_copy',
+    function () {
+        $_REQUEST['add-to-cart'] = 2005;
+        WC()->cart->add_to_cart( 2005, 1, 0, array(), array( Pipeline::AUTO_ADDED => true, 'ct_round' => 11 ) );
+        WC()->cart->add_to_cart( 2005, 1, 0, array(), array( 'ct_gift' => true, 'ct_round' => 11 ) );
+        unset( $_REQUEST['add-to-cart'] );
+    }
+);
+// The grouped form posts every child; one left at 0 is not named, so its $0 gift sends nothing.
+$step(
+    'grouped_unpicked_child_gift',
+    function () {
+        $_REQUEST['add-to-cart'] = 2002;
+        $_REQUEST['quantity']    = array( 2001 => '1', 2005 => '0' );
+        WC()->cart->add_to_cart( 2001, 1 );
+        WC()->cart->add_to_cart( 2005, 1, 0, array(), array( 'ct_gift' => true, 'ct_round' => 12 ) );
+        unset( $_REQUEST['add-to-cart'], $_REQUEST['quantity'] );
+    }
+);
 // A plugin removes the shopper's line and adds nothing.
 $step( 'vanish', function () { WC()->cart->add_to_cart( 2005, 1, 0, array(), array( 'ct_vanish' => true ) ); } );
 // A side cart's own AJAX action that posts product_id.
@@ -243,6 +311,20 @@ $step(
                 ),
             )
         );
+    }
+);
+// Two Store API requests one after the other, each naming the free T-Shirt: each sends, since a finished request's names are forgotten.
+$rest_names_left = null;
+$step(
+    'free_by_store_api_twice',
+    function () use ( $store_api, $names, $pipeline, &$rest_names_left ) {
+        foreach ( array( 1, 2 ) as $round ) {
+            WC()->cart->remove_cart_item( WC()->cart->generate_cart_id( 2005 ) );
+            $store_api( '/wc/store/v1/cart/add-item', array( 'id' => 2005, 'quantity' => 1 ) );
+        }
+
+        // Each finished REST request's names are gone (object IDs get reused).
+        $rest_names_left = array_values( array_filter( array_keys( $names->getValue( $pipeline ) ), function ( $scope ) { return 0 === strpos( $scope, 'rest-' ); } ) );
     }
 );
 unset( $GLOBALS['ct_free_ids'] );
@@ -330,5 +412,6 @@ return array(
     'lines'   => $lines,
     'cart_id' => ProductId::for_cart( WC()->cart->get_cart(), 'facebook' ),
     'status'  => $status,
+    'rest_names_left' => $rest_names_left,
     'nested'  => isset( $GLOBALS['ct_nested_filtered'] ) ? array_values( array_unique( $GLOBALS['ct_nested_filtered'] ) ) : array(),
 );

@@ -39,6 +39,10 @@ class GiftAddToCartTest extends TestCase {
         // Like a gift plugin adding on a page load, a coupon or a quantity change, or StoreGrowth's gift picker.
         $this->assertSame( array(), $this->result()['steps']['picked_gift'] );
         $this->assertSame( array(), $this->result()['steps']['gift_on_store_api_update'] );
+
+        // The grouped form's child left at 0 is not named; the child picked sends.
+        $this->assertCount( 1, $this->result()['steps']['grouped_unpicked_child_gift'] );
+        $this->assertMatchesRegularExpression( '/"content_ids": \[\s*"2001"\s*\]/', $this->result()['steps']['grouped_unpicked_child_gift'][0]['scripts']['facebook'] );
     }
 
     public function test_a_0_gift_during_the_shoppers_request_sends_nothing_and_their_add_does() {
@@ -75,6 +79,24 @@ class GiftAddToCartTest extends TestCase {
 
     public function test_nothing_is_sent_when_the_shoppers_line_is_gone() {
         $this->assertSame( array(), $this->result()['steps']['vanish'] );
+
+        // Its add used the request's name: a $0 copy added after it is a gift.
+        $this->assertSame( array(), $this->result()['steps']['vanish_then_free_copy'] );
+        $this->assertSame( array(), $this->result()['steps']['flagged_then_free_copy'] );
+    }
+
+    public function test_a_copy_merged_into_the_shoppers_line_adds_nothing() {
+        $queued = $this->result()['steps']['merge_into_shoppers_line'];
+
+        $this->assertCount( 1, $queued );
+        $this->assertMatchesRegularExpression( '/"content_ids": \[\s*"2001"\s*\],\s*"content_type": "product",\s*"value": "18.00"/', $queued[0]['scripts']['facebook'] );
+    }
+
+    public function test_an_add_on_added_while_the_grouped_form_recalculates_joins() {
+        $queued = $this->result()['steps']['grouped_calc_addon'];
+
+        $this->assertCount( 1, $queued );
+        $this->assertMatchesRegularExpression( '/"content_ids": \[\s*"2003",\s*"2001"\s*\],\s*"content_type": "product",\s*"value": "60.00"/', $queued[0]['scripts']['facebook'] );
     }
 
     public function test_a_free_product_the_shopper_adds_is_sent_at_its_cart_price() {
@@ -87,6 +109,8 @@ class GiftAddToCartTest extends TestCase {
         $this->assertMatchesRegularExpression( '/"content_ids": \[\s*"2005"\s*\],\s*"content_type": "product",\s*"value": "0.00"/', $steps['free_by_store_api_batch'][0]['scripts']['facebook'] );
         $this->assertMatchesRegularExpression( '/"content_ids": \[\s*"2004"\s*\],\s*"content_type": "product",\s*"value": "0.00"/', $steps['free_by_store_api_batch'][1]['scripts']['facebook'] );
         $this->assertCount( 1, $steps['free_by_form_after_rest'] );
+        $this->assertCount( 2, $steps['free_by_store_api_twice'] );
+        $this->assertSame( array(), $this->result()['rest_names_left'] );
         $this->assertCount( 1, $queued );
         $this->assertMatchesRegularExpression( '/"content_ids": \[\s*"2005"\s*\],\s*"content_type": "product",\s*"value": "0.00"/', $queued[0]['scripts']['facebook'] );
         $this->assertStringContainsString( '"value":0,', $queued[0]['scripts']['ga4'] );
