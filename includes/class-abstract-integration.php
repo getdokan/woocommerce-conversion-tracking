@@ -386,6 +386,17 @@ abstract class WCCT_Integration {
     }
 
     /**
+     * The Purchase value this platform sends for an order, for the Activity log; null when it sends none
+     *
+     * @param \WC_Order $order Order.
+     *
+     * @return string|null Decimal string.
+     */
+    public function sent_purchase_value( $order ) {
+        return $this->purchase_value( $order );
+    }
+
+    /**
      * Whether the integration has a method for a pipeline event
      *
      * @param string $name Event name.

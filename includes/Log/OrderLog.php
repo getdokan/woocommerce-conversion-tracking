@@ -15,7 +15,7 @@ class OrderLog {
     /**
      * Schema version; bump it when the table changes.
      */
-    const DB_VERSION = '2';
+    const DB_VERSION = '3';
 
     /**
      * Option holding the installed schema version.
@@ -51,6 +51,8 @@ class OrderLog {
         'consent'          => "varchar(16) NOT NULL DEFAULT ''",
         'reason'           => "varchar(32) NOT NULL DEFAULT ''",
         'event_id'         => "varchar(64) NOT NULL DEFAULT ''",
+        // The Purchase value this platform was sent, as a decimal string; empty when unknown (older rows, not sent, the custom script).
+        'value'            => "varchar(32) NOT NULL DEFAULT ''",
         // Token of the page load that checked in; a hand-over from another page load is a repeat (Log\RepeatSends).
         'load_id'          => 'varchar(32) NULL DEFAULT NULL',
         'created_at'       => 'datetime NOT NULL',
@@ -242,6 +244,9 @@ class OrderLog {
 
             if ( 'thankyou_seen_at' === $column ) {
                 $updates[] = "{$column} = COALESCE({$column}, VALUES({$column}))";
+            } elseif ( 'value' === $column ) {
+                // The value of the first send stays: a reload's repeat or a late check-in doesn't change it.
+                $updates[] = "{$column} = IF({$column} <> '', {$column}, VALUES({$column}))";
             } elseif ( in_array( $column, self::CHECKIN_COLUMNS, true ) ) {
                 // A late "not handed over" check-in can't undo a hand-over that arrived first.
                 $updates[] = "{$column} = IF(library_loaded = 1 AND VALUES(library_loaded) = 0, {$column}, VALUES({$column}))";

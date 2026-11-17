@@ -400,6 +400,19 @@ class WCCT_Integration_GA4 extends WCCT_Integration {
     }
 
     /**
+     * The Purchase value GA4 is sent: the item total; shipping and tax go in their own fields
+     *
+     * @param WC_Order $order Order.
+     *
+     * @return string Decimal string.
+     */
+    public function sent_purchase_value( $order ) {
+        $event = EventFactory::purchase( $order );
+
+        return number_format( $event->get_items_total_value( $this->id ), $event->get_decimals(), '.', '' );
+    }
+
+    /**
      * Purchase parameters for an order; value is the item total (fees excluded), tax and shipping are sent on their own
      *
      * @param  WC_Order   $order

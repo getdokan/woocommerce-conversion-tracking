@@ -141,6 +141,7 @@ class LogController extends Controller {
                 'consent'       => $platform['consent'],
                 'event_id'      => $platform['event_id'],
                 'unknown'       => ! empty( $platform['unknown'] ),
+                'values'        => self::values( isset( $platform['values'] ) ? $platform['values'] : array(), $platform['integrations'], $order['currency'] ),
             );
         }
 
@@ -164,6 +165,48 @@ class LogController extends Controller {
             'settles_at'         => self::iso( $order['settles_at'] ),
             'platforms'          => $platforms,
         );
+    }
+
+    /**
+     * The value each integration of a platform was sent, in the order's currency, in the platform's integration order.
+     *
+     * @param string[] $values       Integration ID => decimal string.
+     * @param string[] $integrations Integration IDs.
+     * @param string   $currency     Currency code.
+     *
+     * @return array[] integration, label (GA4 or Google Ads for Google, else empty), value and amount.
+     */
+    private static function values( array $values, array $integrations, $currency ) {
+        $labels = array(
+            'ga4'      => __( 'GA4', 'woocommerce-conversion-tracking' ),
+            'adwords'  => __( 'Google Ads', 'woocommerce-conversion-tracking' ),
+        );
+        $list   = array();
+
+        // GA4 before Google Ads, whatever order the integrations checked in.
+        usort(
+            $integrations,
+            function ( $a, $b ) {
+                $rank = array( 'ga4' => 0, 'adwords' => 1 );
+
+                return ( isset( $rank[ $a ] ) ? $rank[ $a ] : 2 ) - ( isset( $rank[ $b ] ) ? $rank[ $b ] : 2 );
+            }
+        );
+
+        foreach ( $integrations as $id ) {
+            if ( ! isset( $values[ $id ] ) || ! is_numeric( $values[ $id ] ) ) {
+                continue;
+            }
+
+            $list[] = array(
+                'integration' => (string) $id,
+                'label'       => isset( $labels[ $id ] ) ? $labels[ $id ] : '',
+                'value'       => (string) $values[ $id ],
+                'amount'      => self::amount( $values[ $id ], $currency ),
+            );
+        }
+
+        return $list;
     }
 
     /**
@@ -301,6 +344,19 @@ class LogController extends Controller {
                                         'unknown'       => array(
                                             'description' => __( 'No check-in from this platform while others checked in: listed, never judged.', 'woocommerce-conversion-tracking' ),
                                             'type'        => 'boolean',
+                                        ),
+                                        'values'        => array(
+                                            'description' => __( 'The Purchase value each of the platform\'s integrations was sent, when its check-in recorded one.', 'woocommerce-conversion-tracking' ),
+                                            'type'        => 'array',
+                                            'items'       => array(
+                                                'type'       => 'object',
+                                                'properties' => array(
+                                                    'integration' => $text,
+                                                    'label'       => $text,
+                                                    'value'       => $text,
+                                                    'amount'      => $text,
+                                                ),
+                                            ),
                                         ),
                                     ),
                                 ),

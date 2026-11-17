@@ -235,6 +235,46 @@ function wcct_test_v3_from_v1() {
 }
 
 /**
+ * Give an order a fee and tax, for 'call' steps: the fee is part of the order's items value but not of GA4's items total.
+ *
+ * @param int    $order_id Order ID.
+ * @param string $fee      Fee amount.
+ * @param string $tax      Tax amount, added to the total.
+ *
+ * @return null
+ */
+function wcct_test_order_fee_and_tax( $order_id, $fee, $tax ) {
+    $order = wc_get_order( $order_id );
+    $item  = new WC_Order_Item_Fee();
+
+    $item->set_props( array( 'name' => 'Handling', 'total' => $fee ) );
+    $order->add_item( $item );
+    $order->calculate_totals( false );
+    $order->set_cart_tax( $tax );
+    $order->set_total( (float) $order->get_total() + (float) $tax );
+    $order->save();
+
+    return null;
+}
+
+/**
+ * Set a platform's "Order value includes" in the 3.0 settings, for 'call' steps.
+ *
+ * @param string $key  Settings platform key (facebook, google, twitter).
+ * @param string $mode items, shipping or all.
+ *
+ * @return null
+ */
+function wcct_test_value_mode( $key, $mode ) {
+    $settings = get_option( 'wcct_settings_v3', array() );
+
+    $settings['platforms'][ $key ]['value_mode'] = $mode;
+    update_option( 'wcct_settings_v3', $settings );
+
+    return null;
+}
+
+/**
  * Forget every platform's last purchase, for 'call' steps.
  *
  * @return null

@@ -6,12 +6,12 @@ import type { StatusTone } from '@wcct/components';
 /**
  * WordPress dependencies
  */
-import { __, sprintf } from '@wordpress/i18n';
+import { __, _x, sprintf } from '@wordpress/i18n';
 
 /**
  * Internal dependencies
  */
-import type { LogOrder, LogStatus, LogTab } from '../../data/log';
+import type { LogOrder, LogPlatform, LogStatus, LogTab } from '../../data/log';
 
 /**
  * Pill tone per order status: Counted once green, Not confirmed and Pending amber, the rest grey.
@@ -177,6 +177,61 @@ export const sentText = ( order: LogOrder ): string => {
     }
 
     return '';
+};
+
+/**
+ * The Purchase value a platform was sent: one amount, or each integration's when Google's two differ; empty when unknown.
+ *
+ * @param {LogPlatform} platform Platform.
+ * @return {string} Text.
+ */
+export const sentValueText = ( platform: LogPlatform ): string => {
+    const values = platform.values ?? [];
+
+    if ( ! values.length ) {
+        return '';
+    }
+
+    // Google's two integrations are named unless both were sent the same value.
+    const same =
+        values.length === platform.integrations.length &&
+        values.every(
+            ( entry ) => Number( entry.value ) === Number( values[ 0 ].value )
+        );
+    const amounts = same
+        ? values[ 0 ].amount
+        : values
+              .map( ( entry ) =>
+                  entry.label
+                      ? sprintf(
+                            /* translators: 1: GA4 or Google Ads, 2: amount, for example $99.00 */
+                            __(
+                                '%1$s %2$s',
+                                'woocommerce-conversion-tracking'
+                            ),
+                            entry.label,
+                            entry.amount
+                        )
+                      : entry.amount
+              )
+              .reduce( ( list, item ) =>
+                  sprintf(
+                      /* translators: 1: the list so far, 2: the next item */
+                      _x(
+                          '%1$s, %2$s',
+                          'list of values',
+                          'woocommerce-conversion-tracking'
+                      ),
+                      list,
+                      item
+                  )
+              );
+
+    return sprintf(
+        /* translators: %s: amount sent, for example $99.00, or "GA4 $99.00, Google Ads $109.00" */
+        __( 'Value sent: %s', 'woocommerce-conversion-tracking' ),
+        amounts
+    );
 };
 
 /**

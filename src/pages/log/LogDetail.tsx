@@ -20,6 +20,7 @@ import {
     eventLabel,
     handOverStep,
     orderStatusText,
+    sentValueText,
     statusLabel,
 } from './text';
 
@@ -119,12 +120,19 @@ const PlatformResult = ( {
 } ) => {
     let steps: ReactNode = null;
     let note: ReactNode = null;
+    const sentValue = sentValueText( platform );
+    const valueStep = sentValue ? (
+        <Step>
+            <span data-testid="wcct-log-sent-value">{ sentValue }</span>
+        </Step>
+    ) : null;
 
     switch ( platform.status ) {
         case 'confirmed':
             steps = (
                 <>
                     <Step>{ handOverStep( platform.id ) }</Step>
+                    { valueStep }
                     <Step>
                         { at(
                             __(
@@ -180,12 +188,15 @@ const PlatformResult = ( {
             break;
         case 'pending':
             steps = platform.sent ? (
-                <Step>
-                    { __(
-                        'Sent on the thank-you page; payment still pending',
-                        'woocommerce-conversion-tracking'
-                    ) }
-                </Step>
+                <>
+                    <Step>
+                        { __(
+                            'Sent on the thank-you page; payment still pending',
+                            'woocommerce-conversion-tracking'
+                        ) }
+                    </Step>
+                    { valueStep }
+                </>
             ) : (
                 <Step tone="warn">
                     { __(

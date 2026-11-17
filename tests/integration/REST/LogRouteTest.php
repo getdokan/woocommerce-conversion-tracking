@@ -269,6 +269,46 @@ class LogRouteTest extends WCCT_Test_Rest_Case {
         $this->assertSame( 2, $results[7], 'a check-in drops the cache' );
     }
 
+    public function test_each_platform_shows_the_value_it_was_sent() {
+        $check_in = function ( $platform, $loaded = true ) {
+            return array( 'request', 'POST', '/wcct/v1/events', array( 'order_id' => 3001, 'key' => 'wc_order_ctguest0001', 'platform' => $platform, 'loaded' => $loaded, 'reason' => $loaded ? '' : 'timeout' ), 'logged_out' );
+        };
+
+        // Order 3001: $73.00 of items after the coupon, $5.00 shipping, then a $4.00 fee and $2.00 tax: $84.00 in all.
+        // Items only: $77.00 (the fee counts), items and shipping: $82.00, everything: $84.00; GA4's items total: $73.00.
+        $steps = array(
+            self::settings(),
+            array( 'call', 'wcct_test_v3_from_v1' ),
+            array( 'call', 'wcct_test_value_mode', array( 'facebook', 'all' ) ),
+            array( 'call', 'wcct_test_value_mode', array( 'google', 'shipping' ) ),
+            array( 'call', 'wcct_test_value_mode', array( 'twitter', 'items' ) ),
+            array( 'call', 'wcct_test_order_fee_and_tax', array( 3001, '4.00', '2.00' ) ),
+            array( 'call', 'wcct_test_log_clear', array( 30 ) ),
+            $check_in( 'facebook' ),
+            $check_in( 'adwords' ),
+            $check_in( 'ga4' ),
+            $check_in( 'twitter' ),
+            $check_in( 'custom' ),
+            // A repeat after the setting changed keeps the value of the first send.
+            array( 'call', 'wcct_test_value_mode', array( 'facebook', 'items' ) ),
+            $check_in( 'facebook' ),
+            self::get(),
+        );
+
+        $results   = $this->rest( $steps );
+        $platforms = array_column( end( $results )['data']['orders'][0]['platforms'], null, 'id' );
+        $values    = function ( $id ) use ( $platforms ) {
+            return array_column( $platforms[ $id ]['values'], 'amount', 'integration' );
+        };
+
+        $this->assertSame( array( 'facebook' => '$84.00' ), $values( 'facebook' ) );
+        // GA4 is sent the items total, listed first; Google Ads follows "Order value includes".
+        $this->assertSame( array( 'ga4' => '$73.00', 'adwords' => '$82.00' ), $values( 'google' ) );
+        $this->assertSame( array( 'GA4', 'Google Ads' ), array_column( $platforms['google']['values'], 'label' ) );
+        $this->assertSame( array( 'twitter' => '$77.00' ), $values( 'twitter' ) );
+        $this->assertSame( array(), $values( 'custom' ) );
+    }
+
     public function test_no_orders_gives_an_empty_log() {
         $results = $this->rest( array( self::settings(), array( 'call', 'wcct_test_log_clear' ), self::get() ) );
 

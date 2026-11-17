@@ -112,6 +112,32 @@ class CheckIn {
     }
 
     /**
+     * The Purchase value an integration sends for an order, as a decimal string; empty when it sends none or isn't loaded.
+     *
+     * @param \WC_Order $order    Order.
+     * @param string    $platform Integration ID.
+     *
+     * @return string
+     */
+    private static function sent_value( $order, $platform ) {
+        $integrations = function_exists( 'wcct_init' ) && isset( wcct_init()->manager ) ? wcct_init()->manager->get_integrations() : array();
+        $integration  = isset( $integrations[ $platform ] ) ? $integrations[ $platform ] : null;
+
+        if ( ! is_object( $integration ) || ! method_exists( $integration, 'sent_purchase_value' ) ) {
+            return '';
+        }
+
+        // A value filter that throws costs the log its value, not the check-in.
+        try {
+            $value = $integration->sent_purchase_value( $order );
+        } catch ( \Throwable $e ) {
+            return '';
+        }
+
+        return is_numeric( $value ) ? substr( (string) $value, 0, 32 ) : '';
+    }
+
+    /**
      * Record a check-in for an order and platform whose key was already checked.
      *
      * @param \WC_Order $order    Order.
@@ -143,6 +169,11 @@ class CheckIn {
 
         if ( $flagged || ( $changes && $changes['library_loaded'] ) ) {
             LastPurchase::record( $platform, $order, $now );
+        }
+
+        // Once the platform's script ran: the value it was sent, as it sends it.
+        if ( null !== $changes && $changes['library_loaded'] ) {
+            $changes['value'] = self::sent_value( $order, $platform );
         }
 
         if ( null !== $changes ) {
