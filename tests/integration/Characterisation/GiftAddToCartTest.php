@@ -41,14 +41,52 @@ class GiftAddToCartTest extends TestCase {
         $this->assertSame( array(), $this->result()['steps']['gift_on_store_api_update'] );
     }
 
+    public function test_a_0_gift_during_the_shoppers_request_sends_nothing_and_their_add_does() {
+        $steps = $this->result()['steps'];
+
+        $this->assertCount( 1, $steps['gift_in_add_request'] );
+        $this->assertMatchesRegularExpression( '/"content_ids": \[\s*"2001"\s*\],\s*"content_type": "product",\s*"value": "18.00"/', $steps['gift_in_add_request'][0]['scripts']['facebook'] );
+
+        // The request names the free variation once: the second $0 add of it is a gift.
+        $this->assertCount( 1, $steps['free_named_twice'] );
+        $this->assertMatchesRegularExpression( '/"content_ids": \[\s*"2003"\s*\],\s*"content_type": "product",\s*"value": "0.00"/', $steps['free_named_twice'][0]['scripts']['facebook'] );
+
+        $this->assertCount( 1, $steps['free_by_custom_ajax'] );
+        $this->assertMatchesRegularExpression( '/"content_ids": \[\s*"2001"\s*\],\s*"content_type": "product",\s*"value": "0.00"/', $steps['free_by_custom_ajax'][0]['scripts']['facebook'] );
+
+        // A same-product gift, or a sibling variation's, after the shopper's priced add in that request.
+        $this->assertCount( 1, $steps['same_product_gift_in_request'] );
+        $this->assertStringContainsString( '"value": "18.00"', $steps['same_product_gift_in_request'][0]['scripts']['facebook'] );
+        $this->assertCount( 1, $steps['sibling_gift_in_request'] );
+        $this->assertMatchesRegularExpression( '/"content_ids": \[\s*"2003"\s*\],\s*"content_type": "product",\s*"value": "42.00"/', $steps['sibling_gift_in_request'][0]['scripts']['facebook'] );
+    }
+
+    public function test_bundle_items_a_plugin_flags_or_filters_stay_out() {
+        $value = $this->result();
+
+        foreach ( array( 'bundle_flagged_child', 'bundle_filtered_child' ) as $name ) {
+            $this->assertCount( 1, $value['steps'][ $name ] );
+            $this->assertMatchesRegularExpression( '/"content_ids": \[\s*"2005"\s*\],\s*"content_type": "product",\s*"value": "25.00"/', $value['steps'][ $name ][0]['scripts']['facebook'] );
+        }
+
+        // The filter is asked about lines added inside an add.
+        $this->assertContains( 2001, $value['nested'] );
+    }
+
+    public function test_nothing_is_sent_when_the_shoppers_line_is_gone() {
+        $this->assertSame( array(), $this->result()['steps']['vanish'] );
+    }
+
     public function test_a_free_product_the_shopper_adds_is_sent_at_its_cart_price() {
         $steps  = $this->result()['steps'];
         $queued = $steps['free_by_form'];
 
         $this->assertSame( array( 201, 207, 207 ), $this->result()['status'] );
         $this->assertCount( 1, $steps['free_by_store_api'] );
-        $this->assertCount( 1, $steps['free_by_store_api_batch'] );
-        $this->assertStringContainsString( '"value": "0.00"', $steps['free_by_store_api_batch'][0]['scripts']['facebook'] );
+        $this->assertCount( 2, $steps['free_by_store_api_batch'] );
+        $this->assertMatchesRegularExpression( '/"content_ids": \[\s*"2005"\s*\],\s*"content_type": "product",\s*"value": "0.00"/', $steps['free_by_store_api_batch'][0]['scripts']['facebook'] );
+        $this->assertMatchesRegularExpression( '/"content_ids": \[\s*"2004"\s*\],\s*"content_type": "product",\s*"value": "0.00"/', $steps['free_by_store_api_batch'][1]['scripts']['facebook'] );
+        $this->assertCount( 1, $steps['free_by_form_after_rest'] );
         $this->assertCount( 1, $queued );
         $this->assertMatchesRegularExpression( '/"content_ids": \[\s*"2005"\s*\],\s*"content_type": "product",\s*"value": "0.00"/', $queued[0]['scripts']['facebook'] );
         $this->assertStringContainsString( '"value":0,', $queued[0]['scripts']['ga4'] );
@@ -147,6 +185,6 @@ class GiftAddToCartTest extends TestCase {
         // Gift lines stay in the cart (two lines for the Beanie alone); InitiateCheckout lists each product once.
         $this->assertGreaterThan( count( $ids ), count( $value['lines'] ) );
         $this->assertSame( $ids, $value['cart_id'] );
-        $this->assertSame( array( 2001, 2005, 2003 ), $value['cart_id'] );
+        $this->assertSame( array( 2001, 2005, 2003, 2004 ), $value['cart_id'] );
     }
 }

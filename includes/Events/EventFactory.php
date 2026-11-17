@@ -165,7 +165,7 @@ class EventFactory {
      *
      * @return int|float
      */
-    private static function quantity( $quantity ) {
+    public static function quantity( $quantity ) {
         return is_numeric( $quantity ) && $quantity > 0 ? 0 + $quantity : 1;
     }
 

@@ -210,6 +210,14 @@ class ProductIdTest extends TestCase {
         $this->assertSame( array( 'CT-BEANIE', '2004' ), ProductId::for_cart( $cart, 'facebook' ) );
     }
 
+    public function test_two_products_with_the_same_identifier_both_stay() {
+        // SKU "2004" on one product, ID 2004 without a SKU on another.
+        $cart = array( array( 'data' => new WCCT_Test_Fake_Product( 2001, '2004' ) ), array( 'data' => new WCCT_Test_Fake_Product( 2004 ) ) );
+
+        $this->set_mode( 'facebook', ProductId::SKU );
+        $this->assertSame( array( '2004', '2004' ), ProductId::for_cart( $cart, 'facebook' ) );
+    }
+
     public function test_order_sends_variation_ids_and_keeps_deleted_products() {
         $order = new class() {
             public function get_items() {

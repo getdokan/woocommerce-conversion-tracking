@@ -129,7 +129,9 @@ Yes. Use the Custom script page to paste that platform's tag and choose where it
 
 = Do free gifts and BOGO items send their own Add to cart? =
 
-No. One click sends one Add to cart, valued at cart prices. Items another plugin adds during that click join it: bundle items and ticked add-ons count with their price, and free gifts are left out. A free item a plugin adds at another time (on a page load, a coupon or a quantity change) is a gift and sends nothing, and neither do StoreGrowth BOGO gifts. A priced item a plugin adds on its own, such as an order bump, sends its own Add to cart at its cart price. A plugin can leave an item out by setting `wcct_auto_added` to true in its cart item data, or by returning false from the `wcct_track_add_to_cart` filter, which gets the cart item key, the cart item and whether it was added during another add. A plugin with its own add to cart request for free products can return true from `wcct_is_add_to_cart_request`.
+No. Adding a product sends one Add to cart, valued at cart prices (the grouped product form sends one for each product picked). Items another plugin adds during that click join it: bundle items and ticked add-ons count with their price, and free gifts are left out. A free item counts as the shopper's only when the request names that product, as the product form, WooCommerce's AJAX add and the Store API do. Any other free item a plugin adds, on a page load, a coupon or a quantity change, is a gift and sends nothing. StoreGrowth BOGO gifts never send their own. A priced item a plugin adds on its own, such as an order bump, sends its own Add to cart at its cart price.
+
+Plugins can change this. Set `wcct_auto_added` to true in an item's cart item data to leave it out, or return false from the `wcct_track_add_to_cart` filter (cart item key, cart item, whether it was added during another add). For free products added through a request that doesn't send the product ID, return true from `wcct_track_free_add_to_cart` (whether it counts, product ID, variation ID).
 
 = Where do I buy or manage Pro? =
 

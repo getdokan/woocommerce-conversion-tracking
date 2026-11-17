@@ -65,11 +65,18 @@ class Pipeline {
     private $nested_lines = array();
 
     /**
-     * REST requests running, innermost last, as "METHOD route": the Store API batch runs each add as its own.
+     * REST requests running, innermost last: the Store API batch runs each add as its own request.
      *
-     * @var string[]
+     * @var array
      */
     private static $rest_requests = array();
+
+    /**
+     * Products a request named that a $0 shopper's add already used, per request: one free add each.
+     *
+     * @var array[]
+     */
+    private static $named_used = array();
 
     /**
      * Code waiting for the footer, per platform ID.
@@ -188,10 +195,11 @@ class Pipeline {
             return;
         }
 
-        $nested    = isset( $this->nested_lines[ $cart_item_key ] ) ? $this->nested_lines[ $cart_item_key ] : array();
+        // Lines under '' were added inside an add whose key the call stack could not give.
+        $nested    = array_merge( isset( $this->nested_lines[ $cart_item_key ] ) ? $this->nested_lines[ $cart_item_key ] : array(), isset( $this->nested_lines[''] ) ? $this->nested_lines[''] : array() );
         $cart_item = $cart ? $cart->get_cart_item( $cart_item_key ) : array();
 
-        unset( $this->nested_lines[ $cart_item_key ] );
+        unset( $this->nested_lines[ $cart_item_key ], $this->nested_lines[''] );
 
         if ( ! self::tracks_line( $cart_item_key, $cart_item, false ) ) {
             return;
@@ -203,10 +211,10 @@ class Pipeline {
         }
 
         // Quantity added per line, the shopper's first; a line added again (removed and re-added, or more of it) is one line.
-        $added = array( (string) $cart_item_key => self::number( $quantity ) );
+        $added = array( (string) $cart_item_key => EventFactory::quantity( $quantity ) );
 
         foreach ( $nested as $line ) {
-            $added[ $line[0] ] = ( isset( $added[ $line[0] ] ) ? $added[ $line[0] ] : 0 ) + self::number( $line[1] );
+            $added[ $line[0] ] = ( isset( $added[ $line[0] ] ) ? $added[ $line[0] ] : 0 ) + EventFactory::quantity( $line[1] );
         }
 
         $lines = array();
@@ -224,7 +232,7 @@ class Pipeline {
             }
 
             // Each line's product carries the price plugins set in the cart (a $0 gift).
-            $lines[] = array( $item['data'], isset( $item['quantity'] ) ? min( $added_quantity, self::number( $item['quantity'] ) ) : $added_quantity );
+            $lines[] = array( $item['data'], isset( $item['quantity'] ) ? min( $added_quantity, EventFactory::quantity( $item['quantity'] ) ) : $added_quantity );
         }
 
         // Nothing it added is left in the cart.
@@ -234,8 +242,19 @@ class Pipeline {
 
         $event = EventFactory::add_to_cart( $lines[0][0], $quantity, $lines );
 
-        // A $0 item a plugin adds on a page load, coupon or quantity change is a gift.
-        if ( $event->get_value() <= 0 && ! self::is_add_request() ) {
+        // Every shopper's add uses up the request's name for its product, so a same-product gift after it is not taken for the shopper's.
+        $first_named = self::use_request_name( $product_id, $variation_id );
+
+        /**
+         * Filters whether a $0 add is the shopper's own and sends AddToCart; otherwise it is a gift.
+         *
+         * @since 3.0.0
+         *
+         * @param bool $track        Whether it is: the request names the product and no add used that name yet.
+         * @param int  $product_id   Product ID.
+         * @param int  $variation_id Variation ID.
+         */
+        if ( $event->get_value() <= 0 && ! apply_filters( 'wcct_track_free_add_to_cart', $first_named, (int) $product_id, (int) $variation_id ) ) {
             return;
         }
 
@@ -243,7 +262,7 @@ class Pipeline {
     }
 
     /**
-     * Note the REST request about to run, so an add knows whether it is the Store API's add item.
+     * Note the REST request about to run, so an add can read the product it names.
      *
      * @param mixed            $response Response so far.
      * @param array            $handler  Route handler.
@@ -252,7 +271,7 @@ class Pipeline {
      * @return mixed The response, unchanged.
      */
     public function rest_started( $response, $handler, $request ) {
-        self::$rest_requests[] = $request instanceof \WP_REST_Request ? strtoupper( $request->get_method() ) . ' ' . $request->get_route() : '';
+        self::$rest_requests[] = $request instanceof \WP_REST_Request ? $request : null;
 
         return $response;
     }
@@ -267,36 +286,62 @@ class Pipeline {
      * @return mixed The response, unchanged.
      */
     public function rest_finished( $response, $handler, $request ) {
-        array_pop( self::$rest_requests );
+        $done = array_pop( self::$rest_requests );
+
+        // Object IDs are reused once a request is gone.
+        if ( $done instanceof \WP_REST_Request ) {
+            unset( self::$named_used[ 'rest-' . spl_object_id( $done ) ] );
+        }
 
         return $response;
     }
 
     /**
-     * Whether this request is a shopper's add to cart: the product form or link, WooCommerce's AJAX add, or the Store API's.
+     * Use up the request's name for a product: true when the request (or the REST request running) names it and no add used it yet.
+     *
+     * A gift a plugin adds names nothing: it comes on a page load, coupon or quantity change, or after the shopper's add in their request.
+     *
+     * @param int $product_id   Product ID.
+     * @param int $variation_id Variation ID.
      *
      * @return bool
      */
-    private static function is_add_request() {
-        // phpcs:disable WordPress.Security.NonceVerification -- only reads which request this is.
-        $wc_ajax = isset( $_GET['wc-ajax'] ) ? sanitize_key( wp_unslash( $_GET['wc-ajax'] ) ) : '';
-        $action  = isset( $_REQUEST['action'] ) ? sanitize_key( wp_unslash( $_REQUEST['action'] ) ) : '';
-        $is_add  = isset( $_REQUEST['add-to-cart'] ) || 'add_to_cart' === $wc_ajax || ( wp_doing_ajax() && 'woocommerce_add_to_cart' === $action );
-        // phpcs:enable
+    private static function use_request_name( $product_id, $variation_id ) {
+        $rest = self::$rest_requests ? end( self::$rest_requests ) : null;
 
-        // The Store API's add item, also inside a batch (the block product button); a batch's update item is not an add.
-        if ( ! $is_add && self::$rest_requests ) {
-            $is_add = (bool) preg_match( '#^POST /wc/store(/v\d+)?/cart/(add-item|items)/?$#i', (string) end( self::$rest_requests ) );
+        if ( $rest instanceof \WP_REST_Request ) {
+            $scope = 'rest-' . spl_object_id( $rest );
+            $named = array( $rest->get_param( 'id' ), $rest->get_param( 'product_id' ), $rest->get_param( 'variation_id' ) );
+        } else {
+            $scope = 'request';
+
+            // phpcs:disable WordPress.Security.NonceVerification, WordPress.Security.ValidatedSanitizedInput -- only compared with product IDs.
+            $named = array(
+                isset( $_REQUEST['add-to-cart'] ) ? wp_unslash( $_REQUEST['add-to-cart'] ) : null,
+                isset( $_REQUEST['product_id'] ) ? wp_unslash( $_REQUEST['product_id'] ) : null,
+                isset( $_REQUEST['variation_id'] ) ? wp_unslash( $_REQUEST['variation_id'] ) : null,
+                isset( $_REQUEST['id'] ) ? wp_unslash( $_REQUEST['id'] ) : null,
+            );
+
+            // The grouped form names its children as quantity[ id ].
+            if ( isset( $_REQUEST['quantity'] ) && is_array( $_REQUEST['quantity'] ) ) {
+                $named = array_merge( $named, array_keys( $_REQUEST['quantity'] ) );
+            }
+            // phpcs:enable
         }
 
-        /**
-         * Filters whether this request is a shopper's add to cart; outside one, a $0 add is a gift and sends no AddToCart.
-         *
-         * @since 3.0.0
-         *
-         * @param bool $is_add Whether it is.
-         */
-        return (bool) apply_filters( 'wcct_is_add_to_cart_request', $is_add );
+        $named = array_map( 'absint', array_filter( $named, 'is_scalar' ) );
+        $first = false;
+
+        // The variation and its parent: a sibling variation's gift then finds the parent used.
+        foreach ( array_filter( array( absint( $variation_id ), absint( $product_id ) ) ) as $id ) {
+            if ( in_array( $id, $named, true ) ) {
+                $first                             = $first || empty( self::$named_used[ $scope ][ $id ] );
+                self::$named_used[ $scope ][ $id ] = true;
+            }
+        }
+
+        return $first;
     }
 
     /**
@@ -349,20 +394,10 @@ class Pipeline {
     }
 
     /**
-     * A quantity as a number, 1 when it is not one.
-     *
-     * @param mixed $quantity Quantity.
-     *
-     * @return int|float
-     */
-    private static function number( $quantity ) {
-        return is_numeric( $quantity ) && $quantity > 0 ? 0 + $quantity : 1;
-    }
-
-    /**
      * Cart item key of the add this one runs inside, or null for the shopper's own add.
      *
      * Read from the call stack: $wp_current_filter keeps a hook that threw, and WooCommerce catches add exceptions.
+     * Without debug_backtrace (disabled by some hosts) the count decides, and the key is ''.
      *
      * @return string|null
      */
@@ -374,12 +409,22 @@ class Pipeline {
             return null;
         }
 
+        if ( ! function_exists( 'debug_backtrace' ) ) {
+            return '';
+        }
+
         $keys = array();
 
         // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_debug_backtrace -- only while adds are nested.
         foreach ( debug_backtrace( 0 ) as $frame ) {
-            if ( isset( $frame['function'], $frame['args'][0] ) && ! isset( $frame['class'] ) && 'do_action' === $frame['function'] && 'woocommerce_add_to_cart' === $frame['args'][0] ) {
-                $keys[] = isset( $frame['args'][1] ) ? (string) $frame['args'][1] : '';
+            if ( ! isset( $frame['function'], $frame['args'][0] ) || isset( $frame['class'] ) || 'woocommerce_add_to_cart' !== $frame['args'][0] ) {
+                continue;
+            }
+
+            if ( 'do_action' === $frame['function'] ) {
+                $keys[] = isset( $frame['args'][1] ) && is_scalar( $frame['args'][1] ) ? (string) $frame['args'][1] : '';
+            } elseif ( 'do_action_ref_array' === $frame['function'] ) {
+                $keys[] = isset( $frame['args'][1][0] ) && is_scalar( $frame['args'][1][0] ) ? (string) $frame['args'][1][0] : '';
             }
         }
 

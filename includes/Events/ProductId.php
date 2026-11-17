@@ -179,11 +179,11 @@ class ProductId {
 
         foreach ( (array) $cart as $item ) {
             if ( isset( $item['data'] ) && is_object( $item['data'] ) ) {
-                $ids[] = self::value( $item['data'], $mode );
+                $ids[ self::product_key( $item['data'] ) ] = self::value( $item['data'], $mode );
             }
         }
 
-        return self::unique( $ids );
+        return array_values( $ids );
     }
 
     /**
@@ -205,12 +205,12 @@ class ProductId {
 
         foreach ( is_array( $lines ) ? $lines : array() as $line ) {
             if ( isset( $line['product'] ) && is_object( $line['product'] ) ) {
-                $ids[] = self::value( $line['product'], $mode );
+                $ids[ self::product_key( $line['product'] ) ] = self::value( $line['product'], $mode );
             }
         }
 
         if ( $ids ) {
-            return self::unique( $ids );
+            return array_values( $ids );
         }
 
         $product = $event->get_product();
@@ -250,22 +250,26 @@ class ProductId {
             $id = self::for_order_item( $item, $mode );
 
             if ( $id ) {
-                $ids[] = $id;
+                // Keyed by the product (a deleted one by its stored ID), so each is listed once.
+                $product = $item->get_product();
+                $key     = is_object( $product ) ? self::product_key( $product ) : 'p' . (int) ( $item->get_variation_id() ? $item->get_variation_id() : $item->get_product_id() );
+
+                $ids[ $key ] = $id;
             }
         }
 
-        return self::unique( $ids );
+        return array_values( $ids );
     }
 
     /**
-     * Each identifier once, in first-seen order; a free gift of the same product is its own line.
+     * Key that lists a product once: a free gift of the same product is its own line, while two products sharing an identifier stay two.
      *
-     * @param array $ids Identifiers.
+     * @param object $product Product.
      *
-     * @return array
+     * @return string
      */
-    private static function unique( $ids ) {
-        return array_values( array_unique( $ids ) );
+    private static function product_key( $product ) {
+        return method_exists( $product, 'get_id' ) ? 'p' . (int) $product->get_id() : 'o' . spl_object_id( $product );
     }
 
     /**

@@ -6,6 +6,7 @@
 // phpcs:disable
 
 use StorePulse\ConversionTracking\Events\Pipeline;
+use StorePulse\ConversionTracking\Events\PendingEvents;
 use StorePulse\ConversionTracking\Events\ProductId;
 
 $pipeline = wcct_init()->event_dispatcher->get_pipeline();
@@ -38,6 +39,16 @@ add_action(
         // A gift plugin whose gift is new to the cart, so it is $0 only once the totals are calculated.
         if ( ! empty( $item['ct_gift_new'] ) ) {
             WC()->cart->add_to_cart( 2005, 1, 0, array(), array( 'ct_gift' => true, 'ct_round' => 2 ) );
+        }
+
+        // A bundle plugin whose item carries the given cart item data.
+        if ( ! empty( $item['ct_child_data'] ) ) {
+            WC()->cart->add_to_cart( 2001, 1, 0, array(), $item['ct_child_data'] );
+        }
+
+        // A plugin that removes the shopper's line and adds nothing.
+        if ( ! empty( $item['ct_vanish'] ) ) {
+            WC()->cart->remove_cart_item( $cart_item_key );
         }
 
         // A discounted BOGO item: StoreGrowth's key, half price.
@@ -100,7 +111,7 @@ add_action(
     'woocommerce_before_calculate_totals',
     function ( $cart ) {
         foreach ( $cart->get_cart() as $item ) {
-            if ( ! empty( $item['ct_gift'] ) || ! empty( $item['ct_bundle'] ) || ( ! empty( $GLOBALS['ct_free_tshirt'] ) && 2005 === $item['data']->get_id() && empty( $item['ct_child'] ) ) ) {
+            if ( ! empty( $item['ct_gift'] ) || ! empty( $item['ct_bundle'] ) || ( ! empty( $GLOBALS['ct_free_ids'] ) && in_array( $item['data']->get_id(), $GLOBALS['ct_free_ids'], true ) && empty( $item['ct_child'] ) ) ) {
                 $item['data']->set_price( 0 );
             }
 
@@ -112,15 +123,26 @@ add_action(
 );
 add_filter(
     'wcct_track_add_to_cart',
-    function ( $track, $cart_item_key, $cart_item ) {
+    function ( $track, $cart_item_key, $cart_item, $nested ) {
+        if ( $nested ) {
+            $GLOBALS['ct_nested_filtered'][] = (int) $cart_item['data']->get_id();
+        }
+
         return ! empty( $cart_item['ct_skip'] ) ? false : $track;
     },
     10,
-    3
+    4
 );
 
 $steps = array();
-$step  = function ( $name, $callback ) use ( $pipeline, &$steps ) {
+// Each step stands for its own request: forget the product names earlier steps used.
+$names = new ReflectionProperty( Pipeline::class, 'named_used' );
+$names->setAccessible( true );
+$step  = function ( $name, $callback ) use ( $pipeline, &$steps, $names ) {
+    $names->setValue( null, array() );
+
+    // The browser ran the earlier steps' events; the queue keeps only the last PendingEvents::MAX.
+    WC()->session->set( PendingEvents::SESSION_KEY, array() );
     $before = count( $pipeline->pending()->after( '' ) );
     $callback();
     $steps[ $name ] = array_slice( $pipeline->pending()->after( '' ), $before );
@@ -139,6 +161,61 @@ $step(
         unset( $_REQUEST['add-to-cart'] );
     }
 );
+// A gift plugin that adds a $0 gift of another product while the shopper's add request runs (on template_redirect, say).
+$step(
+    'gift_in_add_request',
+    function () {
+        $_REQUEST['add-to-cart'] = 2001;
+        WC()->cart->add_to_cart( 2001, 1 );
+        WC()->cart->add_to_cart( 2005, 1, 0, array(), array( 'ct_gift' => true, 'ct_round' => 4 ) );
+        unset( $_REQUEST['add-to-cart'] );
+    }
+);
+// A free variation the request names, then a second $0 add of it in the same request: only the first is the shopper's.
+$step(
+    'free_named_twice',
+    function () {
+        $_REQUEST['add-to-cart'] = 2003;
+        WC()->cart->add_to_cart( 2002, 1, 2003, array( 'attribute_color' => 'Blue' ), array( 'ct_gift' => true ) );
+        WC()->cart->add_to_cart( 2002, 1, 2003, array( 'attribute_color' => 'Blue' ), array( 'ct_gift' => true, 'ct_round' => 5 ) );
+        unset( $_REQUEST['add-to-cart'] );
+    }
+);
+// A "buy one, get the same free" gift added after the shopper's AJAX add, in the same request.
+$step(
+    'same_product_gift_in_request',
+    function () {
+        $_REQUEST['product_id'] = 2001;
+        WC()->cart->add_to_cart( 2001, 1 );
+        WC()->cart->add_to_cart( 2001, 1, 0, array(), array( 'ct_gift' => true, 'ct_round' => 7 ) );
+        unset( $_REQUEST['product_id'] );
+    }
+);
+// The shopper's variation from the form, then a $0 sibling variation as a gift.
+$step(
+    'sibling_gift_in_request',
+    function () {
+        $_REQUEST['add-to-cart']  = 2002;
+        $_REQUEST['variation_id'] = 2003;
+        WC()->cart->add_to_cart( 2002, 1, 2003, array( 'attribute_color' => 'Blue' ) );
+        WC()->cart->add_to_cart( 2002, 1, 2004, array( 'attribute_color' => 'Red' ), array( 'ct_gift' => true, 'ct_round' => 7 ) );
+        unset( $_REQUEST['add-to-cart'], $_REQUEST['variation_id'] );
+    }
+);
+// Bundle items a plugin flags, or leaves out through the filter, stay out of the event.
+$step( 'bundle_flagged_child', function () { WC()->cart->add_to_cart( 2005, 1, 0, array(), array( 'ct_child_data' => array( Pipeline::AUTO_ADDED => true ) ) ); } );
+$step( 'bundle_filtered_child', function () { WC()->cart->add_to_cart( 2005, 1, 0, array(), array( 'ct_child_data' => array( 'ct_skip' => true ) ) ); } );
+// A plugin removes the shopper's line and adds nothing.
+$step( 'vanish', function () { WC()->cart->add_to_cart( 2005, 1, 0, array(), array( 'ct_vanish' => true ) ); } );
+// A side cart's own AJAX action that posts product_id.
+$step(
+    'free_by_custom_ajax',
+    function () {
+        $_REQUEST['product_id'] = 2001;
+        WC()->cart->add_to_cart( 2001, 1, 0, array(), array( 'ct_gift' => true, 'ct_round' => 6 ) );
+        unset( $_REQUEST['product_id'] );
+    }
+);
 // The Store API's add item, alone and in a batch (the block product button), with the T-Shirt free for these steps.
 add_filter( 'woocommerce_store_api_disable_nonce_check', '__return_true' );
 $store_api = function ( $path, $body ) {
@@ -149,17 +226,35 @@ $store_api = function ( $path, $body ) {
     return rest_do_request( $request )->get_status();
 };
 $status = array();
-$GLOBALS['ct_free_tshirt'] = true;
+$GLOBALS['ct_free_ids'] = array( 2005, 2004 );
 $step( 'free_by_store_api', function () use ( $store_api, &$status ) { $status[] = $store_api( '/wc/store/v1/cart/add-item', array( 'id' => 2005, 'quantity' => 1 ) ); } );
 $step(
     'free_by_store_api_batch',
     function () use ( $store_api, &$status ) {
         // The Store API raises an existing line's quantity without firing woocommerce_add_to_cart, so start a new line.
         WC()->cart->remove_cart_item( WC()->cart->generate_cart_id( 2005 ) );
-        $status[] = $store_api( '/wc/store/v1/batch', array( 'requests' => array( array( 'method' => 'POST', 'path' => '/wc/store/v1/cart/add-item', 'body' => array( 'id' => 2005, 'quantity' => 1 ) ) ) ) );
+        // Two free adds in one batch, each its own sub-request.
+        $status[] = $store_api(
+            '/wc/store/v1/batch',
+            array(
+                'requests' => array(
+                    array( 'method' => 'POST', 'path' => '/wc/store/v1/cart/add-item', 'body' => array( 'id' => 2005, 'quantity' => 1 ) ),
+                    array( 'method' => 'POST', 'path' => '/wc/store/v1/cart/add-item', 'body' => array( 'id' => 2004, 'quantity' => 1 ) ),
+                ),
+            )
+        );
     }
 );
-unset( $GLOBALS['ct_free_tshirt'] );
+unset( $GLOBALS['ct_free_ids'] );
+// A form add the request names, after the REST requests are done.
+$step(
+    'free_by_form_after_rest',
+    function () {
+        $_REQUEST['add-to-cart'] = 2005;
+        WC()->cart->add_to_cart( 2005, 1, 0, array(), array( 'ct_gift' => true, 'ct_round' => 8 ) );
+        unset( $_REQUEST['add-to-cart'] );
+    }
+);
 // A gift plugin that adds a $0 gift on a quantity change, here the Store API's update item in a batch.
 add_action(
     'woocommerce_after_cart_item_quantity_update',
@@ -235,4 +330,5 @@ return array(
     'lines'   => $lines,
     'cart_id' => ProductId::for_cart( WC()->cart->get_cart(), 'facebook' ),
     'status'  => $status,
+    'nested'  => isset( $GLOBALS['ct_nested_filtered'] ) ? array_values( array_unique( $GLOBALS['ct_nested_filtered'] ) ) : array(),
 );
