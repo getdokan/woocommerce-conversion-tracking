@@ -284,9 +284,8 @@ class WCCT_Integration_GA4 extends WCCT_Integration {
                 $order = $this->get_purchase_order( $page_event->get_order() );
 
                 if ( $order ) {
-                    // The params first: they note the value the callback reports.
                     $params                       = $this->get_purchase_params( $order, $page_event );
-                    $confirms[ count( $events ) ] = $this->purchase_sent_callback( $order );
+                    $confirms[ count( $events ) ] = $this->purchase_sent_callback( $order, number_format( (float) $params['value'], wc_get_price_decimals(), '.', '' ) );
                     $events[]                     = array( 'purchase', $params );
                 }
             }
@@ -414,8 +413,6 @@ class WCCT_Integration_GA4 extends WCCT_Integration {
         $items    = array();
         $event    = $event instanceof Event ? $event : EventFactory::purchase( $order );
         $value    = $event->get_items_total_value( $this->id );
-
-        $this->rendered_value( $order, number_format( (float) $value, $decimals, '.', '' ) );
 
         foreach ( $order->get_items() as $order_item ) {
             if ( ! $order_item instanceof WC_Order_Item_Product ) {

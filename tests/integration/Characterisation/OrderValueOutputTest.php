@@ -10,6 +10,9 @@ use PHPUnit\Framework\TestCase;
  */
 class OrderValueOutputTest extends TestCase {
 
+    // Salt the page signs check-in values with (jobs/purchase-order-state.php).
+    const SALT = 'wcct-test-salt';
+
     /**
      * Where each platform prints the Purchase value and currency
      *
@@ -56,9 +59,11 @@ class OrderValueOutputTest extends TestCase {
             $this->assertSame( $expected, $values['twitter'][0], "X, $mode" );
             $this->assertSame( 73.0, $values['ga4'][0], "GA4 ignores the mode and fees, $mode" );
 
-            // The check-in reports the value the page printed for that platform (#138).
+            // The check-in reports the value the page printed for that platform, signed for this order and platform (#138).
             foreach ( $values as $platform => $value ) {
-                $this->assertSame( $value[0], $value[2], "$platform check-in value, $mode" );
+                $printed = number_format( $value[0], 2, '.', '' );
+
+                $this->assertSame( $printed . ':' . hash_hmac( 'md5', "wcct_value|3001|$platform|$printed", self::SALT ), $value[2], "$platform check-in value, $mode" );
             }
         }
     }
@@ -89,7 +94,7 @@ class OrderValueOutputTest extends TestCase {
      * @param array $state   Order state.
      * @param array $options Options for the request.
      *
-     * @return array Platform => [value, currency, value its check-in reports].
+     * @return array Platform => [value, currency, signed value its check-in reports].
      */
     private function values( array $state, array $options = array() ) {
         $result = WCCT_Test_WP::run(
@@ -99,7 +104,7 @@ class OrderValueOutputTest extends TestCase {
                 'request'     => array( 'path' => '/checkout/order-received/3001/?key=wc_order_ctguest0001' ),
                 'options'     => array_merge( $options, array( 'wcct_settings' => WCCT_Test_Settings::lite_all() ) ),
                 'before'      => dirname( __DIR__ ) . '/jobs/purchase-order-state.php',
-                'before_args' => $state,
+                'before_args' => array_merge( $state, array( 'salt' => self::SALT ) ),
             )
         );
 
@@ -117,7 +122,7 @@ class OrderValueOutputTest extends TestCase {
 
         foreach ( $calls as $call ) {
             if ( isset( $values[ $call['platform'] ] ) ) {
-                $values[ $call['platform'] ][2] = (float) $call['value'];
+                $values[ $call['platform'] ][2] = $call['value'];
             }
         }
 

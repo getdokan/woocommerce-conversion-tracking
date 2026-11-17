@@ -68,6 +68,48 @@ test( 'Google names the one integration that was sent when the other was not', a
     assert.equal( sentValueText( google ), 'Value sent: GA4 $73.00' );
 } );
 
+test( 'values that are the same number show once, whatever their decimals', async () => {
+    const { sentValueText } = await load();
+    const google = {
+        id: 'google',
+        integrations: [ 'ga4', 'adwords' ],
+        values: [
+            {
+                integration: 'ga4',
+                label: 'GA4',
+                value: '73.00',
+                amount: '$73.00',
+            },
+            {
+                integration: 'adwords',
+                label: 'Google Ads',
+                value: '73.0',
+                amount: '$73.00',
+            },
+        ],
+    };
+
+    assert.equal( sentValueText( google ), 'Value sent: $73.00' );
+} );
+
+test( 'three grouped values are listed in order, each named', async () => {
+    const { sentValueText } = await load();
+    const grouped = {
+        id: 'grouped',
+        integrations: [ 'a', 'b', 'c' ],
+        values: [
+            value( 'a', 'A', '$1.00' ),
+            value( 'b', 'B', '$2.00' ),
+            value( 'c', 'C', '$1.00' ),
+        ],
+    };
+
+    assert.equal(
+        sentValueText( grouped ),
+        'Value sent: A $1.00, B $2.00, C $1.00'
+    );
+} );
+
 test( 'Google names GA4 when it is the only one set up', async () => {
     const { sentValueText } = await load();
     const google = {

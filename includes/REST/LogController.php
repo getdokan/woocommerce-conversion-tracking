@@ -5,6 +5,8 @@ namespace StorePulse\ConversionTracking\REST;
 use StorePulse\ConversionTracking\Log\Activity;
 use StorePulse\ConversionTracking\Log\OrderLog;
 use StorePulse\ConversionTracking\Log\Statuses;
+use StorePulse\ConversionTracking\Platforms\Pause;
+use StorePulse\ConversionTracking\Platforms\Registry;
 use WP_REST_Request;
 use WP_REST_Response;
 use WP_REST_Server;
@@ -174,22 +176,17 @@ class LogController extends Controller {
      * @param string[] $integrations Integration IDs.
      * @param string   $currency     Currency code.
      *
-     * @return array[] integration, label (GA4 or Google Ads for Google, else empty), value and amount.
+     * @return array[] integration, label (the integration's name when the platform groups several, else empty), value and amount.
      */
     private static function values( array $values, array $integrations, $currency ) {
-        $labels = array(
-            'ga4'      => __( 'GA4', 'woocommerce-conversion-tracking' ),
-            'adwords'  => __( 'Google Ads', 'woocommerce-conversion-tracking' ),
-        );
-        $list   = array();
+        $list = array();
+        $rank = array_flip( array_keys( Pause::INTEGRATIONS ) );
 
-        // GA4 before Google Ads, whatever order the integrations checked in.
+        // In the grouped order (GA4 before Google Ads), whatever order the integrations checked in.
         usort(
             $integrations,
-            function ( $a, $b ) {
-                $rank = array( 'ga4' => 0, 'adwords' => 1 );
-
-                return ( isset( $rank[ $a ] ) ? $rank[ $a ] : 2 ) - ( isset( $rank[ $b ] ) ? $rank[ $b ] : 2 );
+            function ( $a, $b ) use ( $rank ) {
+                return ( isset( $rank[ $a ] ) ? $rank[ $a ] : count( $rank ) ) - ( isset( $rank[ $b ] ) ? $rank[ $b ] : count( $rank ) );
             }
         );
 
@@ -200,13 +197,30 @@ class LogController extends Controller {
 
             $list[] = array(
                 'integration' => (string) $id,
-                'label'       => isset( $labels[ $id ] ) ? $labels[ $id ] : '',
+                'label'       => isset( Pause::INTEGRATIONS[ $id ] ) ? self::integration_name( (string) $id ) : '',
                 'value'       => (string) $values[ $id ],
                 'amount'      => self::amount( $values[ $id ], $currency ),
             );
         }
 
         return $list;
+    }
+
+    /**
+     * An integration's name for the log: GA4 shortened, as on the 3.0 screens; else the integration's own name, or its ID.
+     *
+     * @param string $id Integration ID.
+     *
+     * @return string
+     */
+    private static function integration_name( $id ) {
+        if ( 'ga4' === $id ) {
+            return __( 'GA4', 'woocommerce-conversion-tracking' );
+        }
+
+        $all = function_exists( 'wcct_init' ) && isset( wcct_init()->manager ) ? Registry::normalise( wcct_init()->manager->get_integrations() ) : array();
+
+        return isset( $all[ $id ] ) ? (string) $all[ $id ]->get_name() : $id;
     }
 
     /**

@@ -2,6 +2,7 @@
 
 namespace StorePulse\ConversionTracking\Log;
 
+use StorePulse\ConversionTracking\Events\PurchaseConfirmation;
 use StorePulse\ConversionTracking\Events\PurchaseGate;
 use StorePulse\ConversionTracking\Events\SentFlags;
 use StorePulse\ConversionTracking\Platforms\Registry;
@@ -53,7 +54,7 @@ class CheckIn {
     }
 
     /**
-     * Clean the check-in fields: loaded, consent, reason, event_id and load (the page load's token).
+     * Clean the check-in fields: loaded, consent, reason, event_id, load (the page load's token) and value (signed, see PurchaseConfirmation::signed_value()).
      *
      * @param array $input Raw fields.
      *
@@ -65,8 +66,8 @@ class CheckIn {
         $reason   = ! $loaded && isset( $input['reason'] ) && in_array( $input['reason'], self::REASONS, true ) ? $input['reason'] : '';
         $event_id = isset( $input['event_id'] ) && is_string( $input['event_id'] ) ? substr( preg_replace( '/[^A-Za-z0-9_\-]/', '', $input['event_id'] ), 0, 64 ) : '';
         $load     = isset( $input['load'] ) && is_string( $input['load'] ) ? substr( preg_replace( '/[^A-Za-z0-9]/', '', $input['load'] ), 0, 32 ) : '';
-        // The Purchase value the page rendered: a plain decimal, else nothing (never cut to fit).
-        $value = isset( $input['value'] ) && is_string( $input['value'] ) && preg_match( '/^-?[0-9]{1,20}(\.[0-9]{1,8})?\z/', $input['value'] ) ? $input['value'] : '';
+        // The signed Purchase value the page rendered, else nothing (never cut to fit); record() checks the signature.
+        $value = isset( $input['value'] ) && is_string( $input['value'] ) && preg_match( '/^' . PurchaseConfirmation::VALUE_PATTERN . ':[0-9a-f]{32}\z/', $input['value'] ) ? $input['value'] : '';
 
         return array(
             'loaded'   => $loaded,
@@ -148,9 +149,9 @@ class CheckIn {
             LastPurchase::record( $platform, $order, $now );
         }
 
-        // Once the platform's script ran: the value the page rendered for it; only when the table has the column (OrderLog::install()).
-        if ( null !== $changes && $changes['library_loaded'] && OrderLog::is_current() ) {
-            $changes['value'] = $checkin['value'];
+        // Once the platform's script ran: the value the page rendered for this order and platform; OrderLog::upsert() drops it while the table lacks the column.
+        if ( null !== $changes && $changes['library_loaded'] ) {
+            $changes['value'] = PurchaseConfirmation::verified_value( $order->get_id(), $platform, $checkin['value'] );
         }
 
         if ( null !== $changes ) {
@@ -169,7 +170,7 @@ class CheckIn {
     /**
      * Validate a check-in request and record it; shared by the REST route and the admin-ajax fallback.
      *
-     * @param array    $params     Request fields: order_id, key, platform, loaded, consent, reason, event_id, load.
+     * @param array    $params     Request fields: order_id, key, platform, loaded, consent, reason, event_id, load, value.
      * @param string[] $platforms  Active platform IDs.
      * @param callable $find_order Receives ( order ID, key ), returns the order or false.
      * @param callable $record     Receives ( order, platform, fields ), returns a result constant.

@@ -272,7 +272,7 @@ class LogRouteTest extends WCCT_Test_Rest_Case {
     public function test_each_platform_shows_the_value_it_was_sent() {
         // The value is the one the thank-you page rendered for the platform (see the order-received fixtures); the check-in posts it.
         $check_in = function ( $platform, $value, $loaded = true ) {
-            return array( 'request', 'POST', '/wcct/v1/events', array( 'order_id' => 3001, 'key' => 'wc_order_ctguest0001', 'platform' => $platform, 'loaded' => $loaded, 'reason' => $loaded ? '' : 'timeout', 'value' => $value ), 'logged_out' );
+            return array( 'request', 'POST', '/wcct/v1/events', array( 'order_id' => 3001, 'key' => 'wc_order_ctguest0001', 'platform' => $platform, 'loaded' => $loaded, 'reason' => $loaded ? '' : 'timeout', 'value' => is_string( $value ) && '' !== $value ? '{signed:' . $value . '}' : $value ), 'logged_out' );
         };
 
         $steps = array(
@@ -283,9 +283,9 @@ class LogRouteTest extends WCCT_Test_Rest_Case {
             $check_in( 'adwords', '', false ),
             $check_in( 'adwords', '82.00' ),
             $check_in( 'ga4', '73.00' ),
-            // Not a plain string decimal, or too long: no value, and the check-in still counts.
+            // An array, or a value signed for another platform (Custom renders none): no value, and the check-in still counts.
             $check_in( 'twitter', array( '84.00' ) ),
-            $check_in( 'custom', '123456789012345678901.5' ),
+            $check_in( 'custom', '84.00@facebook' ),
             // A repeat send, or a late miss, keeps the value of the first send.
             $check_in( 'facebook', '99.00' ),
             $check_in( 'facebook', '', false ),

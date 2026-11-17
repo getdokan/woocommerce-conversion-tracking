@@ -60,6 +60,9 @@ class WCCT_Test_Fixture {
         // Inline script data is JSON-encoded again in the scripts section, so escaped URLs get a second backslash.
         $text = str_replace( array( $home, str_replace( '/', '\\\\/', $home ), str_replace( '/', '\/', $home ), rawurlencode( $home ) ), array( '{home}', '{home}', '{home}', '{home}' ), $text );
 
+        // The check-in value's signature hashes with the store's salts.
+        $text = preg_replace( '/([0-9]):[0-9a-f]{32}(?=\\\\?")/', '$1:{signature}', $text );
+
         // Random IDs, for example GA4's add to cart entry IDs.
         return preg_replace( '/[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}/', '{uuid}', $text );
     }

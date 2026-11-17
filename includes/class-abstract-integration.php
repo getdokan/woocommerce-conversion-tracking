@@ -87,11 +87,11 @@ abstract class WCCT_Integration {
     private $purchases_rendered = array();
 
     /**
-     * Purchase value rendered per order ID, which the check-in reports to the Activity log.
+     * Purchase value purchase_value() rendered while the current event's method ran; get_event_script() hands it to the check-in.
      *
-     * @var string[]
+     * @var string
      */
-    private $rendered_values = array();
+    private $event_value = '';
 
     /**
      * WP Consent API category this integration's tags need
@@ -281,7 +281,9 @@ abstract class WCCT_Integration {
         }
 
         $this->current_event = $event;
+        $this->event_value   = '';
         $code                = $this->$method( $purchase ? $event->get_order_id() : '' );
+        $value               = $this->event_value;
         $this->current_event = null;
 
         if ( ! is_string( $code ) ) {
@@ -292,7 +294,7 @@ abstract class WCCT_Integration {
             $this->purchases_rendered[ $event->get_order_id() ] = true;
         }
 
-        return $purchase && '' !== trim( $code ) ? $this->with_purchase_confirmation( $code, $event->get_order() ) : $code;
+        return $purchase && '' !== trim( $code ) ? $this->with_purchase_confirmation( $code, $event->get_order(), $value ) : $code;
     }
 
     /**
@@ -300,17 +302,18 @@ abstract class WCCT_Integration {
      *
      * @param string    $code  Purchase code.
      * @param \WC_Order $order Order.
+     * @param string    $value Purchase value the code rendered, for the Activity log; empty for none.
      *
      * @return string
      */
-    protected function with_purchase_confirmation( $code, $order ) {
+    protected function with_purchase_confirmation( $code, $order, $value = '' ) {
         $check = $this->purchase_sent_check();
 
         if ( false === $check ) {
             return PurchaseConfirmation::helper() . "\n" . $code;
         }
 
-        return PurchaseConfirmation::helper() . "\n" . $code . "\n" . PurchaseConfirmation::confirm_script( $this->id, $order, (string) $check, $this->purchase_consent_category(), $this->sent_value( $order ) );
+        return PurchaseConfirmation::helper() . "\n" . $code . "\n" . PurchaseConfirmation::confirm_script( $this->id, $order, (string) $check, $this->purchase_consent_category(), $value );
     }
 
     /**
@@ -335,11 +338,12 @@ abstract class WCCT_Integration {
      * JS expression for the function that confirms this Purchase, for library callbacks
      *
      * @param \WC_Order $order Order.
+     * @param string    $value Purchase value the code rendered, for the Activity log; empty for none.
      *
      * @return string
      */
-    protected function purchase_sent_callback( $order ) {
-        return PurchaseConfirmation::callback( $this->id, $order, $this->checkin_consent_category(), $this->sent_value( $order ) );
+    protected function purchase_sent_callback( $order, $value = '' ) {
+        return PurchaseConfirmation::callback( $this->id, $order, $this->checkin_consent_category(), $value );
     }
 
     /**
@@ -389,36 +393,9 @@ abstract class WCCT_Integration {
     protected function purchase_value( $order ) {
         $event = $this->purchase_event( $order );
 
-        return $this->rendered_value( $order, number_format( $event->get_value_for( ValueMode::for_platform( $this->id ), $this->id ), $event->get_decimals(), '.', '' ) );
-    }
+        $this->event_value = number_format( $event->get_value_for( ValueMode::for_platform( $this->id ), $this->id ), $event->get_decimals(), '.', '' );
 
-    /**
-     * Note the Purchase value this page renders for an order, so the check-in reports what was sent to the Activity log
-     *
-     * @param \WC_Order|object $order Order.
-     * @param string           $value Decimal string.
-     *
-     * @return string The value.
-     */
-    protected function rendered_value( $order, $value ) {
-        if ( is_object( $order ) && method_exists( $order, 'get_id' ) ) {
-            $this->rendered_values[ (int) $order->get_id() ] = (string) $value;
-        }
-
-        return $value;
-    }
-
-    /**
-     * The Purchase value this page rendered for an order, empty when none
-     *
-     * @param \WC_Order|object $order Order.
-     *
-     * @return string
-     */
-    protected function sent_value( $order ) {
-        $id = is_object( $order ) && method_exists( $order, 'get_id' ) ? (int) $order->get_id() : 0;
-
-        return isset( $this->rendered_values[ $id ] ) ? $this->rendered_values[ $id ] : '';
+        return $this->event_value;
     }
 
     /**

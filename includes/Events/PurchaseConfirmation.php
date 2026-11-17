@@ -11,6 +11,11 @@ use StorePulse\ConversionTracking\Log\CheckIn;
 class PurchaseConfirmation {
 
     /**
+     * A Purchase value the check-in logs: a plain decimal, up to 20 digits and 18 decimals.
+     */
+    const VALUE_PATTERN = '-?[0-9]{1,20}(?:\.[0-9]{1,18})?';
+
+    /**
      * Give up waiting for a platform library after this many milliseconds; the next page view sends again.
      */
     const WAIT_MS = 30000;
@@ -131,8 +136,57 @@ class PurchaseConfirmation {
             self::encode( (string) $order->get_order_key() ),
             self::encode( Event::new_event_id( Event::PURCHASE, (int) $order->get_id() ) ),
             self::encode( (string) $category ),
-            self::encode( (string) $value )
+            self::encode( self::signed_value( (int) $order->get_id(), (string) $platform, $value ) )
         );
+    }
+
+    /**
+     * The value with its signature for the order and platform, "84.00:<hash>", so a check-in can't log another; empty for none.
+     *
+     * @param int    $order_id Order ID.
+     * @param string $platform Platform ID.
+     * @param string $value    Decimal string.
+     *
+     * @return string
+     */
+    public static function signed_value( $order_id, $platform, $value ) {
+        $value = (string) $value;
+
+        if ( ! preg_match( '/^' . self::VALUE_PATTERN . '\z/', $value ) ) {
+            return '';
+        }
+
+        return $value . ':' . self::value_signature( $order_id, $platform, $value );
+    }
+
+    /**
+     * The value of a signed value posted with a check-in, empty unless the page rendered it for this order and platform.
+     *
+     * @param int    $order_id Order ID.
+     * @param string $platform Platform ID.
+     * @param mixed  $signed   Posted value, see signed_value().
+     *
+     * @return string Decimal string or empty.
+     */
+    public static function verified_value( $order_id, $platform, $signed ) {
+        if ( ! is_string( $signed ) || ! preg_match( '/^(' . self::VALUE_PATTERN . '):([0-9a-f]{32})\z/', $signed, $match ) ) {
+            return '';
+        }
+
+        return hash_equals( self::value_signature( $order_id, (string) $platform, $match[1] ), $match[2] ) ? $match[1] : '';
+    }
+
+    /**
+     * Signature of a value for an order and platform.
+     *
+     * @param int    $order_id Order ID.
+     * @param string $platform Platform ID.
+     * @param string $value    Decimal string.
+     *
+     * @return string 32 hex characters.
+     */
+    private static function value_signature( $order_id, $platform, $value ) {
+        return wp_hash( 'wcct_value|' . (int) $order_id . '|' . $platform . '|' . $value );
     }
 
     /**

@@ -57,7 +57,7 @@ class OrderLog {
         'reason'           => "varchar(32) NOT NULL DEFAULT ''",
         'event_id'         => "varchar(64) NOT NULL DEFAULT ''",
         // The Purchase value this platform was sent, as a decimal string; empty when unknown (older rows, not sent, the custom script).
-        'value'            => "varchar(32) NOT NULL DEFAULT ''",
+        'value'            => "varchar(40) NOT NULL DEFAULT ''",
         // Token of the page load that checked in; a hand-over from another page load is a repeat (Log\RepeatSends).
         'load_id'          => 'varchar(32) NULL DEFAULT NULL',
         'created_at'       => 'datetime NOT NULL',
@@ -67,7 +67,14 @@ class OrderLog {
     /**
      * Columns a check-in writes; kept when the row was already handed over.
      */
-    const CHECKIN_COLUMNS = array( 'sent_at', 'consent', 'reason', 'event_id', 'load_id', 'updated_at' );
+    const CHECKIN_COLUMNS = array( 'sent_at', 'consent', 'reason', 'event_id', 'load_id', 'value', 'updated_at' );
+
+    /**
+     * Columns per table (a multisite request can switch sites), read once per request.
+     *
+     * @var string[][]
+     */
+    private static $columns = array();
 
     /**
      * Full table name.
@@ -124,15 +131,12 @@ class OrderLog {
 
         require_once ABSPATH . 'wp-admin/includes/upgrade.php';
 
-        $table = self::table();
+        dbDelta( self::schema( self::table(), $wpdb->get_charset_collate() ) );
 
-        dbDelta( self::schema( $table, $wpdb->get_charset_collate() ) );
-
-        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- own table, once per upgrade.
-        $columns = (array) $wpdb->get_col( "SHOW COLUMNS FROM {$table}" );
+        self::$columns = array();
 
         // A failed upgrade keeps the older version, so the log still reads, and retries in an hour.
-        if ( array_diff( array_keys( self::COLUMNS ), $columns ) ) {
+        if ( array_diff( array_keys( self::COLUMNS ), self::columns() ) ) {
             set_transient( self::RETRY_TRANSIENT, 1, HOUR_IN_SECONDS );
 
             return;
@@ -143,7 +147,7 @@ class OrderLog {
     }
 
     /**
-     * Whether the table is installed, at any version; the log reads and writes the columns every version has.
+     * Whether the table is installed, at any version; upsert() writes only the columns it has.
      *
      * @return bool
      */
@@ -152,12 +156,21 @@ class OrderLog {
     }
 
     /**
-     * Whether the table is at the current version, so it has the value column.
+     * Names of the columns the table has, read once per request.
      *
-     * @return bool
+     * @return string[]
      */
-    public static function is_current() {
-        return self::DB_VERSION === get_option( self::VERSION_OPTION );
+    public static function columns() {
+        global $wpdb;
+
+        $table = self::table();
+
+        if ( ! isset( self::$columns[ $table ] ) ) {
+            // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- own table, once per request.
+            self::$columns[ $table ] = array_map( 'strval', (array) $wpdb->get_col( "SHOW COLUMNS FROM {$table}" ) );
+        }
+
+        return self::$columns[ $table ];
     }
 
     /**
@@ -250,6 +263,13 @@ class OrderLog {
 
         $row = array_intersect_key( $row, self::COLUMNS );
 
+        // A table an upgrade hasn't reached yet takes the columns it has.
+        $columns = self::columns();
+
+        if ( $columns ) {
+            $row = array_intersect_key( $row, array_flip( $columns ) );
+        }
+
         unset( $row['id'] );
 
         // The hand-over guard below needs it.
@@ -271,9 +291,6 @@ class OrderLog {
 
             if ( 'thankyou_seen_at' === $column ) {
                 $updates[] = "{$column} = COALESCE({$column}, VALUES({$column}))";
-            } elseif ( 'value' === $column ) {
-                // The value of the first send stays: a reload's repeat or a late check-in doesn't change it.
-                $updates[] = "{$column} = IF({$column} <> '', {$column}, VALUES({$column}))";
             } elseif ( in_array( $column, self::CHECKIN_COLUMNS, true ) ) {
                 // A late "not handed over" check-in can't undo a hand-over that arrived first.
                 $updates[] = "{$column} = IF(library_loaded = 1 AND VALUES(library_loaded) = 0, {$column}, VALUES({$column}))";
