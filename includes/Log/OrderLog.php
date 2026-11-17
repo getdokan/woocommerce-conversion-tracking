@@ -15,7 +15,7 @@ class OrderLog {
     /**
      * Schema version; bump it when the table changes.
      */
-    const DB_VERSION = '3';
+    const DB_VERSION = '4';
 
     /**
      * Option holding the installed schema version.
