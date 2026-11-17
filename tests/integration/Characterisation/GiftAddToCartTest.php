@@ -35,9 +35,20 @@ class GiftAddToCartTest extends TestCase {
         $this->assertStringContainsString( '"value":18,"items":[{"item_id":"2001"', $queued[0]['scripts']['ga4'] );
     }
 
-    public function test_a_gift_the_shopper_picks_is_sent_at_its_cart_price() {
-        $queued = $this->result()['steps']['picked_gift'];
+    public function test_a_0_item_added_outside_an_add_to_cart_request_is_a_gift() {
+        // Like a gift plugin adding on a page load, a coupon or a quantity change, or StoreGrowth's gift picker.
+        $this->assertSame( array(), $this->result()['steps']['picked_gift'] );
+        $this->assertSame( array(), $this->result()['steps']['gift_on_store_api_update'] );
+    }
 
+    public function test_a_free_product_the_shopper_adds_is_sent_at_its_cart_price() {
+        $steps  = $this->result()['steps'];
+        $queued = $steps['free_by_form'];
+
+        $this->assertSame( array( 201, 207, 207 ), $this->result()['status'] );
+        $this->assertCount( 1, $steps['free_by_store_api'] );
+        $this->assertCount( 1, $steps['free_by_store_api_batch'] );
+        $this->assertStringContainsString( '"value": "0.00"', $steps['free_by_store_api_batch'][0]['scripts']['facebook'] );
         $this->assertCount( 1, $queued );
         $this->assertMatchesRegularExpression( '/"content_ids": \[\s*"2005"\s*\],\s*"content_type": "product",\s*"value": "0.00"/', $queued[0]['scripts']['facebook'] );
         $this->assertStringContainsString( '"value":0,', $queued[0]['scripts']['ga4'] );
@@ -74,6 +85,13 @@ class GiftAddToCartTest extends TestCase {
         $this->assertCount( 1, $steps['readd'] );
         $this->assertMatchesRegularExpression( '/"content_ids": \[\s*"2005"\s*\],\s*"content_type": "product",\s*"value": "25.00"/', $steps['readd'][0]['scripts']['facebook'] );
         $this->assertSame( 1, substr_count( $steps['readd'][0]['scripts']['ga4'], '"item_id"' ) );
+    }
+
+    public function test_an_item_added_by_a_late_hook_joins_the_shoppers_add_to_cart() {
+        $queued = $this->result()['steps']['late_join'];
+
+        $this->assertCount( 1, $queued );
+        $this->assertMatchesRegularExpression( '/"content_ids": \[\s*"2005",\s*"2001"\s*\],\s*"content_type": "product",\s*"value": "43.00"/', $queued[0]['scripts']['facebook'] );
     }
 
     public function test_an_item_added_after_the_event_is_not_carried_into_the_next_add() {

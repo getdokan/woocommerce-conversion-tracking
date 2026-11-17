@@ -129,7 +129,7 @@ Yes. Use the Custom script page to paste that platform's tag and choose where it
 
 = Do free gifts and BOGO items send their own Add to cart? =
 
-No. One click sends one Add to cart, valued at cart prices. Items another plugin adds during that click join it: bundle items and ticked add-ons count with their price, and free gifts are left out. StoreGrowth BOGO gifts never send their own. An item a plugin adds at another time (on a quantity change, a coupon or a page load) sends its own Add to cart at its cart price, unless the plugin sets `wcct_auto_added` to true in its cart item data or returns false from the `wcct_track_add_to_cart` filter, which gets the cart item key, the cart item and whether it was added during another add.
+No. One click sends one Add to cart, valued at cart prices. Items another plugin adds during that click join it: bundle items and ticked add-ons count with their price, and free gifts are left out. A free item a plugin adds at another time (on a page load, a coupon or a quantity change) is a gift and sends nothing, and neither do StoreGrowth BOGO gifts. A priced item a plugin adds on its own, such as an order bump, sends its own Add to cart at its cart price. A plugin can leave an item out by setting `wcct_auto_added` to true in its cart item data, or by returning false from the `wcct_track_add_to_cart` filter, which gets the cart item key, the cart item and whether it was added during another add. A plugin with its own add to cart request for free products can return true from `wcct_is_add_to_cart_request`.
 
 = Where do I buy or manage Pro? =
 

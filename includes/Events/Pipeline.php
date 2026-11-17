@@ -65,6 +65,13 @@ class Pipeline {
     private $nested_lines = array();
 
     /**
+     * REST requests running, innermost last, as "METHOD route": the Store API batch runs each add as its own.
+     *
+     * @var string[]
+     */
+    private static $rest_requests = array();
+
+    /**
      * Code waiting for the footer, per platform ID.
      *
      * @var string[][]
@@ -121,9 +128,11 @@ class Pipeline {
      * @return void
      */
     public function init_hooks() {
-        // After WooCommerce recalculates the totals (priority 20).
+        // Last, after WooCommerce recalculates the totals (priority 20) and every plugin has added its lines.
         add_action( 'woocommerce_add_to_cart', array( $this, 'add_started' ), PHP_INT_MIN, 0 );
-        add_action( 'woocommerce_add_to_cart', array( $this, 'added_to_cart' ), 9999, 4 );
+        add_action( 'woocommerce_add_to_cart', array( $this, 'added_to_cart' ), PHP_INT_MAX, 4 );
+        add_filter( 'rest_request_before_callbacks', array( $this, 'rest_started' ), 10, 3 );
+        add_filter( 'rest_request_after_callbacks', array( $this, 'rest_finished' ), 10, 3 );
         add_filter( 'woocommerce_add_to_cart_fragments', array( $this, 'cart_fragments' ) );
         add_action( 'wc_ajax_' . self::AJAX_ACTION, array( $this, 'send_pending_events' ) );
         add_action( 'woocommerce_thankyou', array( $this, 'thankyou_fallback' ) );
@@ -218,10 +227,76 @@ class Pipeline {
             $lines[] = array( $item['data'], isset( $item['quantity'] ) ? min( $added_quantity, self::number( $item['quantity'] ) ) : $added_quantity );
         }
 
-        $product = $lines ? $lines[0][0] : ( function_exists( 'wc_get_product' ) ? wc_get_product( $variation_id ? $variation_id : $product_id ) : false );
-        $event   = $product instanceof \WC_Product ? EventFactory::add_to_cart( $product, $quantity, $lines ) : EventFactory::cart( Event::ADD_TO_CART, $cart );
+        // Nothing it added is left in the cart.
+        if ( ! $lines ) {
+            return;
+        }
+
+        $event = EventFactory::add_to_cart( $lines[0][0], $quantity, $lines );
+
+        // A $0 item a plugin adds on a page load, coupon or quantity change is a gift.
+        if ( $event->get_value() <= 0 && ! self::is_add_request() ) {
+            return;
+        }
 
         $this->queue( $event );
+    }
+
+    /**
+     * Note the REST request about to run, so an add knows whether it is the Store API's add item.
+     *
+     * @param mixed            $response Response so far.
+     * @param array            $handler  Route handler.
+     * @param \WP_REST_Request $request  Request.
+     *
+     * @return mixed The response, unchanged.
+     */
+    public function rest_started( $response, $handler, $request ) {
+        self::$rest_requests[] = $request instanceof \WP_REST_Request ? strtoupper( $request->get_method() ) . ' ' . $request->get_route() : '';
+
+        return $response;
+    }
+
+    /**
+     * Forget the REST request that just ran.
+     *
+     * @param mixed            $response Response.
+     * @param array            $handler  Route handler.
+     * @param \WP_REST_Request $request  Request.
+     *
+     * @return mixed The response, unchanged.
+     */
+    public function rest_finished( $response, $handler, $request ) {
+        array_pop( self::$rest_requests );
+
+        return $response;
+    }
+
+    /**
+     * Whether this request is a shopper's add to cart: the product form or link, WooCommerce's AJAX add, or the Store API's.
+     *
+     * @return bool
+     */
+    private static function is_add_request() {
+        // phpcs:disable WordPress.Security.NonceVerification -- only reads which request this is.
+        $wc_ajax = isset( $_GET['wc-ajax'] ) ? sanitize_key( wp_unslash( $_GET['wc-ajax'] ) ) : '';
+        $action  = isset( $_REQUEST['action'] ) ? sanitize_key( wp_unslash( $_REQUEST['action'] ) ) : '';
+        $is_add  = isset( $_REQUEST['add-to-cart'] ) || 'add_to_cart' === $wc_ajax || ( wp_doing_ajax() && 'woocommerce_add_to_cart' === $action );
+        // phpcs:enable
+
+        // The Store API's add item, also inside a batch (the block product button); a batch's update item is not an add.
+        if ( ! $is_add && self::$rest_requests ) {
+            $is_add = (bool) preg_match( '#^POST /wc/store(/v\d+)?/cart/(add-item|items)/?$#i', (string) end( self::$rest_requests ) );
+        }
+
+        /**
+         * Filters whether this request is a shopper's add to cart; outside one, a $0 add is a gift and sends no AddToCart.
+         *
+         * @since 3.0.0
+         *
+         * @param bool $is_add Whether it is.
+         */
+        return (bool) apply_filters( 'wcct_is_add_to_cart_request', $is_add );
     }
 
     /**
