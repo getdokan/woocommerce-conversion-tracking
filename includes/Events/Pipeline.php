@@ -79,6 +79,13 @@ class Pipeline {
     private $named_used = array();
 
     /**
+     * Cart item keys of shopper's adds whose AddToCart was already decided in this add round.
+     *
+     * @var bool[]
+     */
+    private $finished_adds = array();
+
+    /**
      * Code waiting for the footer, per platform ID.
      *
      * @var string[][]
@@ -170,7 +177,8 @@ class Pipeline {
     public function add_started() {
         // Not the count alone: after a hook threw it stays high, and leftovers would join a later add of the same line.
         if ( null === self::outer_add_key() ) {
-            $this->nested_lines = array();
+            $this->nested_lines  = array();
+            $this->finished_adds = array();
         }
     }
 
@@ -192,8 +200,27 @@ class Pipeline {
         $outer         = self::outer_add_key();
 
         // Lines added inside the shopper's add are judged when it is done, once plugins have set their cart prices.
-        if ( null !== $outer ) {
+        if ( null !== $outer && ! isset( $this->finished_adds[ $outer ] ) ) {
             $this->nested_lines[ $outer ][] = array( $cart_item_key, $quantity );
+
+            return;
+        }
+
+        // Added by a hook that runs after CT's, once the shopper's AddToCart was decided: a priced line sends its own, as before 3.0.
+        if ( null !== $outer ) {
+            if ( $cart && false === has_action( 'woocommerce_add_to_cart', array( $cart, 'calculate_totals' ) ) ) {
+                $cart->calculate_totals();
+            }
+
+            $item = $cart ? $cart->get_cart_item( $cart_item_key ) : array();
+
+            if ( self::tracks_line( $cart_item_key, $item, true ) ) {
+                $lines = $this->lines( $cart, $cart_item_key, $quantity, array() );
+
+                if ( $lines ) {
+                    $this->queue( EventFactory::add_to_cart( $lines ) );
+                }
+            }
 
             return;
         }
@@ -204,23 +231,27 @@ class Pipeline {
 
         if ( ! self::tracks_line( $cart_item_key, $cart_item, false ) ) {
             $this->take_nested_lines( $cart_item_key );
+            $this->finished_adds[ $cart_item_key ] = true;
 
             return;
         }
 
-        // The grouped form detaches the recalculation, which is where plugins set gift prices; lines they add while it runs join too.
-        if ( $cart && $this->has_nested_lines( $cart_item_key ) && false === has_action( 'woocommerce_add_to_cart', array( $cart, 'calculate_totals' ) ) ) {
+        // The grouped form detaches the recalculation, which is where plugins set cart prices; lines they add while it runs join too.
+        if ( $cart && false === has_action( 'woocommerce_add_to_cart', array( $cart, 'calculate_totals' ) ) ) {
             $cart->calculate_totals();
         }
 
         $lines = $this->lines( $cart, $cart_item_key, $quantity, $this->take_nested_lines( $cart_item_key ) );
+
+        // From here a line added inside this add comes too late to join it.
+        $this->finished_adds[ $cart_item_key ] = true;
 
         // Nothing it added is left in the cart.
         if ( ! $lines ) {
             return;
         }
 
-        $event = EventFactory::add_to_cart( $lines[0]['product'], $lines[0]['quantity'], $lines );
+        $event = EventFactory::add_to_cart( $lines );
 
         /**
          * Filters whether a $0 add is the shopper's own and sends AddToCart; otherwise it is a gift.
@@ -285,17 +316,6 @@ class Pipeline {
     }
 
     /**
-     * Whether lines were added inside an add, including those whose key the call stack could not give.
-     *
-     * @param string $cart_item_key Cart item key.
-     *
-     * @return bool
-     */
-    private function has_nested_lines( $cart_item_key ) {
-        return ! empty( $this->nested_lines[ $cart_item_key ] ) || ! empty( $this->nested_lines[''] );
-    }
-
-    /**
      * Take the lines added inside an add, including those under '' (no call stack).
      *
      * @param string $cart_item_key Cart item key.
@@ -335,19 +355,27 @@ class Pipeline {
      * @return mixed The response, unchanged.
      */
     public function rest_finished( $response, $handler, $request ) {
-        $done = array_pop( $this->rest_requests );
+        // Down to this request: one that threw inside it never reached its own after callbacks.
+        $index = array_search( $request, $this->rest_requests, true );
 
-        if ( $done instanceof \WP_REST_Request ) {
-            unset( $this->named_used[ 'rest-' . spl_object_id( $done ) ] );
+        if ( false === $index ) {
+            return $response;
+        }
+
+        foreach ( array_splice( $this->rest_requests, $index ) as $done ) {
+            if ( $done instanceof \WP_REST_Request ) {
+                unset( $this->named_used[ 'rest-' . spl_object_id( $done ) ] );
+            }
         }
 
         return $response;
     }
 
     /**
-     * Use up the request's name for a product: true when the request (or the REST request running) names it and no add used it yet.
+     * Use up the request's name for a product: true when this is an add to cart request naming it and no add used the name yet.
      *
-     * A gift a plugin adds names nothing: it comes on a page load, coupon or quantity change, or after the shopper's add in their request.
+     * Only add requests name a product: the product form or link, WooCommerce's AJAX add, and the Store API's add item (also in a batch).
+     * A gift a plugin adds names nothing: it comes on a page load, coupon, quantity change or other request, or after the shopper's add.
      *
      * @param int $product_id   Product ID.
      * @param int $variation_id Variation ID.
@@ -359,23 +387,10 @@ class Pipeline {
 
         if ( $rest instanceof \WP_REST_Request ) {
             $scope = 'rest-' . spl_object_id( $rest );
-            $named = array( $rest->get_param( 'id' ), $rest->get_param( 'product_id' ), $rest->get_param( 'variation_id' ) );
+            $named = 'POST' === strtoupper( $rest->get_method() ) && preg_match( '#^/wc/store(/v\d+)?/cart/(add-item|items)/?$#i', $rest->get_route() ) ? array( $rest->get_param( 'id' ) ) : array();
         } else {
             $scope = 'request';
-
-            // phpcs:disable WordPress.Security.NonceVerification, WordPress.Security.ValidatedSanitizedInput -- only compared with product IDs.
-            $named = array(
-                isset( $_REQUEST['add-to-cart'] ) ? wp_unslash( $_REQUEST['add-to-cart'] ) : null,
-                isset( $_REQUEST['product_id'] ) ? wp_unslash( $_REQUEST['product_id'] ) : null,
-                isset( $_REQUEST['variation_id'] ) ? wp_unslash( $_REQUEST['variation_id'] ) : null,
-                isset( $_REQUEST['id'] ) ? wp_unslash( $_REQUEST['id'] ) : null,
-            );
-
-            // The grouped form names its children as quantity[ id ]; only those the shopper picked.
-            if ( isset( $_REQUEST['quantity'] ) && is_array( $_REQUEST['quantity'] ) ) {
-                $named = array_merge( $named, array_keys( array_filter( wp_unslash( $_REQUEST['quantity'] ), function ( $picked ) { return is_numeric( $picked ) && $picked > 0; } ) ) );
-            }
-            // phpcs:enable
+            $named = self::add_request_names();
         }
 
         $named = array_map( 'absint', array_filter( $named, 'is_scalar' ) );
@@ -390,6 +405,51 @@ class Pipeline {
         }
 
         return $first;
+    }
+
+    /**
+     * Product IDs a non-REST add to cart request names: the product form or link (with a grouped form's picked children), or WooCommerce's AJAX add.
+     *
+     * @return array
+     */
+    private static function add_request_names() {
+        // phpcs:disable WordPress.Security.NonceVerification, WordPress.Security.ValidatedSanitizedInput -- only compared with product IDs.
+        if ( isset( $_REQUEST['add-to-cart'] ) ) {
+            $named = array( self::add_to_cart_product_id( wp_unslash( $_REQUEST['add-to-cart'] ) ), isset( $_REQUEST['variation_id'] ) ? wp_unslash( $_REQUEST['variation_id'] ) : null );
+
+            // The grouped form names its children as quantity[ id ]; only those the shopper picked.
+            if ( isset( $_REQUEST['quantity'] ) && is_array( $_REQUEST['quantity'] ) ) {
+                $named = array_merge( $named, array_keys( array_filter( wp_unslash( $_REQUEST['quantity'] ), function ( $picked ) { return is_numeric( $picked ) && $picked > 0; } ) ) );
+            }
+
+            return $named;
+        }
+
+        $wc_ajax = isset( $_GET['wc-ajax'] ) ? sanitize_key( wp_unslash( $_GET['wc-ajax'] ) ) : '';
+        $action  = isset( $_REQUEST['action'] ) ? sanitize_key( wp_unslash( $_REQUEST['action'] ) ) : '';
+
+        if ( 'add_to_cart' === $wc_ajax || ( wp_doing_ajax() && 'woocommerce_add_to_cart' === $action ) ) {
+            return array( isset( $_POST['product_id'] ) ? self::add_to_cart_product_id( wp_unslash( $_POST['product_id'] ) ) : null, isset( $_POST['variation_id'] ) ? wp_unslash( $_POST['variation_id'] ) : null );
+        }
+        // phpcs:enable
+
+        return array();
+    }
+
+    /**
+     * A requested product ID as WooCommerce's add handlers see it, after plugins remap it (translations, for example).
+     *
+     * @param mixed $product_id Requested product ID.
+     *
+     * @return int
+     */
+    private static function add_to_cart_product_id( $product_id ) {
+        if ( ! is_scalar( $product_id ) ) {
+            return 0;
+        }
+
+        // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- WooCommerce's own filter, applied as its handlers do.
+        return absint( apply_filters( 'woocommerce_add_to_cart_product_id', absint( $product_id ) ) );
     }
 
     /**

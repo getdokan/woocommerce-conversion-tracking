@@ -194,10 +194,9 @@ class WCCT_Integration_GA4 extends WCCT_Integration {
 
         // Every line of the click; each line's product carries its cart price, so a $0 gift is not sent at its shop price.
         $lines = $event->get( 'lines' );
-        $lines = is_array( $lines ) && $lines ? $lines : array( array( 'product' => $event->get_product(), 'quantity' => $event->get( 'quantity', 1 ) ) );
         $items = array();
 
-        foreach ( $lines as $line ) {
+        foreach ( is_array( $lines ) ? $lines : array() as $line ) {
             if ( isset( $line['product'] ) && $line['product'] instanceof WC_Product ) {
                 $items[] = $this->get_product_item( $line['product'], isset( $line['quantity'] ) ? $line['quantity'] : 1 );
             }

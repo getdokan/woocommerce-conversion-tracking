@@ -39,6 +39,7 @@ class GiftAddToCartTest extends TestCase {
         // Like a gift plugin adding on a page load, a coupon or a quantity change, or StoreGrowth's gift picker.
         $this->assertSame( array(), $this->result()['steps']['picked_gift'] );
         $this->assertSame( array(), $this->result()['steps']['gift_on_store_api_update'] );
+        $this->assertTrue( $this->result()['update_gift_added'] );
 
         // The grouped form's child left at 0 is not named; the child picked sends.
         $this->assertCount( 1, $this->result()['steps']['grouped_unpicked_child_gift'] );
@@ -55,8 +56,17 @@ class GiftAddToCartTest extends TestCase {
         $this->assertCount( 1, $steps['free_named_twice'] );
         $this->assertMatchesRegularExpression( '/"content_ids": \[\s*"2003"\s*\],\s*"content_type": "product",\s*"value": "0.00"/', $steps['free_named_twice'][0]['scripts']['facebook'] );
 
-        $this->assertCount( 1, $steps['free_by_custom_ajax'] );
-        $this->assertMatchesRegularExpression( '/"content_ids": \[\s*"2001"\s*\],\s*"content_type": "product",\s*"value": "0.00"/', $steps['free_by_custom_ajax'][0]['scripts']['facebook'] );
+        foreach ( array( 'free_by_wc_ajax', 'free_by_buy_now', 'grouped_free_child' ) as $name ) {
+            $this->assertCount( 1, $steps[ $name ], $name );
+            $this->assertStringContainsString( '"value": "0.00"', $steps[ $name ][0]['scripts']['facebook'], $name );
+        }
+
+        // Not an add to cart request: nothing, unless the free product opts in.
+        $this->assertSame( array(), $steps['free_by_custom_ajax'] );
+        $this->assertCount( 1, $steps['free_by_custom_ajax_opted_in'] );
+        $this->assertMatchesRegularExpression( '/"content_ids": \[\s*"2001"\s*\],\s*"content_type": "product",\s*"value": "0.00"/', $steps['free_by_custom_ajax_opted_in'][0]['scripts']['facebook'] );
+        $this->assertSame( array(), $steps['gift_during_quick_view'] );
+        $this->assertCount( 1, $steps['free_by_form_after_rest_threw'] );
 
         // A same-product gift, or a sibling variation's, after the shopper's priced add in that request.
         $this->assertCount( 1, $steps['same_product_gift_in_request'] );
@@ -156,13 +166,31 @@ class GiftAddToCartTest extends TestCase {
         $this->assertMatchesRegularExpression( '/"content_ids": \[\s*"2005",\s*"2001"\s*\],\s*"content_type": "product",\s*"value": "43.00"/', $queued[0]['scripts']['facebook'] );
     }
 
-    public function test_an_item_added_after_the_event_is_not_carried_into_the_next_add() {
+    public function test_an_item_added_after_the_event_sends_its_own_and_is_not_carried_into_the_next_add() {
         $steps = $this->result()['steps'];
 
-        foreach ( array( 'late', 'late_again' ) as $name ) {
-            $this->assertCount( 1, $steps[ $name ] );
-            $this->assertMatchesRegularExpression( '/"content_ids": \[\s*"2005"\s*\],\s*"content_type": "product",\s*"value": "25.00"/', $steps[ $name ][0]['scripts']['facebook'] );
-        }
+        // The shopper's AddToCart, then the late item's own, as before 3.0.
+        $this->assertCount( 2, $steps['late'] );
+        $this->assertMatchesRegularExpression( '/"content_ids": \[\s*"2005"\s*\],\s*"content_type": "product",\s*"value": "25.00"/', $steps['late'][0]['scripts']['facebook'] );
+        $this->assertMatchesRegularExpression( '/"content_ids": \[\s*"2001"\s*\],\s*"content_type": "product",\s*"value": "18.00"/', $steps['late'][1]['scripts']['facebook'] );
+
+        $this->assertCount( 1, $steps['late_again'] );
+        $this->assertMatchesRegularExpression( '/"content_ids": \[\s*"2005"\s*\],\s*"content_type": "product",\s*"value": "25.00"/', $steps['late_again'][0]['scripts']['facebook'] );
+    }
+
+    public function test_an_add_that_threw_leaves_nothing_for_the_next_add_of_its_line() {
+        $steps = $this->result()['steps'];
+
+        $this->assertSame( array(), $steps['outer_throws'] );
+        $this->assertCount( 1, $steps['outer_again'] );
+        $this->assertMatchesRegularExpression( '/"content_ids": \[\s*"2005",\s*"2001"\s*\],\s*"content_type": "product",\s*"value": "43.00"/', $steps['outer_again'][0]['scripts']['facebook'] );
+    }
+
+    public function test_a_grouped_child_is_valued_at_its_cart_price() {
+        $queued = $this->result()['steps']['grouped_dynamic_price'];
+
+        $this->assertCount( 1, $queued );
+        $this->assertMatchesRegularExpression( '/"content_ids": \[\s*"2003"\s*\],\s*"content_type": "product",\s*"value": "8.00"/', $queued[0]['scripts']['facebook'] );
     }
 
     public function test_a_gift_added_during_a_grouped_add_is_left_out() {

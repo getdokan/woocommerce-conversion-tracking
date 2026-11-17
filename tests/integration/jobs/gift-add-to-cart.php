@@ -126,6 +126,10 @@ add_action(
             if ( ! empty( $item['ct_half_gift'] ) ) {
                 $item['data']->set_price( 9 );
             }
+
+            if ( ! empty( $GLOBALS['ct_dynamic_price'] ) && ! empty( $item['ct_dynamic'] ) ) {
+                $item['data']->set_price( 8 );
+            }
         }
 
         // A plugin that adds an add-on while totals are calculated, once.
@@ -201,10 +205,11 @@ $step(
 $step(
     'same_product_gift_in_request',
     function () {
-        $_REQUEST['product_id'] = 2001;
+        $_GET['wc-ajax']     = 'add_to_cart';
+        $_POST['product_id'] = 2001;
         WC()->cart->add_to_cart( 2001, 1 );
         WC()->cart->add_to_cart( 2001, 1, 0, array(), array( 'ct_gift' => true, 'ct_round' => 7 ) );
-        unset( $_REQUEST['product_id'] );
+        unset( $_GET['wc-ajax'], $_POST['product_id'] );
     }
 );
 // The shopper's variation from the form, then a $0 sibling variation as a gift.
@@ -275,13 +280,115 @@ $step(
 );
 // A plugin removes the shopper's line and adds nothing.
 $step( 'vanish', function () { WC()->cart->add_to_cart( 2005, 1, 0, array(), array( 'ct_vanish' => true ) ); } );
-// A side cart's own AJAX action that posts product_id.
+// An AJAX request with the given action and posted product_id.
+$ajax = function ( $action, $product_id, $callback ) {
+    add_filter( 'wp_doing_ajax', '__return_true' );
+    $_REQUEST['action']   = $action;
+    $_POST['product_id']  = $product_id;
+    $callback();
+    unset( $_REQUEST['action'], $_POST['product_id'] );
+    remove_filter( 'wp_doing_ajax', '__return_true' );
+};
+// WooCommerce's AJAX add and StoreGrowth's Buy Now (admin-ajax woocommerce_add_to_cart) name the product: a free one sends at 0.
+$step(
+    'free_by_wc_ajax',
+    function () {
+        $_GET['wc-ajax']     = 'add_to_cart';
+        $_POST['product_id'] = 2001;
+        WC()->cart->add_to_cart( 2001, 1, 0, array(), array( 'ct_gift' => true, 'ct_round' => 16 ) );
+        unset( $_GET['wc-ajax'], $_POST['product_id'] );
+    }
+);
+$step(
+    'free_by_buy_now',
+    function () use ( $ajax ) {
+        $ajax( 'woocommerce_add_to_cart', 2001, function () { WC()->cart->add_to_cart( 2001, 1, 0, array(), array( 'ct_gift' => true, 'ct_round' => 17 ) ); } );
+    }
+);
+// A side cart's own AJAX action that posts product_id: not an add to cart request, so a free product sends nothing, unless it opts in.
 $step(
     'free_by_custom_ajax',
+    function () use ( $ajax ) {
+        $ajax( 'side_cart_add', 2001, function () { WC()->cart->add_to_cart( 2001, 1, 0, array(), array( 'ct_gift' => true, 'ct_round' => 6 ) ); } );
+    }
+);
+$step(
+    'free_by_custom_ajax_opted_in',
     function () {
-        $_REQUEST['product_id'] = 2001;
-        WC()->cart->add_to_cart( 2001, 1, 0, array(), array( 'ct_gift' => true, 'ct_round' => 6 ) );
-        unset( $_REQUEST['product_id'] );
+        $opt_in = function () {
+            return true;
+        };
+        add_filter( 'wcct_track_free_add_to_cart', $opt_in );
+        WC()->cart->add_to_cart( 2001, 1, 0, array(), array( 'ct_gift' => true, 'ct_round' => 13 ) );
+        remove_filter( 'wcct_track_free_add_to_cart', $opt_in );
+    }
+);
+// A quick view request carries product_id; a gift plugin adds a $0 copy of it during the request.
+$step(
+    'gift_during_quick_view',
+    function () use ( $ajax ) {
+        $ajax( 'spsgqcv_quickview', 2005, function () { WC()->cart->add_to_cart( 2005, 1, 0, array(), array( 'ct_gift' => true, 'ct_round' => 14 ) ); } );
+    }
+);
+// The grouped form names a picked child: a free one sends at 0.
+$step(
+    'grouped_free_child',
+    function () {
+        $_REQUEST['add-to-cart'] = 2002;
+        $_REQUEST['quantity']    = array( 2005 => '1', 2001 => '0' );
+        WC()->cart->add_to_cart( 2005, 1, 0, array(), array( 'ct_gift' => true, 'ct_round' => 18 ) );
+        unset( $_REQUEST['add-to-cart'], $_REQUEST['quantity'] );
+    }
+);
+// A shopper's add whose hook throws after a priced item was added inside it, then the same add again: only the new item joins.
+add_action(
+    'woocommerce_add_to_cart',
+    function ( $cart_item_key ) {
+        if ( ! empty( WC()->cart->cart_contents[ $cart_item_key ]['ct_outer_throw'] ) ) {
+            WC()->cart->add_to_cart( 2001, 1, 0, array(), array( 'ct_outer_child' => true ) );
+        }
+    },
+    10
+);
+add_action(
+    'woocommerce_add_to_cart',
+    function ( $cart_item_key ) {
+        static $thrown = false;
+
+        if ( ! $thrown && ! empty( WC()->cart->cart_contents[ $cart_item_key ]['ct_outer_throw'] ) ) {
+            $thrown = true;
+            throw new Exception( 'Add failed.' );
+        }
+    },
+    11
+);
+$step( 'outer_throws', function () { WC()->cart->add_to_cart( 2005, 1, 0, array(), array( 'ct_outer_throw' => true ) ); } );
+$step( 'outer_again', function () { WC()->cart->add_to_cart( 2005, 1, 0, array(), array( 'ct_outer_throw' => true ) ); } );
+// A REST request that threw inside another never reached its after callbacks: finishing the outer one clears both.
+$step(
+    'free_by_form_after_rest_threw',
+    function () use ( $pipeline ) {
+        $outer = new WP_REST_Request( 'POST', '/wc/store/v1/cart/add-item' );
+        $inner = new WP_REST_Request( 'POST', '/wc/store/v1/cart/add-item' );
+        $pipeline->rest_started( null, array(), $outer );
+        $pipeline->rest_started( null, array(), $inner );
+        $pipeline->rest_finished( null, array(), $outer );
+
+        $_REQUEST['add-to-cart'] = 2005;
+        WC()->cart->add_to_cart( 2005, 1, 0, array(), array( 'ct_gift' => true, 'ct_round' => 15 ) );
+        unset( $_REQUEST['add-to-cart'] );
+    }
+);
+// A dynamic pricing plugin makes a grouped child $8 while totals are calculated.
+$step(
+    'grouped_dynamic_price',
+    function () {
+        remove_action( 'woocommerce_add_to_cart', array( WC()->cart, 'calculate_totals' ), 20 );
+        $GLOBALS['ct_dynamic_price'] = true;
+        WC()->cart->add_to_cart( 2002, 1, 2003, array( 'attribute_color' => 'Blue' ), array( 'ct_dynamic' => true ) );
+        unset( $GLOBALS['ct_dynamic_price'] );
+        add_action( 'woocommerce_add_to_cart', array( WC()->cart, 'calculate_totals' ), 20, 0 );
+        WC()->cart->calculate_totals();
     }
 );
 // The Store API's add item, alone and in a batch (the block product button), with the T-Shirt free for these steps.
@@ -342,7 +449,7 @@ add_action(
     'woocommerce_after_cart_item_quantity_update',
     function () {
         if ( ! empty( $GLOBALS['ct_gift_on_update'] ) ) {
-            WC()->cart->add_to_cart( 2005, 1, 0, array(), array( 'ct_gift' => true, 'ct_round' => 3 ) );
+            $GLOBALS['ct_update_gift_added'] = (bool) WC()->cart->add_to_cart( 2005, 1, 0, array(), array( 'ct_gift' => true, 'ct_round' => 3 ) );
         }
     }
 );
@@ -412,6 +519,7 @@ return array(
     'lines'   => $lines,
     'cart_id' => ProductId::for_cart( WC()->cart->get_cart(), 'facebook' ),
     'status'  => $status,
+    'update_gift_added' => ! empty( $GLOBALS['ct_update_gift_added'] ),
     'rest_names_left' => $rest_names_left,
     'nested'  => isset( $GLOBALS['ct_nested_filtered'] ) ? array_values( array_unique( $GLOBALS['ct_nested_filtered'] ) ) : array(),
 );

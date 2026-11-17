@@ -113,25 +113,27 @@ class EventFactory {
     }
 
     /**
-     * Add to cart event for one click: the product added and any lines other plugins added with it, valued at their cart prices.
+     * Add to cart event for one add: the shopper's product and any lines other plugins added with it, valued at their cart prices.
      *
-     * @param \WC_Product $product  Product or variation added.
-     * @param int|float   $quantity Quantity added.
-     * @param array       $lines    The click's lines, [ 'product' => cart line product, 'quantity' => quantity added ], shopper's first; a line's product carries the cart price. Empty for the product alone.
+     * @param array|\WC_Product $lines    The add's lines, [ 'product' => cart line product, 'quantity' => quantity added ], the shopper's first; a line's product carries the cart price. A product alone also works.
+     * @param int|float         $quantity Quantity, when a product alone is given.
      *
      * @return Event
      */
-    public static function add_to_cart( $product, $quantity = 1, $lines = array() ) {
-        $quantity = self::quantity( $quantity );
-        $lines    = is_array( $lines ) && $lines ? $lines : array(
-            array(
-                'product'  => $product,
-                'quantity' => $quantity,
-            ),
-        );
-        $value    = 0.0;
-        $ids      = array();
-        $items    = array();
+    public static function add_to_cart( $lines, $quantity = 1 ) {
+        if ( $lines instanceof \WC_Product ) {
+            $lines = array(
+                array(
+                    'product'  => $lines,
+                    'quantity' => $quantity,
+                ),
+            );
+        }
+
+        $lines = is_array( $lines ) ? $lines : array();
+        $value = 0.0;
+        $ids   = array();
+        $items = array();
 
         foreach ( $lines as $line ) {
             if ( ! isset( $line['product'] ) || ! $line['product'] instanceof \WC_Product ) {
@@ -153,10 +155,10 @@ class EventFactory {
                 'value'       => $value,
                 'currency'    => get_woocommerce_currency(),
                 'decimals'    => wc_get_price_decimals(),
-                'product'     => $product,
+                'product'     => $items ? $items[0]['product'] : null,
                 'product_ids' => $ids,
                 'data'        => array(
-                    'quantity' => $quantity,
+                    'quantity' => $items ? $items[0]['quantity'] : 1,
                     'lines'    => $items,
                 ),
             )
