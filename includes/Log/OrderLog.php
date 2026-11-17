@@ -23,6 +23,11 @@ class OrderLog {
     const VERSION_OPTION = 'wcct_order_log_db_version';
 
     /**
+     * Transient set after a failed upgrade, so it retries hourly rather than on every load.
+     */
+    const RETRY_TRANSIENT = 'wcct_order_log_install_retry';
+
+    /**
      * Rows are kept this many seconds; 3.0 hard-codes 24 hours.
      */
     const RETENTION = 86400;
@@ -104,13 +109,13 @@ class OrderLog {
      * @return void
      */
     public static function maybe_install() {
-        if ( self::DB_VERSION !== get_option( self::VERSION_OPTION ) ) {
+        if ( self::DB_VERSION !== get_option( self::VERSION_OPTION ) && ! get_transient( self::RETRY_TRANSIENT ) ) {
             self::install();
         }
     }
 
     /**
-     * Create or update the table.
+     * Create or update the table; the version is recorded only once every column is there.
      *
      * @return void
      */
@@ -119,17 +124,39 @@ class OrderLog {
 
         require_once ABSPATH . 'wp-admin/includes/upgrade.php';
 
-        dbDelta( self::schema( self::table(), $wpdb->get_charset_collate() ) );
+        $table = self::table();
+
+        dbDelta( self::schema( $table, $wpdb->get_charset_collate() ) );
+
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- own table, once per upgrade.
+        $columns = (array) $wpdb->get_col( "SHOW COLUMNS FROM {$table}" );
+
+        // A failed upgrade keeps the older version, so the log still reads, and retries in an hour.
+        if ( array_diff( array_keys( self::COLUMNS ), $columns ) ) {
+            set_transient( self::RETRY_TRANSIENT, 1, HOUR_IN_SECONDS );
+
+            return;
+        }
 
         update_option( self::VERSION_OPTION, self::DB_VERSION );
+        delete_transient( self::RETRY_TRANSIENT );
     }
 
     /**
-     * Whether the table is installed at the current version.
+     * Whether the table is installed, at any version; the log reads and writes the columns every version has.
      *
      * @return bool
      */
     public static function is_installed() {
+        return '' !== (string) get_option( self::VERSION_OPTION, '' );
+    }
+
+    /**
+     * Whether the table is at the current version, so it has the value column.
+     *
+     * @return bool
+     */
+    public static function is_current() {
         return self::DB_VERSION === get_option( self::VERSION_OPTION );
     }
 

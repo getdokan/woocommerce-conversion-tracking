@@ -270,28 +270,25 @@ class LogRouteTest extends WCCT_Test_Rest_Case {
     }
 
     public function test_each_platform_shows_the_value_it_was_sent() {
-        $check_in = function ( $platform, $loaded = true ) {
-            return array( 'request', 'POST', '/wcct/v1/events', array( 'order_id' => 3001, 'key' => 'wc_order_ctguest0001', 'platform' => $platform, 'loaded' => $loaded, 'reason' => $loaded ? '' : 'timeout' ), 'logged_out' );
+        // The value is the one the thank-you page rendered for the platform (see the order-received fixtures); the check-in posts it.
+        $check_in = function ( $platform, $value, $loaded = true ) {
+            return array( 'request', 'POST', '/wcct/v1/events', array( 'order_id' => 3001, 'key' => 'wc_order_ctguest0001', 'platform' => $platform, 'loaded' => $loaded, 'reason' => $loaded ? '' : 'timeout', 'value' => $value ), 'logged_out' );
         };
 
-        // Order 3001: $73.00 of items after the coupon, $5.00 shipping, then a $4.00 fee and $2.00 tax: $84.00 in all.
-        // Items only: $77.00 (the fee counts), items and shipping: $82.00, everything: $84.00; GA4's items total: $73.00.
         $steps = array(
             self::settings(),
-            array( 'call', 'wcct_test_v3_from_v1' ),
-            array( 'call', 'wcct_test_value_mode', array( 'facebook', 'all' ) ),
-            array( 'call', 'wcct_test_value_mode', array( 'google', 'shipping' ) ),
-            array( 'call', 'wcct_test_value_mode', array( 'twitter', 'items' ) ),
-            array( 'call', 'wcct_test_order_fee_and_tax', array( 3001, '4.00', '2.00' ) ),
             array( 'call', 'wcct_test_log_clear', array( 30 ) ),
-            $check_in( 'facebook' ),
-            $check_in( 'adwords' ),
-            $check_in( 'ga4' ),
-            $check_in( 'twitter' ),
-            $check_in( 'custom' ),
-            // A repeat after the setting changed keeps the value of the first send.
-            array( 'call', 'wcct_test_value_mode', array( 'facebook', 'items' ) ),
-            $check_in( 'facebook' ),
+            $check_in( 'facebook', '84.00' ),
+            // A miss, then the hand-over: the hand-over's value.
+            $check_in( 'adwords', '', false ),
+            $check_in( 'adwords', '82.00' ),
+            $check_in( 'ga4', '73.00' ),
+            // Not a plain string decimal, or too long: no value, and the check-in still counts.
+            $check_in( 'twitter', array( '84.00' ) ),
+            $check_in( 'custom', '123456789012345678901.5' ),
+            // A repeat send, or a late miss, keeps the value of the first send.
+            $check_in( 'facebook', '99.00' ),
+            $check_in( 'facebook', '', false ),
             self::get(),
         );
 
@@ -302,10 +299,11 @@ class LogRouteTest extends WCCT_Test_Rest_Case {
         };
 
         $this->assertSame( array( 'facebook' => '$84.00' ), $values( 'facebook' ) );
-        // GA4 is sent the items total, listed first; Google Ads follows "Order value includes".
+        // GA4 first, each named.
         $this->assertSame( array( 'ga4' => '$73.00', 'adwords' => '$82.00' ), $values( 'google' ) );
         $this->assertSame( array( 'GA4', 'Google Ads' ), array_column( $platforms['google']['values'], 'label' ) );
-        $this->assertSame( array( 'twitter' => '$77.00' ), $values( 'twitter' ) );
+        $this->assertSame( array( 'confirmed', 'confirmed' ), array( $platforms['twitter']['status'], $platforms['custom']['status'] ) );
+        $this->assertSame( array(), $values( 'twitter' ) );
         $this->assertSame( array(), $values( 'custom' ) );
     }
 

@@ -23,15 +23,24 @@ class CheckInTest extends TestCase {
 
     public function test_fields_are_cleaned_to_known_values() {
         $this->assertSame(
-            array( 'loaded' => true, 'consent' => 'denied', 'reason' => '', 'event_id' => 'wcct_9_purchase', 'load' => 'k3x9a' ),
-            CheckIn::normalise( array( 'loaded' => '1', 'consent' => 'denied', 'reason' => 'timeout', 'event_id' => 'wcct_9_purchase', 'load' => 'k3x9a' ) )
+            array( 'loaded' => true, 'consent' => 'denied', 'reason' => '', 'event_id' => 'wcct_9_purchase', 'load' => 'k3x9a', 'value' => '84.00' ),
+            CheckIn::normalise( array( 'loaded' => '1', 'consent' => 'denied', 'reason' => 'timeout', 'event_id' => 'wcct_9_purchase', 'load' => 'k3x9a', 'value' => '84.00' ) )
         );
         $this->assertSame(
-            array( 'loaded' => false, 'consent' => 'off', 'reason' => '', 'event_id' => 'scriptalert1', 'load' => 'ab' ),
+            array( 'loaded' => false, 'consent' => 'off', 'reason' => '', 'event_id' => 'scriptalert1', 'load' => 'ab', 'value' => '' ),
             CheckIn::normalise( array( 'loaded' => 'yes', 'consent' => 'maybe', 'reason' => 'blocked', 'event_id' => '<script>alert(1)', 'load' => 'a-b' ) )
         );
         $this->assertSame( 64, strlen( CheckIn::normalise( array( 'event_id' => str_repeat( 'a', 100 ) ) )['event_id'] ) );
         $this->assertSame( 32, strlen( CheckIn::normalise( array( 'load' => str_repeat( 'b', 40 ) ) )['load'] ) );
+
+        // A value is a plain decimal or nothing: never cut to fit, so the log never shows another number.
+        foreach ( array( '0', '-5.5', '12345678901234567890.12345678' ) as $kept ) {
+            $this->assertSame( $kept, CheckIn::normalise( array( 'value' => $kept ) )['value'] );
+        }
+
+        foreach ( array( '1e5', '12.', '.5', '1,000.00', ' 12.00', '123456789012345678901', '1.123456789', 'abc', "84.00\n", 12.5, array( '84.00' ) ) as $dropped ) {
+            $this->assertSame( '', CheckIn::normalise( array( 'value' => $dropped ) )['value'] );
+        }
         $this->assertSame( 'hidden', CheckIn::normalise( array( 'loaded' => 0, 'reason' => 'hidden' ) )['reason'] );
     }
 

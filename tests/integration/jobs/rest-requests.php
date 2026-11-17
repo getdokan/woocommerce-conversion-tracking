@@ -99,6 +99,31 @@ function wcct_test_query( $sql ) {
 }
 
 /**
+ * Hide a column of the order log from OrderLog::install()'s check, as a failed upgrade leaves it; null shows it again. For 'call' steps.
+ *
+ * @param string|null $column Column.
+ *
+ * @return void
+ */
+function wcct_test_hide_log_column( $column ) {
+    static $filter = null;
+
+    if ( $filter ) {
+        remove_filter( 'query', $filter );
+        $filter = null;
+    }
+
+    if ( $column ) {
+        $filter = function ( $sql ) use ( $column ) {
+            global $wpdb;
+
+            return 'SHOW COLUMNS FROM ' . \StorePulse\ConversionTracking\Log\OrderLog::table() === $sql ? $sql . $wpdb->prepare( ' WHERE Field <> %s', $column ) : $sql;
+        };
+        add_filter( 'query', $filter );
+    }
+}
+
+/**
  * An order for the Activity log tests, for 'call' steps: placed $props['age'] seconds ago from the checkout, paid by cash on delivery.
  *
  * @param array $props status, created_via, age, thankyou_age (null for no thank-you page visit), renewal, rows (each: platform, loaded, columns, age; see wcct_test_log_row()).
@@ -230,46 +255,6 @@ function wcct_test_log_cached_count() {
  */
 function wcct_test_v3_from_v1() {
     update_option( 'wcct_settings_v3', \StorePulse\ConversionTracking\Settings\LegacyView::from_v1( get_option( 'wcct_settings', array() ) ) );
-
-    return null;
-}
-
-/**
- * Give an order a fee and tax, for 'call' steps: the fee is part of the order's items value but not of GA4's items total.
- *
- * @param int    $order_id Order ID.
- * @param string $fee      Fee amount.
- * @param string $tax      Tax amount, added to the total.
- *
- * @return null
- */
-function wcct_test_order_fee_and_tax( $order_id, $fee, $tax ) {
-    $order = wc_get_order( $order_id );
-    $item  = new WC_Order_Item_Fee();
-
-    $item->set_props( array( 'name' => 'Handling', 'total' => $fee ) );
-    $order->add_item( $item );
-    $order->calculate_totals( false );
-    $order->set_cart_tax( $tax );
-    $order->set_total( (float) $order->get_total() + (float) $tax );
-    $order->save();
-
-    return null;
-}
-
-/**
- * Set a platform's "Order value includes" in the 3.0 settings, for 'call' steps.
- *
- * @param string $key  Settings platform key (facebook, google, twitter).
- * @param string $mode items, shipping or all.
- *
- * @return null
- */
-function wcct_test_value_mode( $key, $mode ) {
-    $settings = get_option( 'wcct_settings_v3', array() );
-
-    $settings['platforms'][ $key ]['value_mode'] = $mode;
-    update_option( 'wcct_settings_v3', $settings );
 
     return null;
 }

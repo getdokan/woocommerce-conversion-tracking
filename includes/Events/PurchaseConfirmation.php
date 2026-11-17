@@ -40,12 +40,14 @@ class PurchaseConfirmation {
     }
 
     /**
-     * Defines window.wcctPurchaseSent(url, platform, orderId, key, eventId, category): one confirm function per platform and order, which checks in once handed over; confirm.when(check, category) waits for check() and consent.
+     * Defines window.wcctPurchaseSent(url, platform, orderId, key, eventId, category, value): one confirm function per platform and order, which checks in once handed over; confirm.when(check, category) waits for check() and consent.
+     *
+     * The value is the Purchase value the page rendered for the platform, for the Activity log; empty when it renders none.
      *
      * @return string
      */
     public static function helper() {
-        return 'window.wcctPurchaseSent = window.wcctPurchaseSent || function (url, platform, orderId, key, eventId, category) {
+        return 'window.wcctPurchaseSent = window.wcctPurchaseSent || function (url, platform, orderId, key, eventId, category, value) {
     var sent = window.wcctPurchaseSent, all = sent.all = sent.all || {}, id = platform + ":" + orderId;
     if (all[id]) return all[id];
     var order = window.wcctOrder, done = false, missed = "";
@@ -72,7 +74,7 @@ class PurchaseConfirmation {
             if (window.console) console.warn("wcct: no order key on this page, the purchase check-in was skipped");
             return;
         }
-        var body = "order_id=" + encodeURIComponent(orderId) + "&key=" + encodeURIComponent(key) + "&platform=" + encodeURIComponent(platform) + "&loaded=" + (loaded ? 1 : 0) + "&consent=" + consentState() + "&event_id=" + encodeURIComponent(eventId || "") + "&reason=" + reason + "&load=" + load;
+        var body = "order_id=" + encodeURIComponent(orderId) + "&key=" + encodeURIComponent(key) + "&platform=" + encodeURIComponent(platform) + "&loaded=" + (loaded ? 1 : 0) + "&consent=" + consentState() + "&event_id=" + encodeURIComponent(eventId || "") + "&reason=" + reason + "&load=" + load + "&value=" + encodeURIComponent(value || "");
         if (!unloading && window.fetch) return post(url, body, true);
         try {
             if (navigator.sendBeacon && navigator.sendBeacon(url, new Blob([body], { type: "application/x-www-form-urlencoded" }))) return;
@@ -116,18 +118,20 @@ class PurchaseConfirmation {
      * @param string    $platform Platform ID.
      * @param \WC_Order $order    Order.
      * @param string    $category Consent category reported with the check-in, empty for marketing.
+     * @param string    $value    Purchase value the page rendered for the platform, empty for none.
      *
      * @return string
      */
-    public static function callback( $platform, $order, $category = '' ) {
+    public static function callback( $platform, $order, $category = '', $value = '' ) {
         return sprintf(
-            'window.wcctPurchaseSent(%s, %s, %s, %s, %s, %s)',
+            'window.wcctPurchaseSent(%s, %s, %s, %s, %s, %s, %s)',
             self::encode( CheckIn::url() ),
             self::encode( (string) $platform ),
             self::encode( (int) $order->get_id() ),
             self::encode( (string) $order->get_order_key() ),
             self::encode( Event::new_event_id( Event::PURCHASE, (int) $order->get_id() ) ),
-            self::encode( (string) $category )
+            self::encode( (string) $category ),
+            self::encode( (string) $value )
         );
     }
 
@@ -138,11 +142,12 @@ class PurchaseConfirmation {
      * @param \WC_Order $order    Order.
      * @param string    $check    JS expression, true once the platform library has taken the event.
      * @param string    $category Consent category the event needs (wcctConsent), empty for none.
+     * @param string    $value    Purchase value the page rendered for the platform, empty for none.
      *
      * @return string
      */
-    public static function confirm_script( $platform, $order, $check = '', $category = '' ) {
-        $callback = self::callback( $platform, $order, $category );
+    public static function confirm_script( $platform, $order, $check = '', $category = '', $value = '' ) {
+        $callback = self::callback( $platform, $order, $category, $value );
         $check    = trim( (string) $check );
         $category = (string) $category;
 

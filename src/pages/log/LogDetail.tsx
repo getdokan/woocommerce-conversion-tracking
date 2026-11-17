@@ -132,7 +132,6 @@ const PlatformResult = ( {
             steps = (
                 <>
                     <Step>{ handOverStep( platform.id ) }</Step>
-                    { valueStep }
                     <Step>
                         { at(
                             __(
@@ -188,15 +187,12 @@ const PlatformResult = ( {
             break;
         case 'pending':
             steps = platform.sent ? (
-                <>
-                    <Step>
-                        { __(
-                            'Sent on the thank-you page; payment still pending',
-                            'woocommerce-conversion-tracking'
-                        ) }
-                    </Step>
-                    { valueStep }
-                </>
+                <Step>
+                    { __(
+                        'Sent on the thank-you page; payment still pending',
+                        'woocommerce-conversion-tracking'
+                    ) }
+                </Step>
             ) : (
                 <Step tone="warn">
                     { __(
@@ -288,7 +284,11 @@ const PlatformResult = ( {
                       )
                     : platform.name }
             </h3>
-            <Timeline>{ steps }</Timeline>
+            <Timeline>
+                { steps }
+                { /* Whatever the status: Google can be not confirmed while GA4 was sent. */ }
+                { valueStep }
+            </Timeline>
             { note }
         </div>
     );

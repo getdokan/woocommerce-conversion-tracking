@@ -284,8 +284,10 @@ class WCCT_Integration_GA4 extends WCCT_Integration {
                 $order = $this->get_purchase_order( $page_event->get_order() );
 
                 if ( $order ) {
+                    // The params first: they note the value the callback reports.
+                    $params                       = $this->get_purchase_params( $order, $page_event );
                     $confirms[ count( $events ) ] = $this->purchase_sent_callback( $order );
-                    $events[]                     = array( 'purchase', $this->get_purchase_params( $order, $page_event ) );
+                    $events[]                     = array( 'purchase', $params );
                 }
             }
         }
@@ -400,19 +402,6 @@ class WCCT_Integration_GA4 extends WCCT_Integration {
     }
 
     /**
-     * The Purchase value GA4 is sent: the item total; shipping and tax go in their own fields
-     *
-     * @param WC_Order $order Order.
-     *
-     * @return string Decimal string.
-     */
-    public function sent_purchase_value( $order ) {
-        $event = EventFactory::purchase( $order );
-
-        return number_format( $event->get_items_total_value( $this->id ), $event->get_decimals(), '.', '' );
-    }
-
-    /**
      * Purchase parameters for an order; value is the item total (fees excluded), tax and shipping are sent on their own
      *
      * @param  WC_Order   $order
@@ -425,6 +414,8 @@ class WCCT_Integration_GA4 extends WCCT_Integration {
         $items    = array();
         $event    = $event instanceof Event ? $event : EventFactory::purchase( $order );
         $value    = $event->get_items_total_value( $this->id );
+
+        $this->rendered_value( $order, number_format( (float) $value, $decimals, '.', '' ) );
 
         foreach ( $order->get_items() as $order_item ) {
             if ( ! $order_item instanceof WC_Order_Item_Product ) {

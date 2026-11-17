@@ -65,6 +65,8 @@ class CheckIn {
         $reason   = ! $loaded && isset( $input['reason'] ) && in_array( $input['reason'], self::REASONS, true ) ? $input['reason'] : '';
         $event_id = isset( $input['event_id'] ) && is_string( $input['event_id'] ) ? substr( preg_replace( '/[^A-Za-z0-9_\-]/', '', $input['event_id'] ), 0, 64 ) : '';
         $load     = isset( $input['load'] ) && is_string( $input['load'] ) ? substr( preg_replace( '/[^A-Za-z0-9]/', '', $input['load'] ), 0, 32 ) : '';
+        // The Purchase value the page rendered: a plain decimal, else nothing (never cut to fit).
+        $value = isset( $input['value'] ) && is_string( $input['value'] ) && preg_match( '/^-?[0-9]{1,20}(\.[0-9]{1,8})?\z/', $input['value'] ) ? $input['value'] : '';
 
         return array(
             'loaded'   => $loaded,
@@ -72,6 +74,7 @@ class CheckIn {
             'reason'   => $reason,
             'event_id' => $event_id,
             'load'     => $load,
+            'value'    => $value,
         );
     }
 
@@ -112,32 +115,6 @@ class CheckIn {
     }
 
     /**
-     * The Purchase value an integration sends for an order, as a decimal string; empty when it sends none or isn't loaded.
-     *
-     * @param \WC_Order $order    Order.
-     * @param string    $platform Integration ID.
-     *
-     * @return string
-     */
-    private static function sent_value( $order, $platform ) {
-        $integrations = function_exists( 'wcct_init' ) && isset( wcct_init()->manager ) ? wcct_init()->manager->get_integrations() : array();
-        $integration  = isset( $integrations[ $platform ] ) ? $integrations[ $platform ] : null;
-
-        if ( ! is_object( $integration ) || ! method_exists( $integration, 'sent_purchase_value' ) ) {
-            return '';
-        }
-
-        // A value filter that throws costs the log its value, not the check-in.
-        try {
-            $value = $integration->sent_purchase_value( $order );
-        } catch ( \Throwable $e ) {
-            return '';
-        }
-
-        return is_numeric( $value ) ? substr( (string) $value, 0, 32 ) : '';
-    }
-
-    /**
      * Record a check-in for an order and platform whose key was already checked.
      *
      * @param \WC_Order $order    Order.
@@ -171,9 +148,9 @@ class CheckIn {
             LastPurchase::record( $platform, $order, $now );
         }
 
-        // Once the platform's script ran: the value it was sent, as it sends it.
-        if ( null !== $changes && $changes['library_loaded'] ) {
-            $changes['value'] = self::sent_value( $order, $platform );
+        // Once the platform's script ran: the value the page rendered for it; only when the table has the column (OrderLog::install()).
+        if ( null !== $changes && $changes['library_loaded'] && OrderLog::is_current() ) {
+            $changes['value'] = $checkin['value'];
         }
 
         if ( null !== $changes ) {
@@ -213,7 +190,7 @@ class CheckIn {
             return array( 'status' => 403, 'code' => 'wcct_rest_invalid_order', 'result' => '' );
         }
 
-        $fields = array_intersect_key( $params, array_flip( array( 'loaded', 'consent', 'reason', 'event_id', 'load' ) ) );
+        $fields = array_intersect_key( $params, array_flip( array( 'loaded', 'consent', 'reason', 'event_id', 'load', 'value' ) ) );
 
         return array( 'status' => 200, 'code' => '', 'result' => (string) call_user_func( $record, $order, $platform, $fields ) );
     }

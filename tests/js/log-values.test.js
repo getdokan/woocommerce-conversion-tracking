@@ -68,6 +68,17 @@ test( 'Google names the one integration that was sent when the other was not', a
     assert.equal( sentValueText( google ), 'Value sent: GA4 $73.00' );
 } );
 
+test( 'Google names GA4 when it is the only one set up', async () => {
+    const { sentValueText } = await load();
+    const google = {
+        id: 'google',
+        integrations: [ 'ga4' ],
+        values: [ value( 'ga4', 'GA4', '$73.00' ) ],
+    };
+
+    assert.equal( sentValueText( google ), 'Value sent: GA4 $73.00' );
+} );
+
 test( 'nothing when no value was recorded', async () => {
     const { sentValueText } = await load();
 

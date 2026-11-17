@@ -24,7 +24,15 @@ class PurchaseScriptTest extends TestCase {
 
         $this->assertStringContainsString( 'window.wcctPurchaseSent = window.wcctPurchaseSent ||', $code );
         $this->assertStringContainsString( 'twitter.purchase(9);', $code );
-        $this->assertStringEndsWith( 'window.wcctPurchaseSent("https://shop.test/wp-json/wcct/v1/events", "twitter", 9, "wc_order_abc", "wcct_9_purchase", "")();', $code );
+        // The fake renders no value: the check-in reports none.
+        $this->assertStringEndsWith( 'window.wcctPurchaseSent("https://shop.test/wp-json/wcct/v1/events", "twitter", 9, "wc_order_abc", "wcct_9_purchase", "", "")();', $code );
+    }
+
+    public function test_the_check_in_reports_the_value_the_page_rendered() {
+        $order = new WCCT_Test_Fake_Order( array( 'id' => 9, 'key' => 'wc_order_abc' ) );
+
+        $this->assertSame( 'window.wcctPurchaseSent("https://shop.test/wp-json/wcct/v1/events", "facebook", 9, "wc_order_abc", "wcct_9_purchase", "marketing", "84.00").when(function () { return window.fbq; }, "marketing");', PurchaseConfirmation::confirm_script( 'facebook', $order, 'window.fbq', 'marketing', '84.00' ) );
+        $this->assertStringContainsString( '"&value=" + encodeURIComponent(value || "")', PurchaseConfirmation::helper() );
     }
 
     public function test_sent_order_renders_nothing() {
@@ -59,9 +67,9 @@ class PurchaseScriptTest extends TestCase {
         $order = new WCCT_Test_Fake_Order( array( 'id' => 9, 'key' => 'wc_order_abc' ) );
         $call  = 'window.wcctPurchaseSent("https://shop.test/wp-json/wcct/v1/events", "facebook", 9, "wc_order_abc", "wcct_9_purchase", ';
 
-        $this->assertSame( $call . '"marketing").when(function () { return window.fbq; }, "marketing");', PurchaseConfirmation::confirm_script( 'facebook', $order, 'window.fbq', 'marketing' ) );
-        $this->assertSame( $call . '"marketing").when(function () { return true; }, "marketing");', PurchaseConfirmation::confirm_script( 'facebook', $order, '', 'marketing' ) );
-        $this->assertSame( $call . '"").when(function () { return window.fbq; });', PurchaseConfirmation::confirm_script( 'facebook', $order, 'window.fbq' ) );
+        $this->assertSame( $call . '"marketing", "").when(function () { return window.fbq; }, "marketing");', PurchaseConfirmation::confirm_script( 'facebook', $order, 'window.fbq', 'marketing' ) );
+        $this->assertSame( $call . '"marketing", "").when(function () { return true; }, "marketing");', PurchaseConfirmation::confirm_script( 'facebook', $order, '', 'marketing' ) );
+        $this->assertSame( $call . '"", "").when(function () { return window.fbq; });', PurchaseConfirmation::confirm_script( 'facebook', $order, 'window.fbq' ) );
         $this->assertStringContainsString( 'consent.allows(needs)', PurchaseConfirmation::helper() );
     }
 
@@ -99,8 +107,8 @@ class PurchaseScriptTest extends TestCase {
         };
         $order    = new WCCT_Test_Fake_Order( array( 'id' => 9, 'key' => 'wc_order_abc' ) );
 
-        $this->assertStringEndsWith( '"wcct_9_purchase", "statistics")', $platform->callback( $order ) );
-        $this->assertStringEndsWith( '"wcct_9_purchase", "marketing")', ( new class( 'adwords' ) extends WCCT_Test_Fake_Integration {
+        $this->assertStringEndsWith( '"wcct_9_purchase", "statistics", "")', $platform->callback( $order ) );
+        $this->assertStringEndsWith( '"wcct_9_purchase", "marketing", "")', ( new class( 'adwords' ) extends WCCT_Test_Fake_Integration {
             public function callback( $order ) {
                 return $this->purchase_sent_callback( $order );
             }

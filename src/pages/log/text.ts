@@ -192,9 +192,9 @@ export const sentValueText = ( platform: LogPlatform ): string => {
         return '';
     }
 
-    // Google's two integrations are named unless both were sent the same value.
+    // Google's integrations are named, unless both were sent the same value.
     const same =
-        values.length === platform.integrations.length &&
+        values.length > 1 &&
         values.every(
             ( entry ) => Number( entry.value ) === Number( values[ 0 ].value )
         );

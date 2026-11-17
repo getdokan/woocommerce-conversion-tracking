@@ -128,17 +128,6 @@ class WCCT_Integration_Custom extends WCCT_Integration {
     }
 
     /**
-     * The merchant's own script sends what it sends: no value to log
-     *
-     * @param WC_Order $order Order.
-     *
-     * @return null
-     */
-    public function sent_purchase_value( $order ) {
-        return null;
-    }
-
-    /**
      * The checkout markup carries its own confirmation, after the merchant's script
      *
      * @param string   $code  Purchase markup.
