@@ -187,7 +187,7 @@ class ProductId {
     }
 
     /**
-     * Identifiers of an event's products for a platform: the event's product, else its product IDs.
+     * Identifiers of an event's products for a platform: its lines' products (an add to cart), its product, else its product IDs.
      *
      * @param Event|object $event    Event.
      * @param string       $platform Platform or integration ID.
@@ -199,7 +199,20 @@ class ProductId {
             return array();
         }
 
-        $mode    = self::mode_for( $platform );
+        $mode  = self::mode_for( $platform );
+        $lines = method_exists( $event, 'get' ) ? $event->get( 'lines' ) : null;
+        $ids   = array();
+
+        foreach ( is_array( $lines ) ? $lines : array() as $line ) {
+            if ( isset( $line['product'] ) && is_object( $line['product'] ) ) {
+                $ids[] = self::value( $line['product'], $mode );
+            }
+        }
+
+        if ( $ids ) {
+            return self::unique( $ids );
+        }
+
         $product = $event->get_product();
 
         if ( is_object( $product ) ) {

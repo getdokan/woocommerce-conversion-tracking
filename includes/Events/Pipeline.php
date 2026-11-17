@@ -39,14 +39,9 @@ class Pipeline {
     const SEEN_COOKIE = 'wcct_events_seen';
 
     /**
-     * Cart item data key a plugin sets on items it adds in code, so they send no AddToCart.
+     * Cart item data key a plugin sets on items it adds in code, so they send no AddToCart and add nothing to one.
      */
     const AUTO_ADDED = 'wcct_auto_added';
-
-    /**
-     * Cart item data keys of auto-added items: ours, and StoreGrowth's BOGO gifts, which it also adds on quantity changes.
-     */
-    const AUTO_ADDED_KEYS = array( self::AUTO_ADDED, 'bogo_offer' );
 
     /**
      * Returns the active platforms.
@@ -61,6 +56,13 @@ class Pipeline {
      * @var \WCCT_Integration[]|null
      */
     private $platforms = null;
+
+    /**
+     * Lines added inside a shopper's add (bundle items, ticked add-ons), keyed by the shopper's cart item key: [ cart item key, quantity ].
+     *
+     * @var array[]
+     */
+    private $nested_lines = array();
 
     /**
      * Code waiting for the footer, per platform ID.
@@ -120,6 +122,7 @@ class Pipeline {
      */
     public function init_hooks() {
         // After WooCommerce recalculates the totals (priority 20).
+        add_action( 'woocommerce_add_to_cart', array( $this, 'add_started' ), PHP_INT_MIN, 0 );
         add_action( 'woocommerce_add_to_cart', array( $this, 'added_to_cart' ), 9999, 4 );
         add_filter( 'woocommerce_add_to_cart_fragments', array( $this, 'cart_fragments' ) );
         add_action( 'wc_ajax_' . self::AJAX_ACTION, array( $this, 'send_pending_events' ) );
@@ -143,7 +146,20 @@ class Pipeline {
     }
 
     /**
+     * A shopper's add starts: forget lines from earlier adds, added after their event was queued or inside an add that threw.
+     *
+     * @return void
+     */
+    public function add_started() {
+        if ( null === self::outer_add_key() ) {
+            $this->nested_lines = array();
+        }
+    }
+
+    /**
      * Queue add to cart for the visitor's browser; covers forms, AJAX buttons and Store API (block) buttons.
+     *
+     * One click sends one AddToCart: lines other plugins add inside it (bundle items, ticked add-ons) join the shopper's event.
      *
      * @param string    $cart_item_key Cart item key.
      * @param int       $product_id    Product ID.
@@ -153,66 +169,147 @@ class Pipeline {
      * @return void
      */
     public function added_to_cart( $cart_item_key = '', $product_id = 0, $quantity = 1, $variation_id = 0 ) {
-        $cart_item = WC()->cart ? WC()->cart->get_cart_item( $cart_item_key ) : array();
+        $cart  = WC()->cart;
+        $outer = self::outer_add_key();
 
-        if ( ! self::is_shopper_add( $cart_item_key, $cart_item ) ) {
+        // Lines added inside the shopper's add are judged when it is done, once plugins have set their cart prices.
+        if ( null !== $outer ) {
+            $this->nested_lines[ $outer ][] = array( (string) $cart_item_key, $quantity );
+
             return;
         }
 
-        // The grouped form detaches the recalculation, so the line still has its totals from before this add.
-        $fresh   = WC()->cart && false !== has_action( 'woocommerce_add_to_cart', array( WC()->cart, 'calculate_totals' ) );
-        $product = function_exists( 'wc_get_product' ) ? wc_get_product( $variation_id ? $variation_id : $product_id ) : false;
-        $event   = $product instanceof \WC_Product ? EventFactory::add_to_cart( $product, $quantity, $fresh ? $cart_item : array() ) : EventFactory::cart( Event::ADD_TO_CART, WC()->cart );
+        $nested    = isset( $this->nested_lines[ $cart_item_key ] ) ? $this->nested_lines[ $cart_item_key ] : array();
+        $cart_item = $cart ? $cart->get_cart_item( $cart_item_key ) : array();
+
+        unset( $this->nested_lines[ $cart_item_key ] );
+
+        if ( ! self::tracks_line( $cart_item_key, $cart_item, false ) ) {
+            return;
+        }
+
+        // The grouped form detaches the recalculation, which is where plugins set gift prices.
+        if ( $nested && $cart && false === has_action( 'woocommerce_add_to_cart', array( $cart, 'calculate_totals' ) ) ) {
+            $cart->calculate_totals();
+        }
+
+        // Quantity added per line, the shopper's first; a line added again (removed and re-added, or more of it) is one line.
+        $added = array( (string) $cart_item_key => self::number( $quantity ) );
+
+        foreach ( $nested as $line ) {
+            $added[ $line[0] ] = ( isset( $added[ $line[0] ] ) ? $added[ $line[0] ] : 0 ) + self::number( $line[1] );
+        }
+
+        $lines = array();
+
+        foreach ( $added as $key => $added_quantity ) {
+            $item = $cart ? $cart->get_cart_item( (string) $key ) : array();
+
+            // A plugin may have removed the shopper's own line.
+            if ( empty( $item['data'] ) || ! $item['data'] instanceof \WC_Product ) {
+                continue;
+            }
+
+            if ( (string) $key !== (string) $cart_item_key && ! self::tracks_line( (string) $key, $item, true ) ) {
+                continue;
+            }
+
+            // Each line's product carries the price plugins set in the cart (a $0 gift).
+            $lines[] = array( $item['data'], isset( $item['quantity'] ) ? min( $added_quantity, self::number( $item['quantity'] ) ) : $added_quantity );
+        }
+
+        $product = $lines ? $lines[0][0] : ( function_exists( 'wc_get_product' ) ? wc_get_product( $variation_id ? $variation_id : $product_id ) : false );
+        $event   = $product instanceof \WC_Product ? EventFactory::add_to_cart( $product, $quantity, $lines ) : EventFactory::cart( Event::ADD_TO_CART, $cart );
 
         $this->queue( $event );
     }
 
     /**
-     * Whether an add is the shopper's own: not made by a plugin while another add runs, and not flagged as auto-added.
+     * Whether a cart line counts: the shopper's add sends AddToCart, and a line added inside it joins that event.
+     *
+     * The shopper's add counts unless it is flagged as auto-added; a line added inside it counts when it has a price and no wcct_auto_added flag.
      *
      * @param string $cart_item_key Cart item key.
      * @param array  $cart_item     Cart item.
+     * @param bool   $nested        Whether the line was added inside another add.
      *
      * @return bool
      */
-    public static function is_shopper_add( $cart_item_key, $cart_item ) {
+    public static function tracks_line( $cart_item_key, $cart_item, $nested ) {
         $cart_item = is_array( $cart_item ) ? $cart_item : array();
-        $track     = ! self::is_nested_add();
 
-        foreach ( self::AUTO_ADDED_KEYS as $key ) {
-            $track = $track && empty( $cart_item[ $key ] );
+        if ( $nested ) {
+            // A $0 line is a gift; a priced one (bundle item, ticked add-on, discounted BOGO item) is part of what the shopper pays.
+            $track = empty( $cart_item[ self::AUTO_ADDED ] ) && ! empty( $cart_item['data'] ) && is_object( $cart_item['data'] ) && method_exists( $cart_item['data'], 'get_price' ) && (float) $cart_item['data']->get_price() > 0;
+        } else {
+            $track = ! self::is_auto_added( $cart_item );
         }
 
         /**
-         * Filters whether an add to cart sends AddToCart; plugins that add items in code can return false.
+         * Filters whether a cart line counts toward AddToCart; plugins that add items in code can return false.
          *
          * @since 3.0.0
          *
-         * @param bool   $track         Whether to send it.
+         * @param bool   $track         Whether it counts: its own AddToCart, or, added inside another add, part of that one.
          * @param string $cart_item_key Cart item key.
          * @param array  $cart_item     Cart item.
+         * @param bool   $nested        Whether it was added inside another add.
          */
-        return (bool) apply_filters( 'wcct_track_add_to_cart', $track, $cart_item_key, $cart_item );
+        return (bool) apply_filters( 'wcct_track_add_to_cart', $track, $cart_item_key, $cart_item, (bool) $nested );
     }
 
     /**
-     * Whether this add runs inside another add's woocommerce_add_to_cart, as gift, BOGO and bundle plugins add theirs.
+     * Whether the shopper's add is flagged as auto-added: our key, or a StoreGrowth BOGO gift, which it also adds on quantity changes.
      *
-     * Read from the call stack: $wp_current_filter keeps a hook that threw, and WooCommerce catches add exceptions.
+     * @param array $cart_item Cart item.
      *
      * @return bool
      */
-    private static function is_nested_add() {
-        $adds = 0;
+    private static function is_auto_added( $cart_item ) {
+        if ( ! empty( $cart_item[ self::AUTO_ADDED ] ) ) {
+            return true;
+        }
 
-        // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_debug_backtrace -- runs once per add to cart.
+        return ! empty( $cart_item['bogo_offer'] ) && class_exists( 'StorePulse\\StoreGrowth\\Modules\\BoGo\\OrderBogo' );
+    }
+
+    /**
+     * A quantity as a number, 1 when it is not one.
+     *
+     * @param mixed $quantity Quantity.
+     *
+     * @return int|float
+     */
+    private static function number( $quantity ) {
+        return is_numeric( $quantity ) && $quantity > 0 ? 0 + $quantity : 1;
+    }
+
+    /**
+     * Cart item key of the add this one runs inside, or null for the shopper's own add.
+     *
+     * Read from the call stack: $wp_current_filter keeps a hook that threw, and WooCommerce catches add exceptions.
+     *
+     * @return string|null
+     */
+    private static function outer_add_key() {
+        // A stale entry only adds to this count, so one or none means no add is running around this one.
+        $running = isset( $GLOBALS['wp_current_filter'] ) ? (array) $GLOBALS['wp_current_filter'] : array();
+
+        if ( count( array_keys( $running, 'woocommerce_add_to_cart', true ) ) < 2 ) {
+            return null;
+        }
+
+        $keys = array();
+
+        // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_debug_backtrace -- only while adds are nested.
         foreach ( debug_backtrace( 0 ) as $frame ) {
             if ( isset( $frame['function'], $frame['args'][0] ) && ! isset( $frame['class'] ) && 'do_action' === $frame['function'] && 'woocommerce_add_to_cart' === $frame['args'][0] ) {
-                ++$adds;
+                $keys[] = isset( $frame['args'][1] ) ? (string) $frame['args'][1] : '';
             }
         }
 
-        return $adds > 1;
+        // Innermost first: the last is the shopper's add.
+        return count( $keys ) > 1 ? end( $keys ) : null;
     }
 
     /**
