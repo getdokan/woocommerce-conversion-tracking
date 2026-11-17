@@ -39,6 +39,16 @@ class Pipeline {
     const SEEN_COOKIE = 'wcct_events_seen';
 
     /**
+     * Cart item data key a plugin sets on items it adds in code, so they send no AddToCart.
+     */
+    const AUTO_ADDED = 'wcct_auto_added';
+
+    /**
+     * Cart item data keys of auto-added items: ours, and StoreGrowth's BOGO gifts, which it also adds on quantity changes.
+     */
+    const AUTO_ADDED_KEYS = array( self::AUTO_ADDED, 'bogo_offer' );
+
+    /**
      * Returns the active platforms.
      *
      * @var callable
@@ -143,10 +153,66 @@ class Pipeline {
      * @return void
      */
     public function added_to_cart( $cart_item_key = '', $product_id = 0, $quantity = 1, $variation_id = 0 ) {
+        $cart_item = WC()->cart ? WC()->cart->get_cart_item( $cart_item_key ) : array();
+
+        if ( ! self::is_shopper_add( $cart_item_key, $cart_item ) ) {
+            return;
+        }
+
+        // The grouped form detaches the recalculation, so the line still has its totals from before this add.
+        $fresh   = WC()->cart && false !== has_action( 'woocommerce_add_to_cart', array( WC()->cart, 'calculate_totals' ) );
         $product = function_exists( 'wc_get_product' ) ? wc_get_product( $variation_id ? $variation_id : $product_id ) : false;
-        $event   = $product instanceof \WC_Product ? EventFactory::add_to_cart( $product, $quantity ) : EventFactory::cart( Event::ADD_TO_CART, WC()->cart );
+        $event   = $product instanceof \WC_Product ? EventFactory::add_to_cart( $product, $quantity, $fresh ? $cart_item : array() ) : EventFactory::cart( Event::ADD_TO_CART, WC()->cart );
 
         $this->queue( $event );
+    }
+
+    /**
+     * Whether an add is the shopper's own: not made by a plugin while another add runs, and not flagged as auto-added.
+     *
+     * @param string $cart_item_key Cart item key.
+     * @param array  $cart_item     Cart item.
+     *
+     * @return bool
+     */
+    public static function is_shopper_add( $cart_item_key, $cart_item ) {
+        $cart_item = is_array( $cart_item ) ? $cart_item : array();
+        $track     = ! self::is_nested_add();
+
+        foreach ( self::AUTO_ADDED_KEYS as $key ) {
+            $track = $track && empty( $cart_item[ $key ] );
+        }
+
+        /**
+         * Filters whether an add to cart sends AddToCart; plugins that add items in code can return false.
+         *
+         * @since 3.0.0
+         *
+         * @param bool   $track         Whether to send it.
+         * @param string $cart_item_key Cart item key.
+         * @param array  $cart_item     Cart item.
+         */
+        return (bool) apply_filters( 'wcct_track_add_to_cart', $track, $cart_item_key, $cart_item );
+    }
+
+    /**
+     * Whether this add runs inside another add's woocommerce_add_to_cart, as gift, BOGO and bundle plugins add theirs.
+     *
+     * Read from the call stack: $wp_current_filter keeps a hook that threw, and WooCommerce catches add exceptions.
+     *
+     * @return bool
+     */
+    private static function is_nested_add() {
+        $adds = 0;
+
+        // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_debug_backtrace -- runs once per add to cart.
+        foreach ( debug_backtrace( 0 ) as $frame ) {
+            if ( isset( $frame['function'], $frame['args'][0] ) && ! isset( $frame['class'] ) && 'do_action' === $frame['function'] && 'woocommerce_add_to_cart' === $frame['args'][0] ) {
+                ++$adds;
+            }
+        }
+
+        return $adds > 1;
     }
 
     /**

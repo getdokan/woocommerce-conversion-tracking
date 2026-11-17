@@ -113,25 +113,37 @@ class EventFactory {
     }
 
     /**
-     * Add to cart event for the product just added; the value is its shop price times the quantity.
+     * Add to cart event for the product just added; the value is its cart line price, else its shop price, times the quantity.
      *
-     * @param \WC_Product $product  Product or variation added.
-     * @param int|float   $quantity Quantity added.
+     * @param \WC_Product $product   Product or variation added.
+     * @param int|float   $quantity  Quantity added.
+     * @param array       $cart_item Its cart line, with totals; a gift's line is $0 while its shop price is not.
      *
      * @return Event
      */
-    public static function add_to_cart( $product, $quantity = 1 ) {
+    public static function add_to_cart( $product, $quantity = 1, $cart_item = array() ) {
         $quantity = is_numeric( $quantity ) && $quantity > 0 ? 0 + $quantity : 1;
+        $data     = array( 'quantity' => $quantity );
+        $value    = wc_get_price_to_display( $product, array( 'qty' => $quantity ) );
+
+        if ( is_array( $cart_item ) && isset( $cart_item['line_subtotal'], $cart_item['quantity'] ) && $cart_item['quantity'] > 0 ) {
+            $unit     = (float) $cart_item['line_subtotal'] / $cart_item['quantity'];
+            $unit_tax = isset( $cart_item['line_subtotal_tax'] ) ? (float) $cart_item['line_subtotal_tax'] / $cart_item['quantity'] : 0.0;
+
+            // Shown with tax like the shop price was; GA4 items take the price before tax.
+            $value         = ( 'incl' === get_option( 'woocommerce_tax_display_shop' ) ? $unit + $unit_tax : $unit ) * $quantity;
+            $data['price'] = $unit;
+        }
 
         return new Event(
             Event::ADD_TO_CART,
             array(
-                'value'       => wc_get_price_to_display( $product, array( 'qty' => $quantity ) ),
+                'value'       => $value,
                 'currency'    => get_woocommerce_currency(),
                 'decimals'    => wc_get_price_decimals(),
                 'product'     => $product,
                 'product_ids' => array( $product->get_id() ),
-                'data'        => array( 'quantity' => $quantity ),
+                'data'        => $data,
             )
         );
     }

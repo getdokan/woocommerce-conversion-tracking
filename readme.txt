@@ -127,6 +127,10 @@ Yes. Turn on "Respect cookie choices" and tags wait for the visitor's consent. G
 
 Yes. Use the Custom script page to paste that platform's tag and choose where it runs.
 
+= Do free gifts and BOGO items send their own Add to cart? =
+
+No. One click sends one Add to cart, for the product the shopper chose, valued at its cart price. Items another plugin adds while the shopper's add runs (gifts, BOGO and bundle items) send none, and neither do StoreGrowth BOGO gifts. A plugin that adds items at another time can set `wcct_auto_added` to true in the item's cart item data, or return false from the `wcct_track_add_to_cart` filter, which gets the cart item key and the cart item.
+
 = Where do I buy or manage Pro? =
 
 Pro is sold on [WooCommerce.com](https://woocommerce.com/products/woocommerce-conversion-tracking-pro/). Manage your subscription from your WooCommerce.com account.

@@ -166,7 +166,7 @@ class ProductId {
     }
 
     /**
-     * Identifiers of the cart items for a platform; a variation sends its own.
+     * Identifiers of the cart items for a platform, each once; a variation sends its own.
      *
      * @param array  $cart     Cart contents.
      * @param string $platform Platform or integration ID.
@@ -183,7 +183,7 @@ class ProductId {
             }
         }
 
-        return $ids;
+        return self::unique( $ids );
     }
 
     /**
@@ -218,7 +218,7 @@ class ProductId {
     }
 
     /**
-     * Identifiers of an order's items for a platform; a variation sends its own, a deleted product its stored ID.
+     * Identifiers of an order's items for a platform, each once; a variation sends its own, a deleted product its stored ID.
      *
      * @param \WC_Order|object $order    Order.
      * @param string           $platform Platform or integration ID.
@@ -241,7 +241,18 @@ class ProductId {
             }
         }
 
-        return $ids;
+        return self::unique( $ids );
+    }
+
+    /**
+     * Each identifier once, in first-seen order; a free gift of the same product is its own line.
+     *
+     * @param array $ids Identifiers.
+     *
+     * @return array
+     */
+    private static function unique( $ids ) {
+        return array_values( array_unique( $ids ) );
     }
 
     /**

@@ -192,7 +192,9 @@ class WCCT_Integration_GA4 extends WCCT_Integration {
             return '';
         }
 
-        $params = $this->get_event_params( array( $this->get_product_item( $event->get_product(), $event->get( 'quantity', 1 ) ) ) );
+        // The cart line's price when the event has one, so a $0 gift is not sent at its shop price.
+        $price  = $event->get( 'price' );
+        $params = $this->get_event_params( array( $this->get_product_item( $event->get_product(), $event->get( 'quantity', 1 ), is_numeric( $price ) ? (float) $price : null ) ) );
 
         return '(window.wcctGtag || function () { (window.dataLayer = window.dataLayer || []).push(arguments); })(\'event\', \'add_to_cart\', ' . $this->encode( $params ) . ');';
     }
