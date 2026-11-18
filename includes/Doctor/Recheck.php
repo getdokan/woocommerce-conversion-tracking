@@ -6,7 +6,7 @@ use StorePulse\ConversionTracking\Alerts\Alerts;
 use StorePulse\ConversionTracking\Platforms\Pause;
 
 /**
- * The quiet re-check of the local checks: after a plugin is activated (once, at the end of the request), after the active plugins change otherwise, such as a deactivation (on the next admin page load that runs without the old list), and after a settings save, a pause or resume, or wcct_doctor_refresh (at once, so the response is up to date).
+ * The quiet re-check of the local checks: after a plugin is activated (once, at the end of the request), after the loaded plugins change otherwise, such as a deactivation (on the next admin page load, which only refreshes the results and never lights the badge), and after a settings save, a pause or resume, or wcct_doctor_refresh (at once, so the response is up to date).
  */
 class Recheck {
 
@@ -14,6 +14,13 @@ class Recheck {
      * Option holding a fingerprint of the active plugins the last admin page load ran with.
      */
     const PLUGINS = 'wcct_doctor_plugins';
+
+    /**
+     * Basenames of the plugins this request loaded, taken at plugins_loaded; null before.
+     *
+     * @var string[]|null
+     */
+    private $loaded = null;
 
     /**
      * Whether a re-check is queued for this request.
@@ -29,6 +36,7 @@ class Recheck {
      */
     public function register() {
         add_action( 'activated_plugin', array( $this, 'queue' ) );
+        add_action( 'plugins_loaded', array( $this, 'snapshot' ), 0, 0 );
         add_action( 'admin_init', array( $this, 'maybe_refresh' ), 10, 0 );
         // After the consent sync (priority 10): it mirrors consent mode into the option the consent check reads.
         add_action( 'wcct_settings_saved', array( $this, 'refresh' ), 20, 0 );
@@ -71,19 +79,26 @@ class Recheck {
     }
 
     /**
-     * On an admin page load: re-check once if the active plugins (this site's and the network's) differ from the last load's.
-     * It compares the list this request loaded, so a request that still runs a just-deactivated plugin changes nothing, and it sees changes made anywhere (network admin, WP-CLI, a removed folder).
+     * Note the plugins this request loaded, before any of them can change the active list.
+     *
+     * @return void
+     */
+    public function snapshot() {
+        $this->loaded = Plugins::active_basenames();
+    }
+
+    /**
+     * On an admin page load: re-check once if the plugins it loaded differ from the last page load's.
+     * AJAX and admin-post requests are skipped (some stores load fewer plugins there), and the re-check never lights the badge, so a plugin update's brief deactivation doesn't flag its warning as new.
      *
      * @return void
      */
     public function maybe_refresh() {
-        $active = (array) get_option( 'active_plugins', array() );
-
-        if ( is_multisite() ) {
-            $active = array_merge( $active, array_keys( (array) get_site_option( 'active_sitewide_plugins', array() ) ) );
+        if ( null === $this->loaded || wp_doing_ajax() || ( isset( $GLOBALS['pagenow'] ) && 'admin-post.php' === $GLOBALS['pagenow'] ) ) {
+            return;
         }
 
-        $active = array_unique( array_map( 'strval', $active ) );
+        $active = array_unique( $this->loaded );
         sort( $active );
 
         $print = md5( implode( "\n", $active ) );
@@ -97,7 +112,7 @@ class Recheck {
 
         // The first load only records the list.
         if ( '' !== $last ) {
-            $this->refresh();
+            $this->refresh( false );
         }
     }
 
@@ -117,11 +132,13 @@ class Recheck {
     /**
      * Re-check now, so no warning outlives its cause; it runs with the Doctor alert off too, which only keeps new findings off the badge.
      *
+     * @param bool $badge Whether new findings may light the badge.
+     *
      * @return void
      */
-    public function refresh() {
+    public function refresh( $badge = true ) {
         try {
-            Doctor::recheck( Alerts::is_on( Alerts::DOCTOR ) );
+            Doctor::recheck( $badge && Alerts::is_on( Alerts::DOCTOR ) );
         } catch ( \Throwable $e ) {
             return;
         }

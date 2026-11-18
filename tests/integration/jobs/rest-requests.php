@@ -235,7 +235,7 @@ function wcct_test_v3_from_v1() {
 }
 
 /**
- * An admin page load as far as one class is concerned: runs that class's admin_init callbacks (all of admin_init needs a real admin screen), for 'call' steps.
+ * An admin page load as far as one class is concerned: its snapshot of the loaded plugins (plugins_loaded, which already fired), then its admin_init callbacks (all of admin_init needs a real admin screen), for 'call' steps.
  *
  * @param string $class Class name.
  *
@@ -247,6 +247,10 @@ function wcct_test_admin_init( $class ) {
     foreach ( isset( $GLOBALS['wp_filter']['admin_init'] ) ? $GLOBALS['wp_filter']['admin_init']->callbacks : array() as $callbacks ) {
         foreach ( $callbacks as $callback ) {
             if ( is_array( $callback['function'] ) && $callback['function'][0] instanceof $class ) {
+                if ( method_exists( $callback['function'][0], 'snapshot' ) ) {
+                    $callback['function'][0]->snapshot();
+                }
+
                 call_user_func( $callback['function'] );
                 ++$ran;
             }

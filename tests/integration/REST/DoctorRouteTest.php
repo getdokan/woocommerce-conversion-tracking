@@ -343,29 +343,34 @@ class DoctorRouteTest extends WCCT_Test_Rest_Case {
         $this->assertNotContains( 'consent-off', array_column( $results[2]['data']['findings'], 'check' ) );
     }
 
-    public function test_deactivating_a_plugin_rechecks_once_on_the_next_admin_load_whatever_the_alert() {
+    public function test_a_plugin_list_change_rechecks_once_on_the_next_admin_load_without_lighting_the_badge() {
         $recheck = 'StorePulse\\ConversionTracking\\Doctor\\Recheck';
         $pys     = 'pixelyoursite/pixelyoursite.php';
         $results = $this->doctor(
             array(
-                // Settings > Alerts > Doctor found something new off: the activation re-check is off, this one still runs.
-                array( 'set_option', 'wcct_settings_v3', array( 'alert_doctor_new' => false ) ),
+                array( 'set_option', 'wcct_settings_v3', array( 'alert_doctor_new' => true ) ),
                 array( 'set_option', 'wcct_doctor_plugins', null ),
                 array( 'set_option', 'wcct_test_plugin_found', 'PixelYourSite' ),
                 array( 'call', 'wcct_test_active_plugin', array( $pys, true ) ),
                 // An admin load records the plugins it runs with.
                 array( 'call', 'wcct_test_admin_init', array( $recheck ) ),
                 array( 'request', 'POST', '/wcct/v1/doctor', array(), 'admin' ),
+                array( 'set_option', 'wcct_doctor_new', null ),
                 // Deactivated: the next admin load runs without it.
                 array( 'call', 'wcct_test_active_plugin', array( $pys, false ) ),
                 array( 'set_option', 'wcct_test_plugin_found', '' ),
                 array( 'call', 'wcct_test_admin_init', array( $recheck ) ),
                 array( 'request', 'GET', '/wcct/v1/doctor', null, 'admin' ),
-                array( 'option', 'wcct_doctor_new' ),
                 // Once: an unchanged list doesn't re-check again.
                 array( 'set_option', 'wcct_test_plugin_found', 'PixelYourSite' ),
                 array( 'call', 'wcct_test_admin_init', array( $recheck ) ),
                 array( 'request', 'GET', '/wcct/v1/doctor', null, 'admin' ),
+                // Back, as after a plugin update's brief deactivation: the warning shows again, not as new.
+                array( 'call', 'wcct_test_active_plugin', array( $pys, true ) ),
+                array( 'call', 'wcct_test_admin_init', array( $recheck ) ),
+                array( 'request', 'GET', '/wcct/v1/doctor', null, 'admin' ),
+                array( 'option', 'wcct_doctor_new' ),
+                array( 'call', 'wcct_test_active_plugin', array( $pys, false ) ),
                 array( 'set_option', 'wcct_settings_v3', null ),
                 array( 'set_option', 'wcct_doctor_plugins', null ),
             )
@@ -376,8 +381,9 @@ class DoctorRouteTest extends WCCT_Test_Rest_Case {
 
         $this->assertSame( 1, $results[4] );
         $this->assertTrue( $found( 5 ) );
-        $this->assertFalse( $found( 9 ) );
-        $this->assertNull( $results[10] );
+        $this->assertFalse( $found( 10 ) );
         $this->assertFalse( $found( 13 ) );
+        $this->assertTrue( $found( 16 ) );
+        $this->assertNull( $results[17] );
     }
 }
