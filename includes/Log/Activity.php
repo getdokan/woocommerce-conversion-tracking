@@ -172,7 +172,8 @@ class Activity {
 
         return array(
             'id'             => (int) $order->get_id(),
-            'number'         => (string) $order->get_order_number(),
+            // The reference the platforms get: the order number, the order ID if a plugin empties it.
+            'number'         => '' !== trim( (string) $order->get_order_number() ) ? trim( (string) $order->get_order_number() ) : (string) $order->get_id(),
             'status'         => (string) $order->get_status(),
             'created_via'    => (string) $order->get_created_via(),
             'created'        => $created instanceof \DateTimeInterface ? $created->getTimestamp() : 0,
