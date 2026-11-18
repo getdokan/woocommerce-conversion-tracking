@@ -776,12 +776,28 @@ class Schema {
     }
 
     /**
-     * "Order value includes" for a platform's Purchase; the default follows the install type (D8).
+     * Help text of "Order value includes": the events of the integration that send an order value.
+     *
+     * @param string $integration Integration ID.
+     *
+     * @return string
+     */
+    private static function value_mode_description( string $integration ): string {
+        // Meta and X also send a value with Start checkout.
+        if ( in_array( $integration, array( 'facebook', 'twitter' ), true ) ) {
+            return __( 'Sent with Start checkout and Purchase. Items only keeps ad results in line with product revenue. Fees count as items; tax is never part of items.', 'woocommerce-conversion-tracking' );
+        }
+
+        return __( 'Sent with Purchase. Items only keeps ad results in line with product revenue. Fees count as items; tax is never part of items.', 'woocommerce-conversion-tracking' );
+    }
+
+    /**
+     * "Order value includes" for a platform's order values; the default follows the install type (D8).
      *
      * @param string $section      Section ID.
      * @param string $integration  Integration ID the mode is for.
      * @param array  $dependencies Field dependencies.
-     * @param string $description  Help text; the Purchase one by default.
+     * @param string $description  Help text; the integration's own by default.
      *
      * @return array
      */
@@ -793,7 +809,7 @@ class Schema {
             'variant'     => 'select',
             'section_id'  => $section,
             'label'       => __( 'Order value includes', 'woocommerce-conversion-tracking' ),
-            'description' => '' !== $description ? $description : __( 'Sent with Purchase. Items only keeps ad results in line with product revenue. Fees count as items; tax is never part of items.', 'woocommerce-conversion-tracking' ),
+            'description' => '' !== $description ? $description : self::value_mode_description( $integration ),
             'default'     => $default,
             'priority'    => 50,
             'options'     => array(

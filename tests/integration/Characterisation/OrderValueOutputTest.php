@@ -79,6 +79,59 @@ class OrderValueOutputTest extends TestCase {
     }
 
     /**
+     * @dataProvider checkouts
+     */
+    public function test_meta_start_checkout_prints_the_value_of_its_mode_on_both_checkouts( array $state, $items, $shipping, $all ) {
+        foreach ( array( 'checkout-classic', 'checkout-block' ) as $page ) {
+            foreach ( array( 'items' => $items, 'shipping' => $shipping, 'all' => $all ) as $mode => $expected ) {
+                $this->assertSame( $expected, $this->checkout_value( $page, array_merge( $state, array( 'value_mode' => $mode ) ) ), "$page, $mode" );
+            }
+        }
+    }
+
+    /**
+     * Checkout carts: state for jobs/checkout-cart-state.php, then the value for items, shipping and all. The cart's lines are 78.00.
+     *
+     * @return array
+     */
+    public function checkouts() {
+        return array(
+            'shipping and tax known'       => array( array( 'shipping' => '20.00', 'tax' => '19.60' ), '78.00', '98.00', '117.60' ),
+            'shipping known, no tax'       => array( array( 'shipping' => '20.00', 'tax' => '0' ), '78.00', '98.00', '98.00' ),
+            'nothing calculated yet'       => array( array(), '78.00', '78.00', '78.00' ),
+            'more tax than the cart total' => array( array( 'shipping' => '-78.00', 'tax' => '5.00' ), '0.00', '0.00', '5.00' ),
+        );
+    }
+
+    /**
+     * The value Meta prints with InitiateCheckout on a checkout page
+     *
+     * @param string $page  Page name from WCCT_Test_Pages.
+     * @param array  $state State for jobs/checkout-cart-state.php.
+     *
+     * @return string
+     */
+    private function checkout_value( $page, array $state ) {
+        $request = WCCT_Test_Pages::get( $page );
+        $result  = WCCT_Test_WP::run(
+            array(
+                'type'        => 'request',
+                'rollback'    => true,
+                'request'     => array( 'path' => $request['path'] ),
+                'cart'        => $request['cart'],
+                'options'     => array_merge( isset( $request['options'] ) ? $request['options'] : array(), array( 'wcct_settings' => WCCT_Test_Settings::lite_all() ) ),
+                'before'      => dirname( __DIR__ ) . '/jobs/checkout-cart-state.php',
+                'before_args' => $state,
+            )
+        );
+
+        $this->assertNull( $result['error'] );
+        $this->assertSame( 1, preg_match( '~wcfbq\("111111111111111", "InitiateCheckout", \{[^}]*?"value": "(?<value>[0-9.]+)"~', $result['html'], $match ), "InitiateCheckout value on $page" );
+
+        return $match['value'];
+    }
+
+    /**
      * Each platform's printed Purchase value and currency for order 3001 in the given state
      *
      * @param array $state   Order state.

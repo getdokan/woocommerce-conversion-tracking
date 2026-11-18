@@ -386,6 +386,21 @@ abstract class WCCT_Integration {
     }
 
     /**
+     * Start checkout value in this platform's value mode, as a decimal string; null without a cart event
+     *
+     * @return string|null
+     */
+    protected function checkout_value() {
+        $event = $this->current_event;
+
+        if ( ! $event || Event::BEGIN_CHECKOUT !== $event->get_name() ) {
+            return null;
+        }
+
+        return number_format( $event->get_value_for( ValueMode::for_platform( $this->id ), $this->id ), $event->get_decimals(), '.', '' );
+    }
+
+    /**
      * Whether the integration has a method for a pipeline event
      *
      * @param string $name Event name.

@@ -217,8 +217,12 @@ class WCCT_Integration_Twitter extends WCCT_Integration {
             return $params;
         }
 
-        if ( $event->get_value() > 0 && '' !== $event->get_currency() ) {
-            $params['value']    = $event->get_value();
+        // Start checkout follows "Order value includes", as Purchase; add to cart is the product's price.
+        $checkout = $this->checkout_value();
+        $value    = null === $checkout ? $event->get_value() : (float) $checkout;
+
+        if ( $value > 0 && '' !== $event->get_currency() ) {
+            $params['value']    = $value;
             $params['currency'] = $event->get_currency();
         }
 
