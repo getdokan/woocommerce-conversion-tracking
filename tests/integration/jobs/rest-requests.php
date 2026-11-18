@@ -235,6 +235,22 @@ function wcct_test_v3_from_v1() {
 }
 
 /**
+ * Move the merchant's last Doctor run back in time, so a later change to it shows, for 'call' steps.
+ *
+ * @param int $seconds Seconds.
+ *
+ * @return int The run's new time.
+ */
+function wcct_test_doctor_age( $seconds ) {
+    $stored         = get_option( 'wcct_doctor_results', array() );
+    $stored['time'] = (int) $stored['time'] - (int) $seconds;
+
+    update_option( 'wcct_doctor_results', $stored, false );
+
+    return $stored['time'];
+}
+
+/**
  * Forget every platform's last purchase, for 'call' steps.
  *
  * @return null

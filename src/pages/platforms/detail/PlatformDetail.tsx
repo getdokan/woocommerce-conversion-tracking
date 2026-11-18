@@ -51,6 +51,7 @@ import {
     focusField,
     focusSection,
     needsAttention,
+    type PlatformStatus,
     resetupEvents,
     sectionFields,
     switchEvent,
@@ -60,6 +61,7 @@ import {
     platformLogoUrl,
     type PlatformCardInfo,
 } from '../../../data/platforms';
+import type { PlatformState } from '../../../data/metrics';
 import type {
     PlatformValues,
     SchemaElement,
@@ -197,63 +199,84 @@ const responseErrors = (
 };
 
 /**
- * The status pill of a platform page.
+ * The status pill of a platform page: the Dashboard card's state, or the page's own checks until it arrives.
  *
- * @param {Object}           props              Component props.
- * @param {PlatformCardInfo} props.card         Platform.
- * @param {LastPurchase}     props.lastPurchase Last checked-in purchase.
- * @param {boolean}          props.attention    X events need new IDs, or Google's split Ads ID is unchecked.
+ * @param {Object}             props              Component props.
+ * @param {PlatformCardInfo}   props.card         Platform.
+ * @param {LastPurchase}       props.lastPurchase Last checked-in purchase.
+ * @param {boolean}            props.attention    It needs the merchant.
+ * @param {PlatformState|null} props.state        State from the server, null while loading.
  */
 const Status = ( {
     card,
     lastPurchase,
     attention,
+    state,
 }: {
     card: PlatformCardInfo;
     lastPurchase: LastPurchase;
     attention: boolean;
+    state: PlatformState | null;
 } ) => {
-    if ( ! card.connected ) {
-        return (
-            <StatusPill tone="off">
-                { __( 'Not set up', 'woocommerce-conversion-tracking' ) }
-            </StatusPill>
-        );
+    let shown: PlatformState = 'waiting';
+
+    if ( state ) {
+        shown = state;
+    } else if ( ! card.connected ) {
+        shown = 'not_set_up';
+    } else if ( card.paused ) {
+        shown = 'paused';
+    } else if ( attention ) {
+        shown = 'attention';
+    } else if ( lastPurchase ) {
+        shown = 'working';
     }
 
-    if ( card.paused ) {
-        return (
-            <StatusPill tone="off">
-                { __( 'Paused', 'woocommerce-conversion-tracking' ) }
-            </StatusPill>
-        );
+    switch ( shown ) {
+        case 'not_set_up':
+            return (
+                <StatusPill tone="off">
+                    { __( 'Not set up', 'woocommerce-conversion-tracking' ) }
+                </StatusPill>
+            );
+        case 'paused':
+            return (
+                <StatusPill tone="off">
+                    { __( 'Paused', 'woocommerce-conversion-tracking' ) }
+                </StatusPill>
+            );
+        case 'attention':
+            return (
+                <StatusPill tone="warn">
+                    { __(
+                        'Needs attention',
+                        'woocommerce-conversion-tracking'
+                    ) }
+                </StatusPill>
+            );
+        case 'working':
+            return (
+                <StatusPill tone="ok">
+                    { __( 'Working', 'woocommerce-conversion-tracking' ) }
+                </StatusPill>
+            );
+        default:
+            return (
+                <StatusPill tone="off">
+                    { __(
+                        'Waiting for first event',
+                        'woocommerce-conversion-tracking'
+                    ) }
+                </StatusPill>
+            );
     }
-
-    if ( attention ) {
-        return (
-            <StatusPill tone="warn">
-                { __( 'Needs attention', 'woocommerce-conversion-tracking' ) }
-            </StatusPill>
-        );
-    }
-
-    return lastPurchase ? (
-        <StatusPill tone="ok">
-            { __( 'Working', 'woocommerce-conversion-tracking' ) }
-        </StatusPill>
-    ) : (
-        <StatusPill tone="off">
-            { __(
-                'Waiting for first event',
-                'woocommerce-conversion-tracking'
-            ) }
-        </StatusPill>
-    );
 };
 
 type PlatformDetailProps = {
     card: PlatformCardInfo;
     platform: SchemaPlatform;
+    // As the Dashboard card shows it; null while loading.
+    status: PlatformStatus | null;
     // Route query; ?field=<field> focuses that field (Doctor links).
     query: string;
 };
@@ -266,6 +289,7 @@ type PlatformDetailProps = {
 export const PlatformDetail = ( {
     card,
     platform,
+    status,
     query,
 }: PlatformDetailProps ) => {
     const { data, replaceSettings } = useAppData();
@@ -310,6 +334,13 @@ export const PlatformDetail = ( {
     const dirty = Object.keys( changes ).length > 0 || consentChanged;
     const dirtyRef = useRef( dirty );
     const lastPurchase = ( values.last_purchase ?? null ) as LastPurchase;
+    // Why the Dashboard says Needs attention, when the page has no notice of its own for it (X re-setup and the Google split do).
+    const attentionNote =
+        status?.state === 'attention' &&
+        ( status.reason === 'finding' || status.reason === 'not_confirmed' ) &&
+        status.note?.text
+            ? status.note
+            : null;
     const target = focusField( query );
     const section = focusSection( query );
 
@@ -797,7 +828,8 @@ export const PlatformDetail = ( {
                     <Status
                         card={ card }
                         lastPurchase={ lastPurchase }
-                        attention={ needsAttention( platform, values ) }
+                        attention={ needsAttention( platform, values, status ) }
+                        state={ status?.state ?? null }
                     />
                 </span>
                 <Button
@@ -825,6 +857,26 @@ export const PlatformDetail = ( {
                                 { __(
                                     'You can see these settings but not change them. Ask an administrator if something needs to change.',
                                     'woocommerce-conversion-tracking'
+                                ) }
+                            </p>
+                        </Notice>
+                    ) }
+
+                    { attentionNote && (
+                        <Notice
+                            variant="warning"
+                            role="status"
+                            data-testid="wcct-platform-attention"
+                        >
+                            <p className="m-0">
+                                { attentionNote.text }{ ' ' }
+                                { attentionNote.link && (
+                                    <a
+                                        href={ attentionNote.link }
+                                        className="font-medium text-primary underline underline-offset-3"
+                                    >
+                                        { attentionNote.link_label }
+                                    </a>
                                 ) }
                             </p>
                         </Notice>

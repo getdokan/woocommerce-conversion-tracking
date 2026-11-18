@@ -64,12 +64,14 @@ class Doctor {
     }
 
     /**
-     * The quiet re-check after a plugin is activated: local checks only; new problems light the dashboard badge.
+     * The quiet re-check (after a plugin is activated, a settings save, a pause): local checks only; new problems light the dashboard badge.
      * Nothing runs before the merchant's first run, and the "Last check" time stays as it is.
+     *
+     * @param bool $flag_new Whether new findings light the badge.
      *
      * @return string[] Hashes of the new findings.
      */
-    public static function recheck() {
+    public static function recheck( $flag_new = true ) {
         $stored = self::stored();
 
         if ( ! $stored['time'] ) {
@@ -81,9 +83,12 @@ class Doctor {
 
         self::store( $run, false );
 
+        // A dismissed warning whose cause went is forgotten, so it shows again if it comes back; the remote checks' stay as stored.
+        self::prune_dismissed( self::stored()['results'], $stored['results'] );
+
         $new = array_values( array_diff( self::hashes( $run, true ), $known ) );
 
-        if ( $new ) {
+        if ( $new && $flag_new ) {
             update_option( self::NEW_OPTION, array_values( array_unique( array_merge( self::new_hashes(), $new ) ) ), false );
         }
 

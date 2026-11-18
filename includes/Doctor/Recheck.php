@@ -2,8 +2,11 @@
 
 namespace StorePulse\ConversionTracking\Doctor;
 
+use StorePulse\ConversionTracking\Alerts\Alerts;
+use StorePulse\ConversionTracking\Platforms\Pause;
+
 /**
- * The quiet re-check: after a plugin is activated, the local checks run once, at the end of the request.
+ * The quiet re-check of the local checks: after a plugin is activated or deactivated (once, at the end of the request), and after a settings save, a pause or resume, or wcct_doctor_refresh (at once, so the response is up to date).
  */
 class Recheck {
 
@@ -21,6 +24,17 @@ class Recheck {
      */
     public function register() {
         add_action( 'activated_plugin', array( $this, 'queue' ) );
+        add_action( 'deactivated_plugin', array( $this, 'queue' ) );
+        // After the consent sync (priority 10): it mirrors consent mode into the option the consent check reads.
+        add_action( 'wcct_settings_saved', array( $this, 'refresh' ), 20, 0 );
+        add_action( Pause::CHANGED_ACTION, array( $this, 'refresh' ), 10, 0 );
+
+        /**
+         * Re-check the Doctor's local checks now, after saving something they read outside the settings (for example Pro's catalog).
+         *
+         * @since 3.0.0
+         */
+        add_action( 'wcct_doctor_refresh', array( $this, 'refresh' ), 10, 0 );
     }
 
     /**
@@ -59,6 +73,19 @@ class Recheck {
     public function run() {
         try {
             Doctor::recheck();
+        } catch ( \Throwable $e ) {
+            return;
+        }
+    }
+
+    /**
+     * Re-check now, after a settings save or a pause, so no warning outlives its cause; it runs with the Doctor alert off too, which only keeps new findings off the badge.
+     *
+     * @return void
+     */
+    public function refresh() {
+        try {
+            Doctor::recheck( Alerts::is_on( Alerts::DOCTOR ) );
         } catch ( \Throwable $e ) {
             return;
         }

@@ -6,6 +6,7 @@ import { __, _n, sprintf } from '@wordpress/i18n';
 /**
  * Internal dependencies
  */
+import type { MetricsNote, PlatformState } from './metrics';
 import type { PlatformValues, SchemaElement, SchemaPlatform } from './types';
 
 // Variants the platform pages edit, with Meta Pro's extra pixels and custom parameters; display-only ones are left out.
@@ -493,18 +494,34 @@ export const eventsTurnedOn = (
         .map( ( event ) => event.value );
 };
 
+// The status the Dashboard card shows (wcct/v1/settings/status): reason is not_confirmed, needs_resetup, ads_id_split or finding.
+export type PlatformStatus = {
+    state: PlatformState;
+    reason: string;
+    note: MetricsNote | null;
+};
+
 /**
- * Whether a platform needs the merchant: X events waiting for a new event ID, or Google's split Ads ID to check.
+ * Whether a platform needs the merchant, as its Dashboard card says; until its status arrives, X events waiting for a new event ID or Google's split Ads ID to check.
  *
- * @param {SchemaPlatform} platform Platform schema.
- * @param {Object}         values   Saved values.
+ * @param {SchemaPlatform}      platform Platform schema.
+ * @param {Object}              values   Saved values.
+ * @param {PlatformStatus|null} status   Status from the server, null while loading.
  */
 export const needsAttention = (
     platform: SchemaPlatform,
-    values: PlatformValues
-): boolean =>
-    resetupEvents( platform, values, values.needs_resetup ).length > 0 ||
-    !! values.ads_id_split;
+    values: PlatformValues,
+    status: PlatformStatus | null = null
+): boolean => {
+    if ( status ) {
+        return status.state === 'attention';
+    }
+
+    return (
+        resetupEvents( platform, values, values.needs_resetup ).length > 0 ||
+        !! values.ads_id_split
+    );
+};
 
 /**
  * Whether any Advanced setting that marks a platform as customised differs from its default.
