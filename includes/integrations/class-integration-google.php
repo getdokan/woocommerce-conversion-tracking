@@ -202,7 +202,7 @@ class WCCT_Integration_Google extends WCCT_Integration {
         $code = $this->build_event( 'conversion', array(
             'send_to'        => sprintf( "%s/%s", $account_id, $label ),
             // The order number the merchant sees, the same reference GA4 gets (#139).
-            'transaction_id' => WCCT_GA4_Data::transaction_id( $order->get_order_number(), $order->get_id() ),
+            'transaction_id' => \StorePulse\ConversionTracking\Events\OrderReference::of( $order ),
             'value'          => (float) $this->purchase_value( $order ),
             'currency'       => $order->get_currency(),
             'event_callback' => self::CALLBACK_PLACEHOLDER,

@@ -180,7 +180,7 @@ class WCCT_Integration_Twitter extends WCCT_Integration {
                 'value'         => (float) $this->purchase_value( $order ),
                 'currency'      => Event::currency_code( $order->get_currency() ),
                 // The order number, as Google gets it; the order ID if a plugin empties it.
-                'conversion_id' => WCCT_GA4_Data::transaction_id( $order->get_order_number(), $order->get_id() ),
+                'conversion_id' => \StorePulse\ConversionTracking\Events\OrderReference::of( $order ),
                 'contents'      => $this->order_contents( $order ),
             )
         );

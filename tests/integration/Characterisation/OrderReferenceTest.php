@@ -56,7 +56,8 @@ class OrderReferenceTest extends TestCase {
     public function test_the_reload_guard_still_keys_on_the_order_and_skips_a_sent_ads_conversion() {
         $html = $this->page( array( 'order_number' => 'WC-2025-0042', 'sent' => array( 'adwords' ) ) );
 
-        $this->assertSame( 0, preg_match( self::PATTERNS['adwords'], $html ), 'No second Ads conversion' );
+        $this->assertStringNotContainsString( "'event', 'conversion'", $html, 'No second Ads conversion' );
+        $this->assertStringContainsString( "'event', 'conversion'", $this->page( array( 'order_number' => 'WC-2025-0042' ) ), 'The marker is what a first view prints' );
         $this->assertSame( 1, preg_match( self::PATTERNS['ga4'], $html ) );
 
         // The check-in of a first view names the internal order ID, not the number.
