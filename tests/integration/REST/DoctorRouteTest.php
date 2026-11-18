@@ -287,7 +287,7 @@ class DoctorRouteTest extends WCCT_Test_Rest_Case {
         $this->assertSame( 1, $results[12]['data']['new'] );
     }
 
-    public function test_a_save_keeps_a_dismissed_warning_that_still_applies_and_forgets_one_whose_cause_went() {
+    public function test_a_dismissed_warning_stays_dismissed_through_re_checks_even_if_its_cause_goes_and_comes_back() {
         $save    = array( 'request', 'POST', '/wcct/v1/settings', array( 'alert_doctor_new' => true ), 'admin' );
         $plugin  = function ( array $report ) {
             foreach ( $report['findings'] as $finding ) {
@@ -313,7 +313,7 @@ class DoctorRouteTest extends WCCT_Test_Rest_Case {
                 // Still there: stays dismissed, not new.
                 $save,
                 array( 'request', 'GET', '/wcct/v1/doctor', null, 'admin' ),
-                // Gone, then back: shows again, as new.
+                // Gone, then back (as with a pause and resume): still dismissed, not new.
                 array( 'set_option', 'wcct_test_plugin_found', '' ),
                 $save,
                 array( 'set_option', 'wcct_test_plugin_found', 'PixelYourSite' ),
@@ -324,7 +324,7 @@ class DoctorRouteTest extends WCCT_Test_Rest_Case {
         );
 
         $this->assertSame( array( true, false ), $plugin( $results[4]['data'] ) );
-        $this->assertSame( array( false, true ), $plugin( $results[9]['data'] ) );
+        $this->assertSame( array( true, false ), $plugin( $results[9]['data'] ) );
     }
 
     public function test_switching_respect_cookie_choices_on_clears_the_consent_note_in_the_same_save() {
@@ -343,38 +343,41 @@ class DoctorRouteTest extends WCCT_Test_Rest_Case {
         $this->assertNotContains( 'consent-off', array_column( $results[2]['data']['findings'], 'check' ) );
     }
 
-    public function test_deactivating_a_plugin_rechecks_in_a_later_cron_request_whatever_the_alert() {
-        $cron    = 'wcct_doctor_recheck';
+    public function test_deactivating_a_plugin_rechecks_once_on_the_next_admin_load_whatever_the_alert() {
+        $recheck = 'StorePulse\\ConversionTracking\\Doctor\\Recheck';
+        $pys     = 'pixelyoursite/pixelyoursite.php';
         $results = $this->doctor(
             array(
                 // Settings > Alerts > Doctor found something new off: the activation re-check is off, this one still runs.
                 array( 'set_option', 'wcct_settings_v3', array( 'alert_doctor_new' => false ) ),
+                array( 'set_option', 'wcct_doctor_plugins', null ),
                 array( 'set_option', 'wcct_test_plugin_found', 'PixelYourSite' ),
+                array( 'call', 'wcct_test_active_plugin', array( $pys, true ) ),
+                // An admin load records the plugins it runs with.
+                array( 'call', 'wcct_test_admin_init', array( $recheck ) ),
                 array( 'request', 'POST', '/wcct/v1/doctor', array(), 'admin' ),
-                // Deactivating Conversion Tracking itself schedules nothing.
-                array( 'action', 'deactivated_plugin', 'woocommerce-conversion-tracking/conversion-tracking.php' ),
-                array( 'call', 'wp_next_scheduled', array( $cron ) ),
-                // The deactivating request still has the plugin's constants and classes: nothing runs in it.
-                array( 'action', 'deactivated_plugin', 'pixelyoursite/pixelyoursite.php' ),
-                array( 'action', 'deactivated_plugin', 'another/another.php' ),
-                array( 'shutdown', 'StorePulse\\ConversionTracking\\Doctor\\Recheck' ),
-                array( 'request', 'GET', '/wcct/v1/doctor', null, 'admin' ),
-                array( 'call', 'wcct_test_cron_count', array( $cron ) ),
-                // The cron request, without the plugin.
+                // Deactivated: the next admin load runs without it.
+                array( 'call', 'wcct_test_active_plugin', array( $pys, false ) ),
                 array( 'set_option', 'wcct_test_plugin_found', '' ),
-                array( 'action', $cron, null ),
+                array( 'call', 'wcct_test_admin_init', array( $recheck ) ),
                 array( 'request', 'GET', '/wcct/v1/doctor', null, 'admin' ),
                 array( 'option', 'wcct_doctor_new' ),
+                // Once: an unchanged list doesn't re-check again.
+                array( 'set_option', 'wcct_test_plugin_found', 'PixelYourSite' ),
+                array( 'call', 'wcct_test_admin_init', array( $recheck ) ),
+                array( 'request', 'GET', '/wcct/v1/doctor', null, 'admin' ),
                 array( 'set_option', 'wcct_settings_v3', null ),
+                array( 'set_option', 'wcct_doctor_plugins', null ),
             )
         );
+        $found   = function ( $index ) use ( $results ) {
+            return in_array( 'PixelYourSite is also active', array_column( $results[ $index ]['data']['findings'], 'found' ), true );
+        };
 
-        $this->assertContains( 'PixelYourSite is also active', array_column( $results[2]['data']['findings'], 'found' ) );
-        $this->assertFalse( $results[4] );
-        $this->assertSame( 0, $results[7] );
-        $this->assertContains( 'PixelYourSite is also active', array_column( $results[8]['data']['findings'], 'found' ) );
-        $this->assertSame( 1, $results[9], 'One re-check for a bulk deactivation' );
-        $this->assertNotContains( 'PixelYourSite is also active', array_column( $results[12]['data']['findings'], 'found' ) );
-        $this->assertNull( $results[13] );
+        $this->assertSame( 1, $results[4] );
+        $this->assertTrue( $found( 5 ) );
+        $this->assertFalse( $found( 9 ) );
+        $this->assertNull( $results[10] );
+        $this->assertFalse( $found( 13 ) );
     }
 }

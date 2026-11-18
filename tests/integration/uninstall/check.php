@@ -85,10 +85,6 @@ foreach ( (array) _get_cron_array() as $events ) {
 }
 $hooks = array_values( array_filter( array_unique( $hooks ), function ( $hook ) { return 0 === strpos( $hook, 'wcct_' ); } ) );
 sort( $hooks );
-// Deactivating Pro while Free runs schedules Free's own Doctor re-check on the current site (#140); it is Free's, so it may stay, and Free's uninstall removes it.
-if ( 'free' === $kept ) {
-    $hooks = array_values( array_diff( $hooks, array( 'wcct_doctor_recheck' ) ) );
-}
 $expect( 'cron hooks', $hooks, 'free' === $kept ? array( 'wcct_example_cron' ) : ( 'pro' === $kept ? array( 'wcct_feed_example_cron' ) : array() ) );
 
 // Order meta: the sent flags stay in both stores, the thank-you flag goes.

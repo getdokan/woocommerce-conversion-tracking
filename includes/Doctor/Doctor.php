@@ -81,10 +81,8 @@ class Doctor {
         $known = array_merge( self::hashes( $stored['results'], false ), array_keys( self::dismissed() ) );
         $run   = self::execute( self::select( Registry::applicable(), array(), Check::LOCAL ), new Context() );
 
+        // Dismissals stay until the next full run, so pausing and resuming a platform doesn't bring a dismissed warning back.
         self::store( $run, false );
-
-        // A dismissed warning whose cause went is forgotten, so it shows again if it comes back; the remote checks' stay as stored.
-        self::prune_dismissed( self::stored()['results'], $stored['results'] );
 
         $new = array_values( array_diff( self::hashes( $run, true ), $known ) );
 

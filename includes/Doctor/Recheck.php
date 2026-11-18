@@ -6,14 +6,14 @@ use StorePulse\ConversionTracking\Alerts\Alerts;
 use StorePulse\ConversionTracking\Platforms\Pause;
 
 /**
- * The quiet re-check of the local checks: after a plugin is activated (once, at the end of the request), after one is deactivated (in a cron request, once its code is gone), and after a settings save, a pause or resume, or wcct_doctor_refresh (at once, so the response is up to date).
+ * The quiet re-check of the local checks: after a plugin is activated (once, at the end of the request), after the active plugins change otherwise, such as a deactivation (on the next admin page load that runs without the old list), and after a settings save, a pause or resume, or wcct_doctor_refresh (at once, so the response is up to date).
  */
 class Recheck {
 
     /**
-     * Cron hook of the re-check a deactivation schedules.
+     * Option holding a fingerprint of the active plugins the last admin page load ran with.
      */
-    const CRON = 'wcct_doctor_recheck';
+    const PLUGINS = 'wcct_doctor_plugins';
 
     /**
      * Whether a re-check is queued for this request.
@@ -29,8 +29,7 @@ class Recheck {
      */
     public function register() {
         add_action( 'activated_plugin', array( $this, 'queue' ) );
-        add_action( 'deactivated_plugin', array( $this, 'queue_next' ) );
-        add_action( self::CRON, array( $this, 'refresh' ), 10, 0 );
+        add_action( 'admin_init', array( $this, 'maybe_refresh' ), 10, 0 );
         // After the consent sync (priority 10): it mirrors consent mode into the option the consent check reads.
         add_action( 'wcct_settings_saved', array( $this, 'refresh' ), 20, 0 );
         add_action( Pause::CHANGED_ACTION, array( $this, 'refresh' ), 10, 0 );
@@ -72,15 +71,33 @@ class Recheck {
     }
 
     /**
-     * After a deactivation: re-check in a cron request, where the plugin's constants and classes (which the checks look for) are no longer loaded; once for a bulk deactivation.
-     *
-     * @param string $plugin Plugin basename.
+     * On an admin page load: re-check once if the active plugins (this site's and the network's) differ from the last load's.
+     * It compares the list this request loaded, so a request that still runs a just-deactivated plugin changes nothing, and it sees changes made anywhere (network admin, WP-CLI, a removed folder).
      *
      * @return void
      */
-    public function queue_next( $plugin = '' ) {
-        if ( plugin_basename( WCCT_FILE ) !== $plugin && ! wp_next_scheduled( self::CRON ) ) {
-            wp_schedule_single_event( time(), self::CRON );
+    public function maybe_refresh() {
+        $active = (array) get_option( 'active_plugins', array() );
+
+        if ( is_multisite() ) {
+            $active = array_merge( $active, array_keys( (array) get_site_option( 'active_sitewide_plugins', array() ) ) );
+        }
+
+        $active = array_unique( array_map( 'strval', $active ) );
+        sort( $active );
+
+        $print = md5( implode( "\n", $active ) );
+        $last  = (string) get_option( self::PLUGINS, '' );
+
+        if ( $print === $last ) {
+            return;
+        }
+
+        update_option( self::PLUGINS, $print );
+
+        // The first load only records the list.
+        if ( '' !== $last ) {
+            $this->refresh();
         }
     }
 

@@ -235,20 +235,39 @@ function wcct_test_v3_from_v1() {
 }
 
 /**
- * How many times a cron hook is scheduled, for 'call' steps.
+ * An admin page load as far as one class is concerned: runs that class's admin_init callbacks (all of admin_init needs a real admin screen), for 'call' steps.
  *
- * @param string $hook Hook.
+ * @param string $class Class name.
  *
- * @return int
+ * @return int How many ran.
  */
-function wcct_test_cron_count( $hook ) {
-    $count = 0;
+function wcct_test_admin_init( $class ) {
+    $ran = 0;
 
-    foreach ( _get_cron_array() as $events ) {
-        $count += isset( $events[ $hook ] ) ? count( $events[ $hook ] ) : 0;
+    foreach ( isset( $GLOBALS['wp_filter']['admin_init'] ) ? $GLOBALS['wp_filter']['admin_init']->callbacks : array() as $callbacks ) {
+        foreach ( $callbacks as $callback ) {
+            if ( is_array( $callback['function'] ) && $callback['function'][0] instanceof $class ) {
+                call_user_func( $callback['function'] );
+                ++$ran;
+            }
+        }
     }
 
-    return $count;
+    return $ran;
+}
+
+/**
+ * Add a plugin to the active list, or take it off, without loading it, for 'call' steps.
+ *
+ * @param string $plugin Plugin basename.
+ * @param bool   $on     Whether it is active.
+ *
+ * @return void
+ */
+function wcct_test_active_plugin( $plugin, $on ) {
+    $active = array_values( array_diff( (array) get_option( 'active_plugins', array() ), array( $plugin ) ) );
+
+    update_option( 'active_plugins', $on ? array_merge( $active, array( $plugin ) ) : $active );
 }
 
 /**

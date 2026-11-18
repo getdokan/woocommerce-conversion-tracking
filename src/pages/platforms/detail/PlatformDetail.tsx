@@ -353,20 +353,19 @@ export const PlatformDetail = ( {
         setConfirmingSplit( true );
         setSplitError( '' );
         confirmWhatsNewItem( 'google_ads_id_split' )
-            .then( () => {
-                if ( data ) {
-                    replaceSettings( {
-                        ...data.settings,
-                        platforms: {
-                            ...data.settings.platforms,
-                            google: {
-                                ...( data.settings.platforms.google ?? {} ),
-                                ads_id_split: null,
-                            },
+            // On the settings as they are now, so a save that finished meanwhile stays.
+            .then( () =>
+                replaceSettings( ( current ) => ( {
+                    ...current,
+                    platforms: {
+                        ...current.platforms,
+                        google: {
+                            ...( current.platforms?.google ?? {} ),
+                            ads_id_split: null,
                         },
-                    } );
-                }
-            } )
+                    },
+                } ) )
+            )
             .catch( ( reason: unknown ) =>
                 setSplitError( errorMessage( reason ) )
             )
