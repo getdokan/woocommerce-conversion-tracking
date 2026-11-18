@@ -717,7 +717,7 @@ const Wizard = ( {
                             ) }
                         />
                     </RadioGroup>
-                    { eu === 'yes' && (
+                    { eu === 'yes' && ! consentGap && (
                         <Notice
                             variant="info"
                             className="max-w-140"

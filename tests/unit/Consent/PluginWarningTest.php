@@ -1,5 +1,7 @@
 <?php
 
+require_once dirname( __DIR__ ) . '/Fakes/doctor-functions.php';
+
 use PHPUnit\Framework\TestCase;
 use StorePulse\ConversionTracking\Consent\PluginWarning;
 
@@ -42,7 +44,7 @@ class PluginWarningTest extends TestCase {
 
         $this->assertStringContainsString( 'isn\'t passing cookie choices.', $warning['title'] );
         $this->assertStringNotContainsString( 'real-cookie-banner', $warning['title'], 'The name, not the slug' );
-        $this->assertStringContainsString( 'Until it does, X events are sent to all visitors.', $warning['messages']['twitter'] );
+        $this->assertStringContainsString( 'Until then, X events are sent to all visitors.', $warning['messages']['twitter'] );
         $this->assertArrayHasKey( 'google', $warning['messages'] );
 
         $this->assertArrayNotHasKey( 'google', PluginWarning::build( $gap, self::LABELS, true )['messages'] );
@@ -54,5 +56,25 @@ class PluginWarningTest extends TestCase {
 
         // No plugin at all: Google keeps its text whatever the flag.
         $this->assertArrayHasKey( 'google', PluginWarning::build( array( 'kind' => 'none', 'tools' => array() ), self::LABELS, true )['messages'] );
+    }
+
+    public function test_without_the_wp_consent_api_the_fix_is_to_install_it() {
+        $gap     = array( 'kind' => 'silent', 'tools' => array( 'complianz' ) );
+        $warning = PluginWarning::build( $gap, self::LABELS, false, false );
+
+        $this->assertStringContainsString( 'the WP Consent API plugin isn\'t', $warning['messages']['facebook'] );
+        $this->assertStringContainsString( 'Install the WP Consent API', $warning['messages']['facebook'] );
+        $this->assertSame( 'Get the WP Consent API', $warning['link']['label'] );
+
+        // With it active, the plugin is what doesn't report.
+        $this->assertStringNotContainsString( 'Install the WP Consent API', PluginWarning::build( $gap, self::LABELS, false, true )['messages']['facebook'] );
+        $this->assertSame( 'See supported cookie plugins', PluginWarning::build( $gap, self::LABELS, false, true )['link']['label'] );
+    }
+
+    public function test_several_silent_plugins_read_as_a_plural() {
+        $warning = PluginWarning::build( array( 'kind' => 'silent', 'tools' => array( 'cookieyes', 'real-cookie-banner' ) ), self::LABELS, false, true );
+
+        $this->assertStringEndsWith( 'aren\'t passing cookie choices.', $warning['title'] );
+        $this->assertStringStartsWith( 'They are active', $warning['messages']['twitter'] );
     }
 }

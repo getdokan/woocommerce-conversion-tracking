@@ -9,14 +9,14 @@ use StorePulse\ConversionTracking\Doctor\Context;
 use StorePulse\ConversionTracking\Doctor\Finding;
 
 /**
- * "Respect cookie choices" is on, but no consent plugin sets a consent type: tags wait for a choice that never comes, or run regardless.
+ * "Respect cookie choices" is on, but no consent plugin sets a consent type: tags run as if everyone agreed.
  */
 class ConsentPluginCheck extends AbstractCheck {
 
     /**
      * Where the merchant finds cookie plugins that work with the WP Consent API.
      */
-    const PLUGINS_URL = 'https://wordpress.org/plugins/wp-consent-api/';
+    const PLUGINS_URL = ConsentData::PLUGINS_URL;
 
     /**
      * Working line, set by run().
