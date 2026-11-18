@@ -65,17 +65,15 @@ class ConsentPluginCheck extends AbstractCheck {
             $this->working = $status['message'];
         }
 
-        $api       = ConsentMode::api();
-        $available = $api->is_available();
+        $gap       = ConsentMode::plugin_gap();
+        $available = ConsentMode::api()->is_available();
 
-        if ( '' !== $api->get_consent_type() || ( $available && ConsentMode::consent_tool_active() ) ) {
+        if ( '' === $gap['kind'] ) {
             return array();
         }
 
-        $silent = ConsentMode::silent_tools();
-
-        if ( array() !== $silent ) {
-            return array( $this->silent_tool_finding( $silent, $available ) );
+        if ( 'silent' === $gap['kind'] ) {
+            return array( $this->silent_tool_finding( $gap['tools'], $available ) );
         }
 
         // No type is expected here (the runtime's typeExpected rule), so tags never wait; they run.

@@ -304,6 +304,12 @@ class SettingsRouteTest extends TestCase {
 
         // No consent tool owns Google consent on the test store.
         $this->assertSame( '', $consent['notice'] );
+
+        // Nor is a cookie plugin active: the switch gets its warning, per platform (#135).
+        $this->assertSame( 'No cookie plugin found.', $consent['warning']['title'] );
+        $this->assertStringEndsWith( 'Meta events are sent to all visitors.', $consent['warning']['messages']['facebook'] );
+        $this->assertStringContainsString( 'Google gets no consent for visitors in Europe', $consent['warning']['messages']['google'] );
+        $this->assertNotEmpty( $consent['warning']['link']['url'] );
     }
 
     public function test_values_carry_the_google_ads_id_split_until_the_split_fields_change() {

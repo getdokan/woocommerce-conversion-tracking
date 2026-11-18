@@ -3,6 +3,7 @@
 namespace StorePulse\ConversionTracking\REST;
 
 use StorePulse\ConversionTracking\Consent\ConsentMode;
+use StorePulse\ConversionTracking\Consent\PluginWarning;
 use StorePulse\ConversionTracking\Log\LastPurchase;
 use StorePulse\ConversionTracking\Migration\Flags;
 use StorePulse\ConversionTracking\Migration\WhatsNew;
@@ -242,12 +243,14 @@ class SettingsController extends Controller {
      */
     public function get_settings_schema( $request ) {
         $output = Schema::for_output( Schema::get(), 'current_user_can' );
-        $notice = ConsentMode::status()['message'];
+        $notice  = ConsentMode::status()['message'];
+        $warning = PluginWarning::get( array_column( $output['platforms'], 'label', 'id' ) );
 
-        // "Consent signals are handled by <tool>" beside the Respect cookie choices switch.
+        // Beside the Respect cookie choices switch: "Consent signals are handled by <tool>", and the warning while no cookie plugin is connected.
         foreach ( $output['global'] as $index => $element ) {
             if ( isset( $element['id'] ) && 'consent_mode' === $element['id'] ) {
-                $output['global'][ $index ]['notice'] = $notice;
+                $output['global'][ $index ]['notice']  = $notice;
+                $output['global'][ $index ]['warning'] = $warning;
             }
         }
 
