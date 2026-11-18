@@ -99,7 +99,8 @@ class OrderValueOutputTest extends TestCase {
             'shipping and tax known'       => array( array( 'shipping' => '20.00', 'tax' => '19.60' ), '78.00', '98.00', '117.60' ),
             'shipping known, no tax'       => array( array( 'shipping' => '20.00', 'tax' => '0' ), '78.00', '98.00', '98.00' ),
             'nothing calculated yet'       => array( array(), '78.00', '78.00', '78.00' ),
-            'more tax than the cart total' => array( array( 'shipping' => '-78.00', 'tax' => '5.00' ), '0.00', '0.00', '5.00' ),
+            // Never below 0: a credit larger than the lines.
+            'a total below its shipping'   => array( array( 'shipping' => '20.00', 'tax' => '0', 'credit' => '90.00' ), '0.00', '8.00', '8.00' ),
         );
     }
 

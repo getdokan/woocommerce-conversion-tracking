@@ -374,7 +374,7 @@ class Schema {
                 )
             ),
             self::section( 'facebook', 'facebook_advanced', __( 'Advanced settings', 'woocommerce-conversion-tracking' ), array( 'collapsible' => true, 'collapsed' => true ) ),
-            self::value_mode_field( 'facebook_advanced', 'facebook' ),
+            self::value_mode_field( 'facebook_advanced', 'facebook', array(), __( 'Sent with Start checkout and Purchase. Items only keeps ad results in line with product revenue. Fees count as items; tax is never part of items.', 'woocommerce-conversion-tracking' ) ),
             self::product_id_field( 'facebook_advanced' ),
             self::skip_roles_field( 'facebook_advanced' ),
         );
@@ -557,7 +557,7 @@ class Schema {
                 )
             ),
             self::section( 'twitter', 'twitter_advanced', __( 'Advanced settings', 'woocommerce-conversion-tracking' ), array( 'collapsible' => true, 'collapsed' => true ) ),
-            self::value_mode_field( 'twitter_advanced', 'twitter' ),
+            self::value_mode_field( 'twitter_advanced', 'twitter', array(), __( 'Sent with Start checkout and Purchase. Items only keeps ad results in line with product revenue. Fees count as items; tax is never part of items.', 'woocommerce-conversion-tracking' ) ),
             self::product_id_field( 'twitter_advanced' ),
             self::skip_roles_field( 'twitter_advanced' ),
         );
@@ -776,28 +776,12 @@ class Schema {
     }
 
     /**
-     * Help text of "Order value includes": the events of the integration that send an order value.
-     *
-     * @param string $integration Integration ID.
-     *
-     * @return string
-     */
-    private static function value_mode_description( string $integration ): string {
-        // Meta and X also send a value with Start checkout.
-        if ( in_array( $integration, array( 'facebook', 'twitter' ), true ) ) {
-            return __( 'Sent with Start checkout and Purchase. Items only keeps ad results in line with product revenue. Fees count as items; tax is never part of items.', 'woocommerce-conversion-tracking' );
-        }
-
-        return __( 'Sent with Purchase. Items only keeps ad results in line with product revenue. Fees count as items; tax is never part of items.', 'woocommerce-conversion-tracking' );
-    }
-
-    /**
      * "Order value includes" for a platform's order values; the default follows the install type (D8).
      *
      * @param string $section      Section ID.
      * @param string $integration  Integration ID the mode is for.
      * @param array  $dependencies Field dependencies.
-     * @param string $description  Help text; the integration's own by default.
+     * @param string $description  Help text; the Purchase one by default.
      *
      * @return array
      */
@@ -809,7 +793,7 @@ class Schema {
             'variant'     => 'select',
             'section_id'  => $section,
             'label'       => __( 'Order value includes', 'woocommerce-conversion-tracking' ),
-            'description' => '' !== $description ? $description : self::value_mode_description( $integration ),
+            'description' => '' !== $description ? $description : __( 'Sent with Purchase. Items only keeps ad results in line with product revenue. Fees count as items; tax is never part of items.', 'woocommerce-conversion-tracking' ),
             'default'     => $default,
             'priority'    => 50,
             'options'     => array(

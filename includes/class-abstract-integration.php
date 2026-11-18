@@ -380,8 +380,17 @@ abstract class WCCT_Integration {
      * @return string
      */
     protected function purchase_value( $order ) {
-        $event = $this->purchase_event( $order );
+        return $this->event_value( $this->purchase_event( $order ) );
+    }
 
+    /**
+     * An order or cart event's value in this platform's value mode, as a decimal string
+     *
+     * @param Event $event Event.
+     *
+     * @return string
+     */
+    private function event_value( Event $event ) {
         return number_format( $event->get_value_for( ValueMode::for_platform( $this->id ), $this->id ), $event->get_decimals(), '.', '' );
     }
 
@@ -397,7 +406,7 @@ abstract class WCCT_Integration {
             return null;
         }
 
-        return number_format( $event->get_value_for( ValueMode::for_platform( $this->id ), $this->id ), $event->get_decimals(), '.', '' );
+        return $this->event_value( $event );
     }
 
     /**

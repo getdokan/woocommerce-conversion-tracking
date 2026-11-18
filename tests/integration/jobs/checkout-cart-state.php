@@ -12,9 +12,12 @@ if ( isset( $wcct_state['shipping'] ) ) {
     add_action(
         'woocommerce_after_calculate_totals',
         function ( $cart ) use ( $wcct_state ) {
-            $tax = (float) $wcct_state['tax'];
+            $tax = isset( $wcct_state['tax'] ) ? (float) $wcct_state['tax'] : 0.0;
 
-            $cart->set_total( (float) $cart->get_total( 'edit' ) + (float) $wcct_state['shipping'] + $tax );
+            // A credit (store credit, gift card) lowers the total only.
+            $credit = isset( $wcct_state['credit'] ) ? (float) $wcct_state['credit'] : 0.0;
+
+            $cart->set_total( (float) $cart->get_total( 'edit' ) + (float) $wcct_state['shipping'] + $tax - $credit );
             $cart->set_shipping_total( $wcct_state['shipping'] );
             $cart->set_total_tax( $tax );
         },
