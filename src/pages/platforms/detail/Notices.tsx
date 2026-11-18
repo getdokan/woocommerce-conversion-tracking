@@ -135,10 +135,24 @@ export const XResetupNotice = ( {
 /**
  * Google upgraders: the 2.x Ads ID held the conversion label, and the update split it.
  *
- * @param {Object} props       Component props.
- * @param {string} props.saved The 2.x value, like AW-123/AbC.
+ * @param {Object}   props            Component props.
+ * @param {string}   props.saved      The 2.x value, like AW-123/AbC.
+ * @param {Function} props.onConfirm  "Looks right"; none when read-only.
+ * @param {boolean}  props.confirming The confirm is running.
+ * @param {string}   props.error      Why the confirm failed.
  */
-export const GoogleSplitNotice = ( { saved }: { saved: string } ) => (
+export const GoogleSplitNotice = ( {
+    saved,
+    onConfirm,
+    confirming = false,
+    error = '',
+}: {
+    saved: string;
+    // "Looks right": closes the notice and the Dashboard's Needs attention; none when read-only.
+    onConfirm?: () => void;
+    confirming?: boolean;
+    error?: string;
+} ) => (
     <Notice
         variant="info"
         role="note"
@@ -166,5 +180,24 @@ export const GoogleSplitNotice = ( { saved }: { saved: string } ) => (
                       'woocommerce-conversion-tracking'
                   ) }
         </p>
+        { onConfirm && (
+            <div className="mt-2 flex flex-wrap items-center gap-3">
+                <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={ onConfirm }
+                    disabled={ confirming }
+                    aria-busy={ confirming }
+                    data-testid="wcct-google-split-confirm"
+                >
+                    { __( 'Looks right', 'woocommerce-conversion-tracking' ) }
+                </Button>
+                { error && (
+                    <span role="alert" className="text-sm text-destructive">
+                        { error }
+                    </span>
+                ) }
+            </div>
+        ) }
     </Notice>
 );

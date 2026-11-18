@@ -356,6 +356,26 @@ class MetricsRouteTest extends WCCT_Test_Rest_Case {
         $this->assertSame( array( 'attention', 'needs_resetup' ), array( $results[5]['data']['platforms']['twitter']['state'], $results[5]['data']['platforms']['twitter']['reason'] ) );
     }
 
+    public function test_the_status_route_reads_orders_fresh_as_the_dashboard_does() {
+        $steps   = array_merge(
+            self::settings(),
+            array(
+                array( 'call', 'wcct_test_log_clear' ),
+                // Meta's script blocked an hour ago: not confirmed.
+                self::order( array( 'rows' => self::rows( array( 'adwords', 'ga4', 'twitter', 'custom' ) ) ) ),
+                // A 60-second list from before that order.
+                array( 'set_option', '_transient_wcct_log_activity', array( 'at' => time(), 'orders' => array() ) ),
+                array( 'request', 'GET', '/wcct/v1/settings/status', null, 'admin' ),
+                self::get(),
+            )
+        );
+        $results = array_slice( $this->rest( $steps ), count( self::settings() ) );
+        $meta    = $results[3]['data']['platforms']['facebook'];
+
+        $this->assertSame( array( 'attention', 'not_confirmed' ), array( $meta['state'], $meta['reason'] ) );
+        $this->assertSame( self::by_id( $results[4]['data']['platforms'] )['facebook']['note'], $meta['note'] );
+    }
+
     public function test_google_s_unchecked_ads_id_split_needs_attention_on_both_screens() {
         $steps   = array_merge(
             self::settings(),

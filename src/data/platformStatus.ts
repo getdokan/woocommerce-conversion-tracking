@@ -22,35 +22,41 @@ export const fetchPlatformStatuses = (): Promise< PlatformStatuses > =>
     } ).then( ( response ) => response?.platforms ?? {} );
 
 /**
- * The platforms' statuses, fetched again whenever the settings change (page change, save, pause); null until the first answer.
+ * The platforms' statuses for these settings: fetched again only when their content changes (a save, a pause, new values); null while that fetch runs or after it fails, so the page shows its own checks rather than an old status.
  *
- * @param {unknown} settings The shared settings; a new object means they changed.
+ * @param {unknown} settings The shared settings.
  */
 export const usePlatformStatuses = (
     settings: unknown
 ): PlatformStatuses | null => {
-    const [ statuses, setStatuses ] = useState< PlatformStatuses | null >(
-        null
-    );
+    const key = settings ? JSON.stringify( settings ) : '';
+    const [ loaded, setLoaded ] = useState< {
+        key: string;
+        statuses: PlatformStatuses;
+    } | null >( null );
 
     useEffect( () => {
         let live = true;
 
-        if ( settings ) {
+        if ( key ) {
             fetchPlatformStatuses()
-                .then( ( next ) => {
+                .then( ( statuses ) => {
                     if ( live ) {
-                        setStatuses( next );
+                        setLoaded( { key, statuses } );
                     }
                 } )
-                // The page keeps its own checks until a status arrives.
-                .catch( () => {} );
+                .catch( () => {
+                    if ( live ) {
+                        setLoaded( null );
+                    }
+                } );
         }
 
         return () => {
             live = false;
         };
-    }, [ settings ] );
+    }, [ key ] );
 
-    return statuses;
+    // A status fetched for other settings is never shown.
+    return loaded && loaded.key === key ? loaded.statuses : null;
 };

@@ -366,7 +366,7 @@ class Metrics {
                 'not_confirmed' => $counts['not_confirmed'],
                 'last_purchase' => self::last_purchase( array_merge( array( $id ), (array) $platform['integrations'] ), $now ),
                 'connected_at'  => isset( $times[ $id ] ) && $times[ $id ] ? gmdate( 'c', $times[ $id ] ) : null,
-                'needs_resetup' => 'twitter' === $id ? (bool) WhatsNew::x_resetup( $id, isset( $doc['platforms'][ $id ] ) && is_array( $doc['platforms'][ $id ] ) ? $doc['platforms'][ $id ] : array() ) : ! empty( $own['needs_resetup'] ),
+                'needs_resetup' => 'twitter' === $id ? (bool) WhatsNew::x_resetup( $id, isset( $doc['platforms'][ $id ] ) && is_array( $doc['platforms'][ $id ] ) ? $doc['platforms'][ $id ] : array(), $schema ) : ! empty( $own['needs_resetup'] ),
                 'ads_id_split'  => 'google' === $id && null !== $split,
                 'finding'       => isset( $fixes[ $id ] ) ? $fixes[ $id ] : null,
             );
@@ -389,27 +389,50 @@ class Metrics {
      * @return string
      */
     public static function reason( array $card ) {
-        foreach ( array( 'not_confirmed', 'needs_resetup', 'ads_id_split', 'finding' ) as $reason ) {
-            if ( ! empty( $card[ $reason ] ) ) {
-                return $reason;
-            }
-        }
+        $reasons = self::reasons( $card );
 
-        return '';
+        return $reasons ? $reasons[0] : '';
     }
 
     /**
-     * A card's status for the platform pages: state, reason (see reason()) and note.
+     * Every reason a card needs attention, in note order.
+     *
+     * @param array $card Card.
+     *
+     * @return string[]
+     */
+    private static function reasons( array $card ) {
+        return array_values(
+            array_filter(
+                array( 'not_confirmed', 'needs_resetup', 'ads_id_split', 'finding' ),
+                function ( $reason ) use ( $card ) {
+                    return ! empty( $card[ $reason ] );
+                }
+            )
+        );
+    }
+
+    /**
+     * A card's status for the platform pages: state, reason (see reason()), note, and notes (one per reason, each with its reason) so no cause is hidden behind another.
      *
      * @param array $card Card from cards().
      *
      * @return array
      */
     public static function status( array $card ) {
+        $notes = array();
+
+        if ( self::ATTENTION === $card['state'] ) {
+            foreach ( self::reasons( $card ) as $reason ) {
+                $notes[] = array_merge( array( 'reason' => $reason ), self::attention_note( $card, $reason ) );
+            }
+        }
+
         return array(
             'state'  => $card['state'],
             'reason' => $card['reason'],
             'note'   => $card['note'],
+            'notes'  => $notes,
         );
     }
 
@@ -531,6 +554,48 @@ class Metrics {
     }
 
     /**
+     * The note for one reason a card needs attention (see reasons()).
+     *
+     * @param array  $card   Card.
+     * @param string $reason Reason.
+     *
+     * @return array text, link, link_label.
+     */
+    private static function attention_note( array $card, $reason ) {
+        if ( 'not_confirmed' === $reason ) {
+            return array(
+                /* translators: %s: number of purchases */
+                'text'       => sprintf( _n( "We couldn't confirm %s purchase in the last 24 hours.", "We couldn't confirm %s purchases in the last 24 hours.", $card['not_confirmed'], 'woocommerce-conversion-tracking' ), number_format_i18n( $card['not_confirmed'] ) ),
+                'link'       => '#/log?tab=not-confirmed',
+                'link_label' => __( 'See the orders', 'woocommerce-conversion-tracking' ),
+            );
+        }
+
+        if ( 'needs_resetup' === $reason ) {
+            return array(
+                /* translators: %s: platform name, for example X */
+                'text'       => sprintf( __( '%s retired the old event codes, so purchases need a new event ID.', 'woocommerce-conversion-tracking' ), $card['name'] ),
+                'link'       => '#/platforms/' . $card['id'],
+                'link_label' => __( 'Fix it', 'woocommerce-conversion-tracking' ),
+            );
+        }
+
+        if ( 'ads_id_split' === $reason ) {
+            return array(
+                'text'       => __( 'We split your Google Ads ID into a conversion ID and a label. Check it looks right.', 'woocommerce-conversion-tracking' ),
+                'link'       => '#/platforms/' . $card['id'],
+                'link_label' => __( 'Fix it', 'woocommerce-conversion-tracking' ),
+            );
+        }
+
+        return array(
+            'text'       => isset( $card['finding']['found'] ) ? (string) $card['finding']['found'] : '',
+            'link'       => self::finding_step( $card['finding'], '' )['link'],
+            'link_label' => __( 'Fix it', 'woocommerce-conversion-tracking' ),
+        );
+    }
+
+    /**
      * The line under a platform card's name.
      *
      * @param array $card         Platform card.
@@ -548,39 +613,7 @@ class Metrics {
                     'link_label' => '',
                 );
             case self::ATTENTION:
-                $reason = isset( $card['reason'] ) ? $card['reason'] : self::reason( $card );
-
-                if ( 'not_confirmed' === $reason ) {
-                    return array(
-                        /* translators: %s: number of purchases */
-                        'text'       => sprintf( _n( "We couldn't confirm %s purchase in the last 24 hours.", "We couldn't confirm %s purchases in the last 24 hours.", $card['not_confirmed'], 'woocommerce-conversion-tracking' ), number_format_i18n( $card['not_confirmed'] ) ),
-                        'link'       => '#/log?tab=not-confirmed',
-                        'link_label' => __( 'See the orders', 'woocommerce-conversion-tracking' ),
-                    );
-                }
-
-                if ( 'needs_resetup' === $reason ) {
-                    return array(
-                        /* translators: %s: platform name, for example X */
-                        'text'       => sprintf( __( '%s retired the old event codes, so purchases need a new event ID.', 'woocommerce-conversion-tracking' ), $card['name'] ),
-                        'link'       => '#/platforms/' . $card['id'],
-                        'link_label' => __( 'Fix it', 'woocommerce-conversion-tracking' ),
-                    );
-                }
-
-                if ( 'ads_id_split' === $reason ) {
-                    return array(
-                        'text'       => __( 'We split your Google Ads ID into a conversion ID and a label. Check it looks right.', 'woocommerce-conversion-tracking' ),
-                        'link'       => '#/platforms/' . $card['id'],
-                        'link_label' => __( 'Fix it', 'woocommerce-conversion-tracking' ),
-                    );
-                }
-
-                return array(
-                    'text'       => isset( $card['finding']['found'] ) ? (string) $card['finding']['found'] : '',
-                    'link'       => self::finding_step( $card['finding'], '' )['link'],
-                    'link_label' => __( 'Fix it', 'woocommerce-conversion-tracking' ),
-                );
+                return self::attention_note( $card, $card['reason'] );
             case self::WORKING:
                 if ( ! $card['last_purchase'] ) {
                     return null;

@@ -235,6 +235,23 @@ function wcct_test_v3_from_v1() {
 }
 
 /**
+ * How many times a cron hook is scheduled, for 'call' steps.
+ *
+ * @param string $hook Hook.
+ *
+ * @return int
+ */
+function wcct_test_cron_count( $hook ) {
+    $count = 0;
+
+    foreach ( _get_cron_array() as $events ) {
+        $count += isset( $events[ $hook ] ) ? count( $events[ $hook ] ) : 0;
+    }
+
+    return $count;
+}
+
+/**
  * Move the merchant's last Doctor run back in time, so a later change to it shows, for 'call' steps.
  *
  * @param int $seconds Seconds.

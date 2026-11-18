@@ -494,11 +494,12 @@ export const eventsTurnedOn = (
         .map( ( event ) => event.value );
 };
 
-// The status the Dashboard card shows (wcct/v1/settings/status): reason is not_confirmed, needs_resetup, ads_id_split or finding.
+// The status the Dashboard card shows (wcct/v1/settings/status): reason is not_confirmed, needs_resetup, ads_id_split or finding; notes has one per reason.
 export type PlatformStatus = {
     state: PlatformState;
     reason: string;
     note: MetricsNote | null;
+    notes?: Array< MetricsNote & { reason: string } >;
 };
 
 /**

@@ -39,6 +39,7 @@ import {
     pixelProblems,
 } from '../../../data/metaPro';
 import { isPro, upgradeUrl } from '../../../data/plan';
+import { confirmWhatsNewItem, hasWhatsNew } from '../../../data/whatsNew';
 import {
     applies,
     changedValues,
@@ -334,13 +335,43 @@ export const PlatformDetail = ( {
     const dirty = Object.keys( changes ).length > 0 || consentChanged;
     const dirtyRef = useRef( dirty );
     const lastPurchase = ( values.last_purchase ?? null ) as LastPurchase;
-    // Why the Dashboard says Needs attention, when the page has no notice of its own for it (X re-setup and the Google split do).
-    const attentionNote =
-        status?.state === 'attention' &&
-        ( status.reason === 'finding' || status.reason === 'not_confirmed' ) &&
-        status.note?.text
-            ? status.note
-            : null;
+    // Why the Dashboard says Needs attention, each cause the page has no notice of its own for (X re-setup and the Google split do).
+    const attentionNotes =
+        status?.state === 'attention'
+            ? ( status.notes ?? [] ).filter(
+                  ( cause ) =>
+                      ( cause.reason === 'finding' ||
+                          cause.reason === 'not_confirmed' ) &&
+                      cause.text
+              )
+            : [];
+    const [ confirmingSplit, setConfirmingSplit ] = useState( false );
+    const [ splitError, setSplitError ] = useState( '' );
+
+    // "Looks right" on the Google split: the What's new confirm, then the split is gone from the shared settings (and the status is fetched again).
+    const confirmSplit = () => {
+        setConfirmingSplit( true );
+        setSplitError( '' );
+        confirmWhatsNewItem( 'google_ads_id_split' )
+            .then( () => {
+                if ( data ) {
+                    replaceSettings( {
+                        ...data.settings,
+                        platforms: {
+                            ...data.settings.platforms,
+                            google: {
+                                ...( data.settings.platforms.google ?? {} ),
+                                ads_id_split: null,
+                            },
+                        },
+                    } );
+                }
+            } )
+            .catch( ( reason: unknown ) =>
+                setSplitError( errorMessage( reason ) )
+            )
+            .finally( () => setConfirmingSplit( false ) );
+    };
     const target = focusField( query );
     const section = focusSection( query );
 
@@ -862,32 +893,43 @@ export const PlatformDetail = ( {
                         </Notice>
                     ) }
 
-                    { attentionNote && (
+                    { attentionNotes.map( ( cause ) => (
                         <Notice
+                            key={ cause.reason }
                             variant="warning"
                             role="status"
                             data-testid="wcct-platform-attention"
                         >
                             <p className="m-0">
-                                { attentionNote.text }{ ' ' }
-                                { attentionNote.link && (
+                                { cause.text }{ ' ' }
+                                { cause.link && (
                                     <a
-                                        href={ attentionNote.link }
+                                        href={ cause.link }
                                         className="font-medium text-primary underline underline-offset-3"
                                     >
-                                        { attentionNote.link_label }
+                                        { cause.link_label }
                                     </a>
                                 ) }
                             </p>
                         </Notice>
-                    ) }
+                    ) ) }
 
                     { resetup.length > 0 && ! readOnlyAll && (
                         <XResetupNotice platform={ id } events={ resetup } />
                     ) }
 
                     { split && id === 'google' && (
-                        <GoogleSplitNotice saved={ text( split.saved ) } />
+                        <GoogleSplitNotice
+                            saved={ text( split.saved ) }
+                            onConfirm={
+                                // Its confirm is What's new's, which only upgraded stores have.
+                                readOnlyAll || ! hasWhatsNew()
+                                    ? undefined
+                                    : confirmSplit
+                            }
+                            confirming={ confirmingSplit }
+                            error={ splitError }
+                        />
                     ) }
 
                     { connection

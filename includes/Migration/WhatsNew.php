@@ -355,26 +355,28 @@ class WhatsNew {
     /**
      * X events that still need a new event ID: flagged, switched on and not locked by the plan (Free), as on the X page; the Dashboard card uses it too.
      *
-     * @param string $platform Platform ID.
-     * @param array  $stored   Stored platform settings.
+     * @param string     $platform Platform ID.
+     * @param array      $stored   Stored platform settings.
+     * @param array|null $schema   Normalized settings schema, null to build it.
      *
      * @return string[]
      */
-    public static function x_resetup( string $platform, array $stored ): array {
+    public static function x_resetup( string $platform, array $stored, $schema = null ): array {
         $x = XSettings::from_v3( $stored );
 
-        return array_values( array_diff( array_intersect( $x['needs_resetup'], $x['events'] ), self::locked_events( $platform ) ) );
+        return array_values( array_diff( array_intersect( $x['needs_resetup'], $x['events'] ), self::locked_events( $platform, $schema ) ) );
     }
 
     /**
      * Events a platform's plan locks (Pro events on Free), from the settings schema.
      *
-     * @param string $platform Platform ID.
+     * @param string     $platform Platform ID.
+     * @param array|null $schema   Normalized settings schema, null to build it.
      *
      * @return string[]
      */
-    private static function locked_events( string $platform ): array {
-        $schema = Schema::get()['platforms'];
+    private static function locked_events( string $platform, $schema = null ): array {
+        $schema = ( is_array( $schema ) ? $schema : Schema::get() )['platforms'];
         $fields = isset( $schema[ $platform ]['schema'] ) ? Schema::fields( $schema[ $platform ]['schema'] ) : array();
         $locked = array();
 

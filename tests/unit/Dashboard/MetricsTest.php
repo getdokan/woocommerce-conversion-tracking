@@ -280,6 +280,18 @@ class MetricsTest extends TestCase {
         $this->assertSame( '', Metrics::reason( self::card( 'google', 'working' ) ) );
     }
 
+    public function test_the_status_carries_a_note_for_every_reason() {
+        $finding = self::finding( str_repeat( 'a', 32 ), 'PixelYourSite is also active', '#/platforms/facebook' );
+        $card    = self::card( 'facebook', 'attention', array( 'not_confirmed' => 2, 'finding' => $finding, 'reason' => 'not_confirmed', 'note' => array( 'text' => 'first' ) ) );
+        $status  = Metrics::status( $card );
+
+        $this->assertSame( array( 'attention', 'not_confirmed' ), array( $status['state'], $status['reason'] ) );
+        $this->assertSame( array( 'not_confirmed', 'finding' ), array_column( $status['notes'], 'reason' ) );
+        $this->assertSame( array( "We couldn't confirm 2 purchases in the last 24 hours.", '#/log?tab=not-confirmed' ), array( $status['notes'][0]['text'], $status['notes'][0]['link'] ) );
+        $this->assertSame( array( 'PixelYourSite is also active', 'Fix it' ), array( $status['notes'][1]['text'], $status['notes'][1]['link_label'] ) );
+        $this->assertSame( array(), Metrics::status( self::card( 'facebook', 'working', array( 'reason' => '', 'note' => null ) ) )['notes'] );
+    }
+
     public function test_a_doctor_that_never_ran_is_a_next_step() {
         $steps = Metrics::next_steps( array( self::card( 'facebook', 'working' ) ), array(), false );
 

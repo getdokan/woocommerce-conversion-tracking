@@ -174,7 +174,7 @@ class SettingsController extends Controller {
     }
 
     /**
-     * Each platform's status: state, reason and note, as the Dashboard card shows them.
+     * Each platform's status: state, reason, note and every reason's note, as the Dashboard card shows them.
      *
      * @param WP_REST_Request $request Request.
      *
@@ -182,8 +182,12 @@ class SettingsController extends Controller {
      */
     public function get_status( $request ) {
         $statuses = array();
+        $now      = time();
 
-        foreach ( Metrics::cards( Schema::get(), Store::load(), Metrics::tally( Activity::orders() ), time() ) as $card ) {
+        // Fresh, as the Dashboard reads them.
+        Activity::reset();
+
+        foreach ( Metrics::cards( Schema::get(), Store::load(), Metrics::tally( Activity::orders( $now ) ), $now ) as $card ) {
             $statuses[ $card['id'] ] = Metrics::status( $card );
         }
 

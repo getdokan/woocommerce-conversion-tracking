@@ -6,9 +6,14 @@ use StorePulse\ConversionTracking\Alerts\Alerts;
 use StorePulse\ConversionTracking\Platforms\Pause;
 
 /**
- * The quiet re-check of the local checks: after a plugin is activated or deactivated (once, at the end of the request), and after a settings save, a pause or resume, or wcct_doctor_refresh (at once, so the response is up to date).
+ * The quiet re-check of the local checks: after a plugin is activated (once, at the end of the request), after one is deactivated (in a cron request, once its code is gone), and after a settings save, a pause or resume, or wcct_doctor_refresh (at once, so the response is up to date).
  */
 class Recheck {
+
+    /**
+     * Cron hook of the re-check a deactivation schedules.
+     */
+    const CRON = 'wcct_doctor_recheck';
 
     /**
      * Whether a re-check is queued for this request.
@@ -24,7 +29,8 @@ class Recheck {
      */
     public function register() {
         add_action( 'activated_plugin', array( $this, 'queue' ) );
-        add_action( 'deactivated_plugin', array( $this, 'queue' ) );
+        add_action( 'deactivated_plugin', array( $this, 'queue_next' ) );
+        add_action( self::CRON, array( $this, 'refresh' ), 10, 0 );
         // After the consent sync (priority 10): it mirrors consent mode into the option the consent check reads.
         add_action( 'wcct_settings_saved', array( $this, 'refresh' ), 20, 0 );
         add_action( Pause::CHANGED_ACTION, array( $this, 'refresh' ), 10, 0 );
@@ -66,6 +72,19 @@ class Recheck {
     }
 
     /**
+     * After a deactivation: re-check in a cron request, where the plugin's constants and classes (which the checks look for) are no longer loaded; once for a bulk deactivation.
+     *
+     * @param string $plugin Plugin basename.
+     *
+     * @return void
+     */
+    public function queue_next( $plugin = '' ) {
+        if ( plugin_basename( WCCT_FILE ) !== $plugin && ! wp_next_scheduled( self::CRON ) ) {
+            wp_schedule_single_event( time(), self::CRON );
+        }
+    }
+
+    /**
      * Run the local checks; never breaks the request.
      *
      * @return void
@@ -79,7 +98,7 @@ class Recheck {
     }
 
     /**
-     * Re-check now, after a settings save or a pause, so no warning outlives its cause; it runs with the Doctor alert off too, which only keeps new findings off the badge.
+     * Re-check now, so no warning outlives its cause; it runs with the Doctor alert off too, which only keeps new findings off the badge.
      *
      * @return void
      */
