@@ -203,3 +203,9 @@ if ( ! function_exists( 'wp_get_current_user' ) ) {
         return $user;
     }
 }
+
+if ( ! function_exists( 'wp_hash' ) ) {
+    function wp_hash( $data, $scheme = 'auth' ) {
+        return hash_hmac( 'md5', $data, 'wcct-test-salt-' . $scheme );
+    }
+}

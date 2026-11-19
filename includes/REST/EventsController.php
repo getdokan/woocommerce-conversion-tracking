@@ -104,6 +104,14 @@ class EventsController extends Controller {
                             'pattern'     => '^[A-Za-z0-9]{0,32}$',
                             'default'     => '',
                         ),
+                        // Never validated here: a malformed value only costs the log its value (CheckIn::normalise()), never the check-in.
+                        'value'     => array(
+                            'description'       => __( 'Purchase value the page rendered for the platform, for the Activity log.', 'woocommerce-conversion-tracking' ),
+                            'type'              => 'string',
+                            'default'           => '',
+                            'validate_callback' => '__return_true',
+                            'sanitize_callback' => array( __CLASS__, 'value_param' ),
+                        ),
                         'token'     => array(
                             'description' => __( 'Test link token.', 'woocommerce-conversion-tracking' ),
                             'type'        => 'string',
@@ -134,7 +142,7 @@ class EventsController extends Controller {
 
         $params = array();
 
-        foreach ( array( 'order_id', 'key', 'platform', 'loaded', 'consent', 'reason', 'event_id', 'load' ) as $name ) {
+        foreach ( array( 'order_id', 'key', 'platform', 'loaded', 'consent', 'reason', 'event_id', 'load', 'value' ) as $name ) {
             $params[ $name ] = $request->get_param( $name );
         }
 
@@ -172,6 +180,17 @@ class EventsController extends Controller {
         }
 
         return rest_ensure_response( array( 'result' => $result ) );
+    }
+
+    /**
+     * The posted value as a string; anything else (an array, a number) becomes empty, so the check-in still counts.
+     *
+     * @param mixed $value Posted value.
+     *
+     * @return string
+     */
+    public static function value_param( $value ) {
+        return is_string( $value ) ? $value : '';
     }
 
     /**

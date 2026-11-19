@@ -113,10 +113,10 @@ class ConsentPageOutputTest extends WCCT_Test_Page_Case {
 
         // The purchase confirmation after the merchant script waits too, so the order isn't marked sent before it ran.
         $this->assertStringContainsString( '<script type="text/plain" data-wcct-consent="marketing" data-no-optimize="1">window.wcctPurchaseSent', $output );
-        $this->assertMatchesRegularExpression( '/<script type="text\/plain"[^>]*>(?:(?!<\/script>).)*"custom", 3001, "wc_order_ctguest0001", "wcct_3001_purchase", ""\)\(\);<\/script>/s', $output );
+        $this->assertMatchesRegularExpression( '/<script type="text\/plain"[^>]*>(?:(?!<\/script>).)*"custom", 3001, "wc_order_ctguest0001", "wcct_3001_purchase", "", ""\)\(\);<\/script>/s', $output );
 
         // Only the unheld check-in runs before consent: it arms the "not handed over" check-in (#111) and confirms nothing.
-        $this->assertStringContainsString( '"custom", 3001, "wc_order_ctguest0001", "wcct_3001_purchase", "marketing");</script>', $output );
+        $this->assertStringContainsString( '"custom", 3001, "wc_order_ctguest0001", "wcct_3001_purchase", "marketing", "");</script>', $output );
         $this->assertDoesNotMatchRegularExpression( '/<script(?![^>]*text\/plain)[^>]*>(?:(?!<\/script>).)*wcctPurchaseSent\([^)]*"custom"[^)]*\)\(\)/s', $output );
     }
 

@@ -108,7 +108,7 @@ class Statuses {
      * @param array    $paused Integration IDs that are set up but paused, as a list or as ID => when the pause started (Unix time, 0 for unknown).
      * @param int      $now    Unix time.
      *
-     * @return array|null The summary plus status, cause, settles_at and platforms (id, integrations, status, cause, sent, checked_in_at, sent_at, consent, event_id, unknown).
+     * @return array|null The summary plus status, cause, settles_at and platforms (id, integrations, status, cause, sent, checked_in_at, sent_at, consent, event_id, unknown, values).
      */
     public static function evaluate( array $order, array $rows, array $active, array $paused, $now ) {
         $order = array_merge(
@@ -430,6 +430,8 @@ class Statuses {
                 'sent_at'       => $sent ? self::time( isset( $row['sent_at'] ) ? $row['sent_at'] : '' ) : 0,
                 'consent'       => $consent,
                 'event_id'      => isset( $row['event_id'] ) ? (string) $row['event_id'] : '',
+                // The value each integration was sent, when its row recorded one.
+                'values'        => $sent && isset( $row['value'] ) && '' !== (string) $row['value'] ? array( (string) $id => (string) $row['value'] ) : array(),
             )
         );
     }
@@ -455,6 +457,7 @@ class Statuses {
             'consent'       => '',
             'event_id'      => '',
             'unknown'       => false,
+            'values'        => array(),
         );
     }
 
@@ -506,6 +509,7 @@ class Statuses {
                     'checked_in_at' => self::earliest( $kept['checked_in_at'], $entry['checked_in_at'] ),
                     'sent_at'       => self::earliest( $kept['sent_at'], $entry['sent_at'] ),
                     'event_id'      => '' !== $kept['event_id'] ? $kept['event_id'] : $entry['event_id'],
+                    'values'        => array_merge( $kept['values'], $entry['values'] ),
                     'unknown'       => $kept['unknown'] && $entry['unknown'],
                 )
             );
