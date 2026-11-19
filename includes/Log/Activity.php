@@ -297,7 +297,7 @@ class Activity {
     }
 
     /**
-     * Orders created before the window that checked in in it, keyed by ID.
+     * Orders the query didn't read that checked in in the window (created before it, or sub-orders), keyed by ID, up to the read limit.
      *
      * @param int         $since  Unix time.
      * @param \WC_Order[] $loaded Orders already read, by ID.
@@ -362,7 +362,7 @@ class Activity {
             'limit'        => self::limit(),
         );
 
-        // Sub-orders never use up the limit; one that checked in is still read (checked_in_since()).
+        // Sub-orders never use up the limit; one that checked in is read by checked_in_since() while the limit has room.
         if ( Statuses::skips_sub_orders() ) {
             $query['parent'] = 0;
         }

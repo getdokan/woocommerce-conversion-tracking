@@ -210,7 +210,7 @@ function wcct_test_log_row( $order_id, $platform, $loaded, array $columns = arra
 }
 
 /**
- * A multi-vendor purchase as Dokan splits it: the parent (checked in on every platform) and its sub-orders (created by dokan, never on a thank-you page), for 'call' steps.
+ * A multi-vendor purchase as Dokan splits it: the parent (checked in on every platform) and its sub-orders (created by dokan 10 seconds later, so they're the newest orders; never on a thank-you page), for 'call' steps.
  *
  * @param int $count Sub-orders.
  *
@@ -221,7 +221,7 @@ function wcct_test_log_multi_vendor_order( $count ) {
     $subs   = array();
 
     for ( $i = 0; $i < $count; $i++ ) {
-        $id          = wcct_test_log_order( array( 'created_via' => 'dokan', 'thankyou_age' => null, 'parent' => $parent ) );
+        $id          = wcct_test_log_order( array( 'created_via' => 'dokan', 'age' => 3590, 'thankyou_age' => null, 'parent' => $parent ) );
         $subs[ $id ] = wc_get_order( $id )->get_parent_id();
     }
 
