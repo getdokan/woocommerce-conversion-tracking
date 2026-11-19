@@ -295,7 +295,9 @@ test.describe('setup wizard', () => {
 
             await expect(button(page, 'Continue')).toBeDisabled();
             await page.getByRole('radio', { name: /^Yes/ }).click();
-            await expect(page.getByTestId('wcct-onboarding-eu-note')).toContainText('Respect cookie choices is on.');
+            // The test store has no cookie plugin, so the warning shows in place of the info note (#135).
+            await expect(page.getByTestId('wcct-consent-no-plugin')).toContainText('No cookie plugin found.');
+            await expect(page.getByTestId('wcct-onboarding-eu-note')).toHaveCount(0);
             await button(page, 'Continue').click();
 
             // Step 5: Verify (#120 waits for the check-in here).

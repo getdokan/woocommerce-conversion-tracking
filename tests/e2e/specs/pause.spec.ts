@@ -61,6 +61,9 @@ const CASES = [
     },
 ];
 
+// Tracking on, whatever its health: earlier specs leave unconfirmed orders, which the page reports as Needs attention, as the Dashboard does (#140).
+const TRACKING = /Waiting for first event|Working|Needs attention/;
+
 for (const platform of CASES) {
     test(`pausing ${platform.name} asks first, stops its tags at once behind a page cache, and Resume brings them back`, async ({ page, browser, baseURL }) => {
         test.skip(!platform.ids, `${platform.name} needs test IDs in config/test-ids.json`);
@@ -84,7 +87,7 @@ for (const platform of CASES) {
             const pauseButton = card.getByRole('button', { name: 'Pause tracking' });
             const dialog = page.getByRole('alertdialog');
 
-            await expect(card.getByTestId('wcct-platform-pill')).toHaveText(/Waiting for first event|Working/);
+            await expect(card.getByTestId('wcct-platform-pill')).toHaveText(TRACKING);
 
             // Keep tracking and Escape leave it on.
             await pauseButton.click();
@@ -96,7 +99,7 @@ for (const platform of CASES) {
             await pauseButton.click();
             await page.keyboard.press('Escape');
             await expect(dialog).toBeHidden();
-            await expect(card.getByTestId('wcct-platform-pill')).toHaveText(/Waiting for first event|Working/);
+            await expect(card.getByTestId('wcct-platform-pill')).toHaveText(TRACKING);
 
             await pauseButton.click();
             await dialog.getByRole('button', { name: 'Pause tracking' }).click();
@@ -123,10 +126,11 @@ for (const platform of CASES) {
 
             await openApp(page, `#/platforms/${platform.id}`);
             await card.getByRole('button', { name: 'Resume tracking' }).click();
-            await expect(card.getByTestId('wcct-platform-pill')).toHaveText(/Waiting for first event|Working/);
+            await expect(card.getByTestId('wcct-platform-pill')).toHaveText(TRACKING);
             await expect(pauseButton).toBeFocused();
             await expect(page.getByTestId(`wcct-pause-${platform.id}-status`)).toHaveText(`Tracking resumed on ${platform.name}.`);
-            await expect(listItem(page, platform.id)).toContainText('On');
+            // The list's label for a resumed platform: On, or Needs attention with unconfirmed orders (#140).
+            await expect(listItem(page, platform.id)).toContainText(/(On|Needs attention)$/);
 
             const resumed = await visitor.view(platform.platforms);
 
