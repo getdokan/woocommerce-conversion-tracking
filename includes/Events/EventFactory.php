@@ -95,11 +95,19 @@ class EventFactory {
         );
 
         if ( $cart instanceof \WC_Cart ) {
-            $ids = array();
+            $ids   = array();
+            $lines = array();
 
             foreach ( $cart->get_cart() as $item ) {
                 if ( isset( $item['data'] ) && $item['data'] instanceof \WC_Product ) {
-                    $ids[] = $item['data']->get_id();
+                    $ids[]    = $item['data']->get_id();
+                    $quantity = self::quantity( isset( $item['quantity'] ) ? $item['quantity'] : 1 );
+                    $lines[]  = array(
+                        'product'  => $item['data'],
+                        'quantity' => $quantity,
+                        // The unit price after discounts, without tax, as an order item's on Purchase.
+                        'price'    => isset( $item['line_total'] ) && is_numeric( $item['line_total'] ) ? (float) $item['line_total'] / $quantity : (float) $item['data']->get_price(),
+                    );
                 }
             }
 
@@ -107,6 +115,8 @@ class EventFactory {
             $args['tax']         = $cart->get_total_tax();
             $args['shipping']    = $cart->get_shipping_total();
             $args['product_ids'] = $ids;
+            // Under its own key: the add to cart event's 'lines' are what one add brought, these are the whole cart.
+            $args['data']        = array( 'cart_lines' => $lines );
         }
 
         return new Event( $name, $args );
