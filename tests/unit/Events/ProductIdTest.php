@@ -165,6 +165,59 @@ class ProductIdTest extends TestCase {
         $this->assertSame( array( 'CT-BEANIE', '2004' ), ProductId::for_cart( $cart, 'facebook' ) );
     }
 
+    public function test_an_add_to_cart_sends_each_line_product_once() {
+        $event = new class() {
+            public function get( $key ) {
+                $beanie = new WCCT_Test_Fake_Product( 2001, 'CT-BEANIE' );
+
+                return 'lines' === $key ? array( array( 'product' => $beanie ), array( 'product' => new WCCT_Test_Fake_Product( 2004 ) ), array( 'product' => $beanie ), array( 'quantity' => 1 ) ) : null;
+            }
+
+            public function get_product() {
+                return new WCCT_Test_Fake_Product( 2001, 'CT-BEANIE' );
+            }
+
+            public function get_product_ids() {
+                return array( 2001 );
+            }
+        };
+
+        $this->assertSame( array( 2001, 2004 ), ProductId::for_event( $event, 'twitter' ) );
+
+        $this->set_mode( 'twitter', ProductId::SKU );
+        $this->assertSame( array( 'CT-BEANIE', '2004' ), ProductId::for_event( $event, 'twitter' ) );
+    }
+
+    public function test_cart_and_order_list_each_product_once() {
+        $beanie = new WCCT_Test_Fake_Product( 2001, 'CT-BEANIE' );
+        $cart   = array( array( 'data' => $beanie ), array( 'data' => new WCCT_Test_Fake_Product( 2004 ) ), array( 'data' => $beanie ) );
+        $order  = new class( $beanie ) {
+            private $beanie;
+
+            public function __construct( $beanie ) {
+                $this->beanie = $beanie;
+            }
+
+            public function get_items() {
+                return array( new WCCT_Test_Fake_Order_Item( $this->beanie, 2001 ), new WCCT_Test_Fake_Order_Item( $this->beanie, 2001 ), new WCCT_Test_Fake_Order_Item( false, 2009 ) );
+            }
+        };
+
+        $this->assertSame( array( 2001, 2004 ), ProductId::for_cart( $cart, 'facebook' ) );
+        $this->assertSame( array( 2001, 2009 ), ProductId::for_order( $order, 'facebook' ) );
+
+        $this->set_mode( 'facebook', ProductId::SKU );
+        $this->assertSame( array( 'CT-BEANIE', '2004' ), ProductId::for_cart( $cart, 'facebook' ) );
+    }
+
+    public function test_two_products_with_the_same_identifier_both_stay() {
+        // SKU "2004" on one product, ID 2004 without a SKU on another.
+        $cart = array( array( 'data' => new WCCT_Test_Fake_Product( 2001, '2004' ) ), array( 'data' => new WCCT_Test_Fake_Product( 2004 ) ) );
+
+        $this->set_mode( 'facebook', ProductId::SKU );
+        $this->assertSame( array( '2004', '2004' ), ProductId::for_cart( $cart, 'facebook' ) );
+    }
+
     public function test_order_sends_variation_ids_and_keeps_deleted_products() {
         $order = new class() {
             public function get_items() {

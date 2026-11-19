@@ -270,9 +270,9 @@ class WCCT_Integration_Facebook extends WCCT_Integration {
     public function add_to_cart() {
         $event = $this->current_event;
 
-        // The product just added; the whole cart only when the event has no product.
+        // The products the click added; the whole cart only when the event has no product.
         if ( $event && $event->get_product() ) {
-            $product_ids = array( \StorePulse\ConversionTracking\Events\ProductId::for_product( $event->get_product(), $this->id ) );
+            $product_ids = \StorePulse\ConversionTracking\Events\ProductId::for_event( $event, $this->id );
             $value       = wc_format_decimal( $event->get_value(), wc_get_price_decimals() );
         } else {
             $product_ids = $this->get_content_ids_from_cart( WC()->cart->get_cart() );
