@@ -102,7 +102,7 @@ class Statuses {
     /**
      * The order and per-platform statuses, or null when the order isn't listed.
      *
-     * @param array    $order  Summary: id, number, status, created_via, created, paid, thankyou (Unix times, 0 for none), total, currency, renewal, counted_before.
+     * @param array    $order  Summary: id, number, status, created_via, created, paid, thankyou (Unix times, 0 for none), total, currency, renewal, counted_before, parent (parent order ID, 0 for none).
      * @param array[]  $rows   The order's log rows.
      * @param string[] $active Integration IDs that check in on the thank-you page now.
      * @param array    $paused Integration IDs that are set up but paused, as a list or as ID => when the pause started (Unix time, 0 for unknown).
@@ -120,6 +120,7 @@ class Statuses {
                 'thankyou'       => 0,
                 'renewal'        => false,
                 'counted_before' => false,
+                'parent'         => 0,
             ),
             $order
         );
@@ -352,8 +353,8 @@ class Statuses {
             return false;
         }
 
-        // An admin or renewal order paid on the pay page really sent a Purchase, so a check-in lists it.
-        return $checked_in || ! self::is_skipped_source( $order['created_via'], ! empty( $order['renewal'] ) );
+        // A sub-order (Dokan and other marketplaces) is part of its parent's purchase; like an admin or renewal order, only a check-in of its own lists it.
+        return $checked_in || ( ! self::is_skipped_source( $order['created_via'], ! empty( $order['renewal'] ) ) && ! $order['parent'] );
     }
 
     /**

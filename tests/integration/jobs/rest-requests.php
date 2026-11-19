@@ -135,12 +135,12 @@ function wcct_test_hide_log_column( $column ) {
 /**
  * An order for the Activity log tests, for 'call' steps: placed $props['age'] seconds ago from the checkout, paid by cash on delivery.
  *
- * @param array $props status, created_via, age, thankyou_age (null for no thank-you page visit), renewal, rows (each: platform, loaded, columns, age; see wcct_test_log_row()).
+ * @param array $props status, created_via, age, thankyou_age (null for no thank-you page visit), renewal, parent (parent order ID, as Dokan's sub-orders), rows (each: platform, loaded, columns, age; see wcct_test_log_row()).
  *
  * @return int Order ID.
  */
 function wcct_test_log_order( array $props = array() ) {
-    $props = array_merge( array( 'status' => 'processing', 'created_via' => 'checkout', 'age' => 3600, 'thankyou_age' => 3595, 'renewal' => false, 'rows' => array() ), $props );
+    $props = array_merge( array( 'status' => 'processing', 'created_via' => 'checkout', 'age' => 3600, 'thankyou_age' => 3595, 'renewal' => false, 'parent' => 0, 'rows' => array() ), $props );
     $order = new WC_Order();
 
     $order->set_currency( 'USD' );
@@ -162,6 +162,8 @@ function wcct_test_log_order( array $props = array() ) {
     if ( $props['renewal'] ) {
         $order->update_meta_data( '_subscription_renewal', 99 );
     }
+
+    $order->set_parent_id( (int) $props['parent'] );
 
     $order->save();
 
@@ -205,6 +207,24 @@ function wcct_test_log_row( $order_id, $platform, $loaded, array $columns = arra
             $columns
         )
     );
+}
+
+/**
+ * Sub-orders of the newest order, as Dokan splits a multi-vendor purchase: created by dokan, paid, never on a thank-you page; for 'call' steps.
+ *
+ * @param int $count Sub-orders to add.
+ *
+ * @return int[] Sub-order IDs.
+ */
+function wcct_test_log_sub_orders( $count ) {
+    $parent = wc_get_orders( array( 'type' => 'shop_order', 'orderby' => 'ID', 'order' => 'DESC', 'limit' => 1 ) );
+    $ids    = array();
+
+    for ( $i = 0; $i < $count; $i++ ) {
+        $ids[] = wcct_test_log_order( array( 'created_via' => 'dokan', 'thankyou_age' => null, 'parent' => $parent[0]->get_id() ) );
+    }
+
+    return $ids;
 }
 
 /**

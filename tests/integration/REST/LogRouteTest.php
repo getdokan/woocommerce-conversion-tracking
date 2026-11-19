@@ -138,6 +138,26 @@ class LogRouteTest extends WCCT_Test_Rest_Case {
         $this->assertStringNotContainsString( 'Person', $json );
     }
 
+    public function test_a_multi_vendor_purchase_lists_only_the_parent_order() {
+        $results = $this->rest(
+            array(
+                self::settings(),
+                array( 'call', 'wcct_test_log_clear' ),
+                self::order( array( 'rows' => self::rows( self::ALL ) ) ),
+                array( 'call', 'wcct_test_log_sub_orders', array( 2 ) ),
+                self::get(),
+            )
+        );
+
+        list( , , $parent, $subs ) = $results;
+        $response = end( $results );
+
+        // Dokan sends the shopper to the parent's thank-you page; its sub-orders never check in.
+        $this->assertCount( 2, $subs );
+        $this->assertSame( array( $parent ), array_column( $response['data']['orders'], 'id' ) );
+        $this->assertSame( array( 'all' => 1, 'tracked' => 1, 'not-confirmed' => 0, 'pending' => 0 ), $response['data']['counts'] );
+    }
+
     public function test_each_tab_and_page() {
         $steps = array(
             self::settings(),

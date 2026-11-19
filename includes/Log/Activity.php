@@ -183,6 +183,7 @@ class Activity {
             'currency'       => (string) $order->get_currency(),
             'renewal'        => self::is_renewal( $order ),
             'counted_before' => PurchaseGate::counted_before( $order ),
+            'parent'         => (int) $order->get_parent_id(),
         );
     }
 
