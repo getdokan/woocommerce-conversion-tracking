@@ -26,7 +26,7 @@ class Cleanup {
     /**
      * Transients listed by name too, for stores that keep transients in an object cache.
      */
-    const TRANSIENTS = array( 'wcct_upgrade_to_20', 'wcct_alert_badge' );
+    const TRANSIENTS = array( 'wcct_upgrade_to_20', 'wcct_alert_badge', 'wcct_order_log_install_retry' );
 
     /**
      * Appsero tracker options, after the plugin folder name.

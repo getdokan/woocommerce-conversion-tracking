@@ -7,6 +7,9 @@ class WCCT_Test_Fake_Integration extends WCCT_Integration {
 
     public $settings_value;
 
+    // Whether checkout() renders the Purchase value through purchase_value().
+    public $renders_value = false;
+
     public function __construct( $id, $enabled = true, $transports = array( 'browser' ) ) {
         $this->id             = $id;
         $this->transports     = $transports;
@@ -26,6 +29,10 @@ class WCCT_Test_Fake_Integration extends WCCT_Integration {
     }
 
     public function checkout( $order_id ) {
+        if ( $this->renders_value ) {
+            return $this->id . '.purchase(' . $order_id . ', ' . $this->purchase_value( $this->current_event->get_order() ) . ');';
+        }
+
         return $this->id . ".purchase(" . $order_id . ");";
     }
 

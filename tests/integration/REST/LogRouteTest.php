@@ -269,6 +269,44 @@ class LogRouteTest extends WCCT_Test_Rest_Case {
         $this->assertSame( 2, $results[7], 'a check-in drops the cache' );
     }
 
+    public function test_each_platform_shows_the_value_it_was_sent() {
+        // The value is the one the thank-you page rendered for the platform (see the order-received fixtures); the check-in posts it.
+        $check_in = function ( $platform, $value, $loaded = true ) {
+            return array( 'request', 'POST', '/wcct/v1/events', array( 'order_id' => 3001, 'key' => 'wc_order_ctguest0001', 'platform' => $platform, 'loaded' => $loaded, 'reason' => $loaded ? '' : 'timeout', 'value' => is_string( $value ) && '' !== $value ? '{signed:' . $value . '}' : $value ), 'logged_out' );
+        };
+
+        $steps = array(
+            self::settings(),
+            array( 'call', 'wcct_test_log_clear', array( 30 ) ),
+            $check_in( 'facebook', '84.00' ),
+            // A miss, then the hand-over: the hand-over's value.
+            $check_in( 'adwords', '', false ),
+            $check_in( 'adwords', '82.00' ),
+            $check_in( 'ga4', '73.00' ),
+            // An array, or a value signed for another platform (Custom renders none): no value, and the check-in still counts.
+            $check_in( 'twitter', array( '84.00' ) ),
+            $check_in( 'custom', '84.00@facebook' ),
+            // A repeat send, or a late miss, keeps the value of the first send.
+            $check_in( 'facebook', '99.00' ),
+            $check_in( 'facebook', '', false ),
+            self::get(),
+        );
+
+        $results   = $this->rest( $steps );
+        $platforms = array_column( end( $results )['data']['orders'][0]['platforms'], null, 'id' );
+        $values    = function ( $id ) use ( $platforms ) {
+            return array_column( $platforms[ $id ]['values'], 'amount', 'integration' );
+        };
+
+        $this->assertSame( array( 'facebook' => '$84.00' ), $values( 'facebook' ) );
+        // GA4 first, each named.
+        $this->assertSame( array( 'ga4' => '$73.00', 'adwords' => '$82.00' ), $values( 'google' ) );
+        $this->assertSame( array( 'GA4', 'Google Ads' ), array_column( $platforms['google']['values'], 'label' ) );
+        $this->assertSame( array( 'confirmed', 'confirmed' ), array( $platforms['twitter']['status'], $platforms['custom']['status'] ) );
+        $this->assertSame( array(), $values( 'twitter' ) );
+        $this->assertSame( array(), $values( 'custom' ) );
+    }
+
     public function test_no_orders_gives_an_empty_log() {
         $results = $this->rest( array( self::settings(), array( 'call', 'wcct_test_log_clear' ), self::get() ) );
 

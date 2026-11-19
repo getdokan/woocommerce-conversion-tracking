@@ -166,7 +166,7 @@ class ProductId {
     }
 
     /**
-     * Identifiers of the cart items for a platform; a variation sends its own.
+     * Identifiers of the cart items for a platform, each once; a variation sends its own.
      *
      * @param array  $cart     Cart contents.
      * @param string $platform Platform or integration ID.
@@ -179,15 +179,15 @@ class ProductId {
 
         foreach ( (array) $cart as $item ) {
             if ( isset( $item['data'] ) && is_object( $item['data'] ) ) {
-                $ids[] = self::value( $item['data'], $mode );
+                $ids[ self::product_key( $item['data'] ) ] = self::value( $item['data'], $mode );
             }
         }
 
-        return $ids;
+        return array_values( $ids );
     }
 
     /**
-     * Identifiers of an event's products for a platform: the event's product, else its product IDs.
+     * Identifiers of an event's products for a platform: its lines' products (an add to cart), its product, else its product IDs.
      *
      * @param Event|object $event    Event.
      * @param string       $platform Platform or integration ID.
@@ -199,7 +199,20 @@ class ProductId {
             return array();
         }
 
-        $mode    = self::mode_for( $platform );
+        $mode  = self::mode_for( $platform );
+        $lines = method_exists( $event, 'get' ) ? $event->get( 'lines' ) : null;
+        $ids   = array();
+
+        foreach ( is_array( $lines ) ? $lines : array() as $line ) {
+            if ( isset( $line['product'] ) && is_object( $line['product'] ) ) {
+                $ids[ self::product_key( $line['product'] ) ] = self::value( $line['product'], $mode );
+            }
+        }
+
+        if ( $ids ) {
+            return array_values( $ids );
+        }
+
         $product = $event->get_product();
 
         if ( is_object( $product ) ) {
@@ -218,7 +231,7 @@ class ProductId {
     }
 
     /**
-     * Identifiers of an order's items for a platform; a variation sends its own, a deleted product its stored ID.
+     * Identifiers of an order's items for a platform, each once; a variation sends its own, a deleted product its stored ID.
      *
      * @param \WC_Order|object $order    Order.
      * @param string           $platform Platform or integration ID.
@@ -237,11 +250,23 @@ class ProductId {
             $id = self::for_order_item( $item, $mode );
 
             if ( $id ) {
-                $ids[] = $id;
+                // Keyed by the item's product (its variation's own ID), as product_key() keys a loaded one, so each is listed once.
+                $ids[ 'p' . (int) ( $item->get_variation_id() ? $item->get_variation_id() : $item->get_product_id() ) ] = $id;
             }
         }
 
-        return $ids;
+        return array_values( $ids );
+    }
+
+    /**
+     * Key that lists a product once: a free gift of the same product is its own line, while two products sharing an identifier stay two.
+     *
+     * @param object $product Product.
+     *
+     * @return string
+     */
+    private static function product_key( $product ) {
+        return method_exists( $product, 'get_id' ) ? 'p' . (int) $product->get_id() : 'o' . spl_object_id( $product );
     }
 
     /**
