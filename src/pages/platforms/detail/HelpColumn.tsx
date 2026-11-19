@@ -7,7 +7,7 @@ import type { ReactNode } from 'react';
  * WordPress dependencies
  */
 import { createInterpolateElement } from '@wordpress/element';
-import { __ } from '@wordpress/i18n';
+import { __, sprintf } from '@wordpress/i18n';
 
 /**
  * Internal dependencies
@@ -62,7 +62,36 @@ const Steps = ( { children }: { children: ReactNode } ) => (
 );
 
 /**
- * Meta: where the Pixel ID is, what to do after saving, and why some events may not arrive.
+ * Any platform: shoppers' cookie choices and blockers may keep events from arriving; the log shows which purchases.
+ *
+ * @param {Object} props      Component props.
+ * @param {string} props.name Platform name, like Meta.
+ */
+const Blockers = ( { name }: { name: string } ) => (
+    <Block
+        title={ __(
+            'Why some events may not arrive',
+            'woocommerce-conversion-tracking'
+        ) }
+    >
+        <p className="m-0 text-sm" data-testid="wcct-blockers-note">
+            { createInterpolateElement(
+                sprintf(
+                    /* translators: %s: platform name, like Meta */
+                    __(
+                        "Shoppers' cookie choices, privacy settings and ad blockers may impact tracking, so some visits and purchases may not reach %s. The <log>Activity log</log> shows the purchases we couldn't confirm.",
+                        'woocommerce-conversion-tracking'
+                    ),
+                    name
+                ),
+                { log: internal( '#/log' ) }
+            ) }
+        </p>
+    </Block>
+);
+
+/**
+ * Meta: where the Pixel ID is, and what to do after saving.
  */
 const MetaHelp = () => (
     <>
@@ -112,19 +141,7 @@ const MetaHelp = () => (
                 ) }
             </p>
         </Block>
-        <Block
-            title={ __(
-                'Why some events may not arrive',
-                'woocommerce-conversion-tracking'
-            ) }
-        >
-            <p className="m-0 text-sm" data-testid="wcct-meta-blockers-note">
-                { __(
-                    "Shoppers' cookie choices, privacy settings and ad blockers may impact tracking, so some visits and purchases may not reach Meta.",
-                    'woocommerce-conversion-tracking'
-                ) }
-            </p>
-        </Block>
+        <Blockers name={ __( 'Meta', 'woocommerce-conversion-tracking' ) } />
     </>
 );
 
@@ -368,15 +385,39 @@ export const HelpContent = ( { id }: { id: string } ) => {
     }
 
     if ( id === 'google' ) {
-        return <GoogleHelp />;
+        return (
+            <>
+                <GoogleHelp />
+                <Blockers
+                    name={ __( 'Google', 'woocommerce-conversion-tracking' ) }
+                />
+            </>
+        );
     }
 
     if ( id === 'twitter' ) {
-        return <XHelp />;
+        return (
+            <>
+                <XHelp />
+                <Blockers
+                    name={ __( 'X', 'woocommerce-conversion-tracking' ) }
+                />
+            </>
+        );
     }
 
     if ( id === 'bing_ads' ) {
-        return <MicrosoftHelp />;
+        return (
+            <>
+                <MicrosoftHelp />
+                <Blockers
+                    name={ __(
+                        'Microsoft Advertising',
+                        'woocommerce-conversion-tracking'
+                    ) }
+                />
+            </>
+        );
     }
 
     return <AfterSave />;
