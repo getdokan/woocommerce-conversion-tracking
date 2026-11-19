@@ -62,7 +62,7 @@ const Steps = ( { children }: { children: ReactNode } ) => (
 );
 
 /**
- * Meta: where the Pixel ID is, and what to do after saving.
+ * Meta: where the Pixel ID is, what to do after saving, and why some events may not arrive.
  */
 const MetaHelp = () => (
     <>
@@ -109,6 +109,19 @@ const MetaHelp = () => (
                         'woocommerce-conversion-tracking'
                     ),
                     { log: internal( '#/log' ), doctor: internal( '#/doctor' ) }
+                ) }
+            </p>
+        </Block>
+        <Block
+            title={ __(
+                'Why some events may not arrive',
+                'woocommerce-conversion-tracking'
+            ) }
+        >
+            <p className="m-0 text-sm" data-testid="wcct-meta-blockers-note">
+                { __(
+                    "Shoppers' cookie choices, privacy settings and ad blockers may impact tracking, so some visits and purchases may not reach Meta.",
+                    'woocommerce-conversion-tracking'
                 ) }
             </p>
         </Block>
