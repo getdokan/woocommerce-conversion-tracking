@@ -354,16 +354,20 @@ class Activity {
             return array();
         }
 
-        $limit  = self::limit();
-        $orders = wc_get_orders(
-            array(
-                'type'         => 'shop_order',
-                'date_created' => '>=' . (int) $since,
-                'orderby'      => 'date',
-                'order'        => 'DESC',
-                'limit'        => $limit,
-            )
+        $query = array(
+            'type'         => 'shop_order',
+            'date_created' => '>=' . (int) $since,
+            'orderby'      => 'date',
+            'order'        => 'DESC',
+            'limit'        => self::limit(),
         );
+
+        // Sub-orders never use up the limit; one that checked in is still read (checked_in_since()).
+        if ( Statuses::skips_sub_orders() ) {
+            $query['parent'] = 0;
+        }
+
+        $orders = wc_get_orders( $query );
         $keyed  = array();
 
         foreach ( is_array( $orders ) ? $orders : array() as $order ) {

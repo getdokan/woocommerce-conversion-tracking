@@ -339,6 +339,22 @@ class Statuses {
     }
 
     /**
+     * Whether the log leaves out sub-orders (Dokan and other marketplaces), part of their parent's purchase (filter wcct_log_skip_sub_orders).
+     *
+     * @return bool
+     */
+    public static function skips_sub_orders() {
+        /**
+         * Whether the Activity log leaves out orders that have a parent order. Return false to list them (a deposit plugin's balance payments, say).
+         *
+         * @since 3.0.0
+         *
+         * @param bool $skip Default true.
+         */
+        return (bool) apply_filters( 'wcct_log_skip_sub_orders', true );
+    }
+
+    /**
      * Whether an order can be listed at all.
      *
      * @param array $order      Summary.
@@ -354,7 +370,7 @@ class Statuses {
         }
 
         // A sub-order (Dokan and other marketplaces) is part of its parent's purchase; like an admin or renewal order, only a check-in of its own lists it.
-        return $checked_in || ( ! self::is_skipped_source( $order['created_via'], ! empty( $order['renewal'] ) ) && ! $order['parent'] );
+        return $checked_in || ( ! self::is_skipped_source( $order['created_via'], ! empty( $order['renewal'] ) ) && ! ( $order['parent'] && self::skips_sub_orders() ) );
     }
 
     /**

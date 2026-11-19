@@ -138,24 +138,48 @@ class LogRouteTest extends WCCT_Test_Rest_Case {
         $this->assertStringNotContainsString( 'Person', $json );
     }
 
-    public function test_a_multi_vendor_purchase_lists_only_the_parent_order() {
-        $results = $this->rest(
-            array(
-                self::settings(),
-                array( 'call', 'wcct_test_log_clear' ),
-                self::order( array( 'rows' => self::rows( self::ALL ) ) ),
-                array( 'call', 'wcct_test_log_sub_orders', array( 2 ) ),
-                self::get(),
-            )
-        );
+    private static function multi_vendor_log( array $filters = array() ) {
+        $steps = array( self::settings(), array( 'call', 'wcct_test_log_clear' ) );
 
-        list( , , $parent, $subs ) = $results;
+        foreach ( $filters as $hook => $value ) {
+            $steps[] = array( 'call', 'wcct_test_log_filter', array( $hook, $value ) );
+        }
+
+        $steps[] = array( 'call', 'wcct_test_log_multi_vendor_order', array( 3 ) );
+        $steps[] = self::get();
+
+        return $steps;
+    }
+
+    public function test_a_multi_vendor_purchase_lists_only_the_parent_order() {
+        $results  = $this->rest( self::multi_vendor_log() );
         $response = end( $results );
+        $order    = prev( $results );
 
         // Dokan sends the shopper to the parent's thank-you page; its sub-orders never check in.
-        $this->assertCount( 2, $subs );
-        $this->assertSame( array( $parent ), array_column( $response['data']['orders'], 'id' ) );
+        $this->assertSame( array_fill( 0, 3, $order['parent'] ), array_values( $order['subs'] ) );
+        $this->assertSame( array( $order['parent'] ), array_column( $response['data']['orders'], 'id' ) );
         $this->assertSame( array( 'all' => 1, 'tracked' => 1, 'not-confirmed' => 0, 'pending' => 0 ), $response['data']['counts'] );
+    }
+
+    public function test_sub_orders_never_use_up_the_order_read_limit() {
+        // The sub-orders are the newest orders; read one order and it is still the parent.
+        $results  = $this->rest( self::multi_vendor_log( array( 'wcct_log_order_limit' => 1 ) ) );
+        $response = end( $results );
+        $order    = prev( $results );
+
+        $this->assertSame( array( $order['parent'] ), array_column( $response['data']['orders'], 'id' ) );
+    }
+
+    public function test_a_store_can_keep_sub_orders_in_the_log() {
+        // WooCommerce Deposits, for example, parents a balance payment to the deposit order.
+        $results  = $this->rest( self::multi_vendor_log( array( 'wcct_log_skip_sub_orders' => false ) ) );
+        $response = end( $results );
+        $order    = prev( $results );
+        $ids      = array_column( $response['data']['orders'], 'id' );
+
+        sort( $ids );
+        $this->assertSame( array_merge( array( $order['parent'] ), array_keys( $order['subs'] ) ), $ids );
     }
 
     public function test_each_tab_and_page() {
