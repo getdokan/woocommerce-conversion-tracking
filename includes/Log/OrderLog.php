@@ -15,12 +15,17 @@ class OrderLog {
     /**
      * Schema version; bump it when the table changes.
      */
-    const DB_VERSION = '2';
+    const DB_VERSION = '4';
 
     /**
      * Option holding the installed schema version.
      */
     const VERSION_OPTION = 'wcct_order_log_db_version';
+
+    /**
+     * Transient set after a failed upgrade, so it retries hourly rather than on every load.
+     */
+    const RETRY_TRANSIENT = 'wcct_order_log_install_retry';
 
     /**
      * Rows are kept this many seconds; 3.0 hard-codes 24 hours.
@@ -51,6 +56,8 @@ class OrderLog {
         'consent'          => "varchar(16) NOT NULL DEFAULT ''",
         'reason'           => "varchar(32) NOT NULL DEFAULT ''",
         'event_id'         => "varchar(64) NOT NULL DEFAULT ''",
+        // The Purchase value this platform was sent, as a decimal string; empty when unknown (older rows, not sent, the custom script).
+        'value'            => "varchar(40) NOT NULL DEFAULT ''",
         // Token of the page load that checked in; a hand-over from another page load is a repeat (Log\RepeatSends).
         'load_id'          => 'varchar(32) NULL DEFAULT NULL',
         'created_at'       => 'datetime NOT NULL',
@@ -60,7 +67,14 @@ class OrderLog {
     /**
      * Columns a check-in writes; kept when the row was already handed over.
      */
-    const CHECKIN_COLUMNS = array( 'sent_at', 'consent', 'reason', 'event_id', 'load_id', 'updated_at' );
+    const CHECKIN_COLUMNS = array( 'sent_at', 'consent', 'reason', 'event_id', 'load_id', 'value', 'updated_at' );
+
+    /**
+     * Columns per table (a multisite request can switch sites), read once per request.
+     *
+     * @var string[][]
+     */
+    private static $columns = array();
 
     /**
      * Full table name.
@@ -102,13 +116,13 @@ class OrderLog {
      * @return void
      */
     public static function maybe_install() {
-        if ( self::DB_VERSION !== get_option( self::VERSION_OPTION ) ) {
+        if ( self::DB_VERSION !== get_option( self::VERSION_OPTION ) && ! get_transient( self::RETRY_TRANSIENT ) ) {
             self::install();
         }
     }
 
     /**
-     * Create or update the table.
+     * Create or update the table; the version is recorded only once every column is there.
      *
      * @return void
      */
@@ -119,16 +133,44 @@ class OrderLog {
 
         dbDelta( self::schema( self::table(), $wpdb->get_charset_collate() ) );
 
+        self::$columns = array();
+
+        // A failed upgrade keeps the older version, so the log still reads, and retries in an hour.
+        if ( array_diff( array_keys( self::COLUMNS ), self::columns() ) ) {
+            set_transient( self::RETRY_TRANSIENT, 1, HOUR_IN_SECONDS );
+
+            return;
+        }
+
         update_option( self::VERSION_OPTION, self::DB_VERSION );
+        delete_transient( self::RETRY_TRANSIENT );
     }
 
     /**
-     * Whether the table is installed at the current version.
+     * Whether the table is installed, at any version; upsert() writes only the columns it has.
      *
      * @return bool
      */
     public static function is_installed() {
-        return self::DB_VERSION === get_option( self::VERSION_OPTION );
+        return '' !== (string) get_option( self::VERSION_OPTION, '' );
+    }
+
+    /**
+     * Names of the columns the table has, read once per request.
+     *
+     * @return string[]
+     */
+    public static function columns() {
+        global $wpdb;
+
+        $table = self::table();
+
+        if ( ! isset( self::$columns[ $table ] ) ) {
+            // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- own table, once per request.
+            self::$columns[ $table ] = array_map( 'strval', (array) $wpdb->get_col( "SHOW COLUMNS FROM {$table}" ) );
+        }
+
+        return self::$columns[ $table ];
     }
 
     /**
@@ -220,6 +262,13 @@ class OrderLog {
         global $wpdb;
 
         $row = array_intersect_key( $row, self::COLUMNS );
+
+        // A table an upgrade hasn't reached yet takes the columns it has.
+        $columns = self::columns();
+
+        if ( $columns ) {
+            $row = array_intersect_key( $row, array_flip( $columns ) );
+        }
 
         unset( $row['id'] );
 

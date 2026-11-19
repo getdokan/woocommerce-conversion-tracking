@@ -260,6 +260,40 @@ class EventsRouteTest extends WCCT_Test_Rest_Case {
         $this->assertSame( OrderLog::DB_VERSION, $results[2] );
     }
 
+    public function test_a_failed_upgrade_keeps_taking_check_ins_retries_hourly_and_writes_the_value_once_current() {
+        $results = $this->rest(
+            array(
+                self::settings(),
+                array( 'set_option', OrderLog::VERSION_OPTION, '2' ),
+                array( 'call', 'wcct_test_hide_log_column', array( array( 'value', 'load_id' ) ) ),
+                array( 'call', self::LOG . '::install', array() ),
+                array( 'option', OrderLog::VERSION_OPTION ),
+                array( 'call', 'wcct_test_hide_log_column', array( null ) ),
+                array( 'call', self::LOG . '::maybe_install', array() ),
+                array( 'option', OrderLog::VERSION_OPTION ),
+                array( 'call', self::LOG . '::is_installed', array() ),
+                array( 'call', 'wcct_test_hide_log_column', array( array( 'value', 'load_id' ) ) ),
+                self::check_in( 'facebook', array( 'loaded' => true, 'load' => 'pageA1', 'value' => '{signed:84.00}' ) ),
+                array( 'call', 'wcct_test_hide_log_column', array( null ) ),
+                self::rows(),
+                array( 'call', 'delete_transient', array( OrderLog::RETRY_TRANSIENT ) ),
+                array( 'call', self::LOG . '::maybe_install', array() ),
+                array( 'option', OrderLog::VERSION_OPTION ),
+                self::check_in( 'ga4', array( 'loaded' => true, 'value' => '{signed:73.00}' ) ),
+                self::rows(),
+            )
+        );
+
+        $this->assertSame( '2', $results[4], 'the version waits for the columns' );
+        $this->assertSame( '2', $results[7], 'no retry within the hour' );
+        $this->assertTrue( $results[8], 'the log still reads' );
+        // A table without value and load_id (schema 1) still takes the check-in, with the columns it has.
+        $this->assertSame( 'recorded', $results[10]['data']['result'] );
+        $this->assertSame( array( '1', '', null ), array( $results[12][0]['library_loaded'], $results[12][0]['value'], $results[12][0]['load_id'] ) );
+        $this->assertSame( OrderLog::DB_VERSION, $results[15] );
+        $this->assertSame( array( 'facebook' => '', 'ga4' => '73.00' ), array_column( $results[17], 'value', 'platform' ) );
+    }
+
     public function test_the_seen_ping_needs_the_open_test_link_and_is_throttled() {
         $token   = 'abcdefghijklmnopqrstuvwxyz012345';
         $results = $this->rest(

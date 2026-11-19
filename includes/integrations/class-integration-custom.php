@@ -132,10 +132,11 @@ class WCCT_Integration_Custom extends WCCT_Integration {
      *
      * @param string   $code  Purchase markup.
      * @param WC_Order $order Order.
+     * @param string   $value Unused: the merchant's script reports no value.
      *
      * @return string
      */
-    protected function with_purchase_confirmation( $code, $order ) {
+    protected function with_purchase_confirmation( $code, $order, $value = '' ) {
         return $code;
     }
 

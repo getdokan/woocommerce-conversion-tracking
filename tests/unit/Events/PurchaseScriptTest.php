@@ -24,7 +24,44 @@ class PurchaseScriptTest extends TestCase {
 
         $this->assertStringContainsString( 'window.wcctPurchaseSent = window.wcctPurchaseSent ||', $code );
         $this->assertStringContainsString( 'twitter.purchase(9);', $code );
-        $this->assertStringEndsWith( 'window.wcctPurchaseSent("https://shop.test/wp-json/wcct/v1/events", "twitter", 9, "wc_order_abc", "wcct_9_purchase", "")();', $code );
+        // The fake renders no value: the check-in reports none.
+        $this->assertStringEndsWith( 'window.wcctPurchaseSent("https://shop.test/wp-json/wcct/v1/events", "twitter", 9, "wc_order_abc", "wcct_9_purchase", "", "")();', $code );
+    }
+
+    public function test_the_check_in_reports_the_value_the_page_rendered() {
+        $order  = new WCCT_Test_Fake_Order( array( 'id' => 9, 'key' => 'wc_order_abc' ) );
+        $signed = '84.00:' . wp_hash( 'wcct_value|9|facebook|84.00' );
+
+        $this->assertSame( 'window.wcctPurchaseSent("https://shop.test/wp-json/wcct/v1/events", "facebook", 9, "wc_order_abc", "wcct_9_purchase", "marketing", "' . $signed . '").when(function () { return window.fbq; }, "marketing");', PurchaseConfirmation::confirm_script( 'facebook', $order, 'window.fbq', 'marketing', '84.00' ) );
+        $this->assertStringContainsString( '"&value=" + encodeURIComponent(value || "")', PurchaseConfirmation::helper() );
+    }
+
+    public function test_the_check_in_carries_the_value_its_event_rendered_and_never_an_earlier_one() {
+        $platform                = new WCCT_Test_Fake_Integration( 'twitter' );
+        $platform->renders_value = true;
+        $code                    = $platform->get_event_script( $this->purchase( array( 'total' => '84.00' ) ) );
+
+        $this->assertSame( 1, preg_match( '/twitter\.purchase\(9, ([0-9.]+)\);/', $code, $printed ) );
+        $this->assertSame( 1, preg_match( '/"wcct_9_purchase", "", "([^"]+)"\)\(\);$/', $code, $posted ) );
+        $this->assertSame( $printed[1], PurchaseConfirmation::verified_value( 9, 'twitter', $posted[1] ) );
+
+        // The next order's method renders none: its check-in reports none, not order 9's.
+        $platform->renders_value = false;
+
+        $this->assertStringEndsWith( '"wcct_10_purchase", "", "")();', $platform->get_event_script( EventFactory::purchase( new WCCT_Test_Fake_Order( array( 'id' => 10, 'key' => 'wc_order_def' ) ) ) ) );
+    }
+
+    public function test_a_value_is_kept_only_with_its_signature_for_that_order_and_platform() {
+        $signed = PurchaseConfirmation::signed_value( 9, 'facebook', '84.00' );
+
+        $this->assertSame( '84.00', PurchaseConfirmation::verified_value( 9, 'facebook', $signed ) );
+        $this->assertSame( '', PurchaseConfirmation::verified_value( 10, 'facebook', $signed ), 'another order' );
+        $this->assertSame( '', PurchaseConfirmation::verified_value( 9, 'custom', $signed ), 'another platform' );
+        $this->assertSame( '', PurchaseConfirmation::verified_value( 9, 'facebook', '99.00' . substr( $signed, 5 ) ), 'another value' );
+        $this->assertSame( '', PurchaseConfirmation::verified_value( 9, 'facebook', '84.00' ), 'unsigned' );
+        $this->assertSame( '', PurchaseConfirmation::verified_value( 9, 'facebook', array( $signed ) ) );
+        $this->assertSame( '', PurchaseConfirmation::signed_value( 9, 'custom', '' ), 'no value, nothing to sign' );
+        $this->assertSame( '0.123456789012345678', PurchaseConfirmation::verified_value( 9, 'facebook', PurchaseConfirmation::signed_value( 9, 'facebook', '0.123456789012345678' ) ), '18 decimals' );
     }
 
     public function test_sent_order_renders_nothing() {
@@ -59,9 +96,9 @@ class PurchaseScriptTest extends TestCase {
         $order = new WCCT_Test_Fake_Order( array( 'id' => 9, 'key' => 'wc_order_abc' ) );
         $call  = 'window.wcctPurchaseSent("https://shop.test/wp-json/wcct/v1/events", "facebook", 9, "wc_order_abc", "wcct_9_purchase", ';
 
-        $this->assertSame( $call . '"marketing").when(function () { return window.fbq; }, "marketing");', PurchaseConfirmation::confirm_script( 'facebook', $order, 'window.fbq', 'marketing' ) );
-        $this->assertSame( $call . '"marketing").when(function () { return true; }, "marketing");', PurchaseConfirmation::confirm_script( 'facebook', $order, '', 'marketing' ) );
-        $this->assertSame( $call . '"").when(function () { return window.fbq; });', PurchaseConfirmation::confirm_script( 'facebook', $order, 'window.fbq' ) );
+        $this->assertSame( $call . '"marketing", "").when(function () { return window.fbq; }, "marketing");', PurchaseConfirmation::confirm_script( 'facebook', $order, 'window.fbq', 'marketing' ) );
+        $this->assertSame( $call . '"marketing", "").when(function () { return true; }, "marketing");', PurchaseConfirmation::confirm_script( 'facebook', $order, '', 'marketing' ) );
+        $this->assertSame( $call . '"", "").when(function () { return window.fbq; });', PurchaseConfirmation::confirm_script( 'facebook', $order, 'window.fbq' ) );
         $this->assertStringContainsString( 'consent.allows(needs)', PurchaseConfirmation::helper() );
     }
 
@@ -99,8 +136,8 @@ class PurchaseScriptTest extends TestCase {
         };
         $order    = new WCCT_Test_Fake_Order( array( 'id' => 9, 'key' => 'wc_order_abc' ) );
 
-        $this->assertStringEndsWith( '"wcct_9_purchase", "statistics")', $platform->callback( $order ) );
-        $this->assertStringEndsWith( '"wcct_9_purchase", "marketing")', ( new class( 'adwords' ) extends WCCT_Test_Fake_Integration {
+        $this->assertStringEndsWith( '"wcct_9_purchase", "statistics", "")', $platform->callback( $order ) );
+        $this->assertStringEndsWith( '"wcct_9_purchase", "marketing", "")', ( new class( 'adwords' ) extends WCCT_Test_Fake_Integration {
             public function callback( $order ) {
                 return $this->purchase_sent_callback( $order );
             }

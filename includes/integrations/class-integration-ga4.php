@@ -294,8 +294,9 @@ class WCCT_Integration_GA4 extends WCCT_Integration {
                 $order = $this->get_purchase_order( $page_event->get_order() );
 
                 if ( $order ) {
-                    $confirms[ count( $events ) ] = $this->purchase_sent_callback( $order );
-                    $events[]                     = array( 'purchase', $this->get_purchase_params( $order, $page_event ) );
+                    $params                       = $this->get_purchase_params( $order, $page_event );
+                    $confirms[ count( $events ) ] = $this->purchase_sent_callback( $order, number_format( (float) $params['value'], wc_get_price_decimals(), '.', '' ) );
+                    $events[]                     = array( 'purchase', $params );
                 }
             }
         }
