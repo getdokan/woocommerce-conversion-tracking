@@ -1105,7 +1105,7 @@ export const PlatformDetail = ( {
                     className="hidden flex-col gap-5 bg-muted/50 p-6 min-[1280px]:flex"
                     data-testid="wcct-platform-help"
                 >
-                    <HelpContent id={ id } />
+                    <HelpContent id={ id } name={ card.name } />
                 </aside>
             </div>
 
@@ -1121,7 +1121,7 @@ export const PlatformDetail = ( {
                         </SheetTitle>
                     </SheetHeader>
                     <div className="flex flex-col gap-5 px-4 pb-6">
-                        <HelpContent id={ id } />
+                        <HelpContent id={ id } name={ card.name } />
                     </div>
                 </SheetContent>
             </Sheet>

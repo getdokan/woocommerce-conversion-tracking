@@ -7,7 +7,7 @@ import type { ReactNode } from 'react';
  * WordPress dependencies
  */
 import { createInterpolateElement } from '@wordpress/element';
-import { __ } from '@wordpress/i18n';
+import { __, sprintf } from '@wordpress/i18n';
 
 /**
  * Internal dependencies
@@ -59,6 +59,35 @@ const Steps = ( { children }: { children: ReactNode } ) => (
     <ol className="m-0 flex flex-col gap-2.5 pl-5 text-sm leading-normal">
         { children }
     </ol>
+);
+
+/**
+ * Any platform: shoppers' cookie choices and blockers may keep events from arriving; the log says what was confirmed per order.
+ *
+ * @param {Object} props      Component props.
+ * @param {string} props.name Platform name, like Meta.
+ */
+const Blockers = ( { name }: { name: string } ) => (
+    <Block
+        title={ __(
+            'Why some events may not arrive',
+            'woocommerce-conversion-tracking'
+        ) }
+    >
+        <p className="m-0 text-sm" data-testid="wcct-blockers-note">
+            { createInterpolateElement(
+                sprintf(
+                    /* translators: %s: platform name, like Meta */
+                    __(
+                        "Shoppers' cookie choices, privacy settings and ad blockers may impact tracking, so some visits and purchases may not reach %s. The <log>Activity log</log> shows, for each order, whether we could confirm it was sent.",
+                        'woocommerce-conversion-tracking'
+                    ),
+                    name
+                ),
+                { log: internal( '#/log' ) }
+            ) }
+        </p>
+    </Block>
 );
 
 /**
@@ -344,12 +373,12 @@ const MicrosoftHelp = () => (
 );
 
 /**
- * The help content of a platform page.
+ * A platform's own help.
  *
  * @param {Object} props    Component props.
  * @param {string} props.id Platform ID.
  */
-export const HelpContent = ( { id }: { id: string } ) => {
+const PlatformHelp = ( { id }: { id: string } ) => {
     if ( id === 'facebook' ) {
         return <MetaHelp />;
     }
@@ -368,3 +397,17 @@ export const HelpContent = ( { id }: { id: string } ) => {
 
     return <AfterSave />;
 };
+
+/**
+ * The help content of a platform page: the platform's own help, then why some events may not arrive.
+ *
+ * @param {Object} props      Component props.
+ * @param {string} props.id   Platform ID.
+ * @param {string} props.name Platform name, as in the page's heading.
+ */
+export const HelpContent = ( { id, name }: { id: string; name: string } ) => (
+    <>
+        <PlatformHelp id={ id } />
+        <Blockers name={ name } />
+    </>
+);
