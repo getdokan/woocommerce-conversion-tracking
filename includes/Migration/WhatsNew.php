@@ -99,6 +99,21 @@ class WhatsNew {
     }
 
     /**
+     * Google's Ads ID split while the merchant hasn't checked it: neither confirmed on What's new nor changed since; null otherwise.
+     *
+     * @param array $doc Stored settings.
+     *
+     * @return array|null saved, ads_id, purchase_label.
+     */
+    public static function google_split( array $doc ) {
+        if ( in_array( Flags::GOOGLE_ADS_ID_SPLIT, self::confirmed(), true ) ) {
+            return null;
+        }
+
+        return Flags::google_split( Flags::all(), isset( $doc['platforms']['google'] ) && is_array( $doc['platforms']['google'] ) ? $doc['platforms']['google'] : array() );
+    }
+
+    /**
      * Close an item whose value was already right ("Looks right").
      *
      * @param string $id Flag ID.
@@ -245,9 +260,8 @@ class WhatsNew {
             }
 
             if ( Flags::X_EVENT_IDS === $id ) {
-                // The flag is written once; the live settings say which events, still switched on, lack an ID. Events the plan locks (Free) are left out, as on the X page.
-                $x      = XSettings::from_v3( $stored );
-                $events = array_values( array_diff( array_intersect( $x['needs_resetup'], $x['events'] ), self::locked_events( $platform ) ) );
+                // The flag is written once; the live settings say which events still need an ID.
+                $events = self::x_resetup( $platform, $stored );
 
                 if ( ! $events ) {
                     continue;
@@ -339,14 +353,30 @@ class WhatsNew {
     }
 
     /**
-     * Events a platform's plan locks (Pro events on Free), from the settings schema.
+     * X events that still need a new event ID: flagged, switched on and not locked by the plan (Free), as on the X page; the Dashboard card uses it too.
      *
-     * @param string $platform Platform ID.
+     * @param string     $platform Platform ID.
+     * @param array      $stored   Stored platform settings.
+     * @param array|null $schema   Normalized settings schema, null to build it.
      *
      * @return string[]
      */
-    private static function locked_events( string $platform ): array {
-        $schema = Schema::get()['platforms'];
+    public static function x_resetup( string $platform, array $stored, $schema = null ): array {
+        $x = XSettings::from_v3( $stored );
+
+        return array_values( array_diff( array_intersect( $x['needs_resetup'], $x['events'] ), self::locked_events( $platform, $schema ) ) );
+    }
+
+    /**
+     * Events a platform's plan locks (Pro events on Free), from the settings schema.
+     *
+     * @param string     $platform Platform ID.
+     * @param array|null $schema   Normalized settings schema, null to build it.
+     *
+     * @return string[]
+     */
+    private static function locked_events( string $platform, $schema = null ): array {
+        $schema = ( is_array( $schema ) ? $schema : Schema::get() )['platforms'];
         $fields = isset( $schema[ $platform ]['schema'] ) ? Schema::fields( $schema[ $platform ]['schema'] ) : array();
         $locked = array();
 

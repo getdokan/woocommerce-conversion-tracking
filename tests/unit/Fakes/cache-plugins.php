@@ -29,8 +29,10 @@ function wp_cache_flush( ...$args ) {
     $GLOBALS['wcct_test_purges'][] = array( 'wp_cache_flush', $args );
 }
 
-function is_multisite() {
-    return ! empty( $GLOBALS['wcct_test_multisite'] );
+if ( ! function_exists( 'is_multisite' ) ) {
+    function is_multisite() {
+        return ! empty( $GLOBALS['wcct_test_multisite'] );
+    }
 }
 
 function get_current_blog_id() {

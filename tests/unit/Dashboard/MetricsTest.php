@@ -262,6 +262,36 @@ class MetricsTest extends TestCase {
         $this->assertSame( array( '#/platforms/facebook?field=consent', "See the Doctor's note" ), array( $steps[5]['link'], $steps[5]['link_label'] ) );
     }
 
+    public function test_google_s_unchecked_ads_id_split_is_a_next_step_before_its_doctor_finding() {
+        $label = self::finding( str_repeat( 'a', 32 ), 'Your Google Ads conversion label looks incomplete.', '#/platforms/google?field=ads_label' );
+        $steps = Metrics::next_steps( array( self::card( 'google', 'attention', array( 'ads_id_split' => true, 'finding' => $label ) ) ), array( $label ), true );
+
+        $this->assertSame( array( 'ads-id-split-google', 'doctor-' . $label['hash'] ), array_column( $steps, 'id' ) );
+        $this->assertSame( array( 'Check the conversion ID and label we split from your Google Ads ID.', '#/platforms/google', 'Open Google' ), array( $steps[0]['text'], $steps[0]['link'], $steps[0]['link_label'] ) );
+    }
+
+    public function test_why_a_card_needs_attention_follows_the_note_order() {
+        $finding = self::finding( str_repeat( 'a', 32 ), 'Found', '#/platforms/google' );
+
+        $this->assertSame( 'not_confirmed', Metrics::reason( self::card( 'google', 'attention', array( 'not_confirmed' => 1, 'needs_resetup' => true, 'ads_id_split' => true, 'finding' => $finding ) ) ) );
+        $this->assertSame( 'needs_resetup', Metrics::reason( self::card( 'google', 'attention', array( 'needs_resetup' => true, 'ads_id_split' => true, 'finding' => $finding ) ) ) );
+        $this->assertSame( 'ads_id_split', Metrics::reason( self::card( 'google', 'attention', array( 'ads_id_split' => true, 'finding' => $finding ) ) ) );
+        $this->assertSame( 'finding', Metrics::reason( self::card( 'google', 'attention', array( 'finding' => $finding ) ) ) );
+        $this->assertSame( '', Metrics::reason( self::card( 'google', 'working' ) ) );
+    }
+
+    public function test_the_status_carries_a_note_for_every_reason() {
+        $finding = self::finding( str_repeat( 'a', 32 ), 'PixelYourSite is also active', '#/platforms/facebook' );
+        $card    = self::card( 'facebook', 'attention', array( 'not_confirmed' => 2, 'finding' => $finding, 'reason' => 'not_confirmed', 'note' => array( 'text' => 'first' ) ) );
+        $status  = Metrics::status( $card );
+
+        $this->assertSame( array( 'attention', 'not_confirmed' ), array( $status['state'], $status['reason'] ) );
+        $this->assertSame( array( 'not_confirmed', 'finding' ), array_column( $status['notes'], 'reason' ) );
+        $this->assertSame( array( "We couldn't confirm 2 purchases in the last 24 hours.", '#/log?tab=not-confirmed' ), array( $status['notes'][0]['text'], $status['notes'][0]['link'] ) );
+        $this->assertSame( array( 'PixelYourSite is also active', 'Fix it' ), array( $status['notes'][1]['text'], $status['notes'][1]['link_label'] ) );
+        $this->assertSame( array(), Metrics::status( self::card( 'facebook', 'working', array( 'reason' => '', 'note' => null ) ) )['notes'] );
+    }
+
     public function test_a_doctor_that_never_ran_is_a_next_step() {
         $steps = Metrics::next_steps( array( self::card( 'facebook', 'working' ) ), array(), false );
 

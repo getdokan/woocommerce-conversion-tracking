@@ -39,6 +39,7 @@ import {
     pixelProblems,
 } from '../../../data/metaPro';
 import { isPro, upgradeUrl } from '../../../data/plan';
+import { confirmWhatsNewItem, hasWhatsNew } from '../../../data/whatsNew';
 import {
     applies,
     changedValues,
@@ -51,6 +52,7 @@ import {
     focusField,
     focusSection,
     needsAttention,
+    type PlatformStatus,
     resetupEvents,
     sectionFields,
     switchEvent,
@@ -60,6 +62,7 @@ import {
     platformLogoUrl,
     type PlatformCardInfo,
 } from '../../../data/platforms';
+import type { PlatformState } from '../../../data/metrics';
 import type {
     PlatformValues,
     SchemaElement,
@@ -197,63 +200,84 @@ const responseErrors = (
 };
 
 /**
- * The status pill of a platform page.
+ * The status pill of a platform page: the Dashboard card's state, or the page's own checks until it arrives.
  *
- * @param {Object}           props              Component props.
- * @param {PlatformCardInfo} props.card         Platform.
- * @param {LastPurchase}     props.lastPurchase Last checked-in purchase.
- * @param {boolean}          props.attention    X events need new IDs, or Google's split Ads ID is unchecked.
+ * @param {Object}             props              Component props.
+ * @param {PlatformCardInfo}   props.card         Platform.
+ * @param {LastPurchase}       props.lastPurchase Last checked-in purchase.
+ * @param {boolean}            props.attention    It needs the merchant.
+ * @param {PlatformState|null} props.state        State from the server, null while loading.
  */
 const Status = ( {
     card,
     lastPurchase,
     attention,
+    state,
 }: {
     card: PlatformCardInfo;
     lastPurchase: LastPurchase;
     attention: boolean;
+    state: PlatformState | null;
 } ) => {
-    if ( ! card.connected ) {
-        return (
-            <StatusPill tone="off">
-                { __( 'Not set up', 'woocommerce-conversion-tracking' ) }
-            </StatusPill>
-        );
+    let shown: PlatformState = 'waiting';
+
+    if ( state ) {
+        shown = state;
+    } else if ( ! card.connected ) {
+        shown = 'not_set_up';
+    } else if ( card.paused ) {
+        shown = 'paused';
+    } else if ( attention ) {
+        shown = 'attention';
+    } else if ( lastPurchase ) {
+        shown = 'working';
     }
 
-    if ( card.paused ) {
-        return (
-            <StatusPill tone="off">
-                { __( 'Paused', 'woocommerce-conversion-tracking' ) }
-            </StatusPill>
-        );
+    switch ( shown ) {
+        case 'not_set_up':
+            return (
+                <StatusPill tone="off">
+                    { __( 'Not set up', 'woocommerce-conversion-tracking' ) }
+                </StatusPill>
+            );
+        case 'paused':
+            return (
+                <StatusPill tone="off">
+                    { __( 'Paused', 'woocommerce-conversion-tracking' ) }
+                </StatusPill>
+            );
+        case 'attention':
+            return (
+                <StatusPill tone="warn">
+                    { __(
+                        'Needs attention',
+                        'woocommerce-conversion-tracking'
+                    ) }
+                </StatusPill>
+            );
+        case 'working':
+            return (
+                <StatusPill tone="ok">
+                    { __( 'Working', 'woocommerce-conversion-tracking' ) }
+                </StatusPill>
+            );
+        default:
+            return (
+                <StatusPill tone="off">
+                    { __(
+                        'Waiting for first event',
+                        'woocommerce-conversion-tracking'
+                    ) }
+                </StatusPill>
+            );
     }
-
-    if ( attention ) {
-        return (
-            <StatusPill tone="warn">
-                { __( 'Needs attention', 'woocommerce-conversion-tracking' ) }
-            </StatusPill>
-        );
-    }
-
-    return lastPurchase ? (
-        <StatusPill tone="ok">
-            { __( 'Working', 'woocommerce-conversion-tracking' ) }
-        </StatusPill>
-    ) : (
-        <StatusPill tone="off">
-            { __(
-                'Waiting for first event',
-                'woocommerce-conversion-tracking'
-            ) }
-        </StatusPill>
-    );
 };
 
 type PlatformDetailProps = {
     card: PlatformCardInfo;
     platform: SchemaPlatform;
+    // As the Dashboard card shows it; null while loading.
+    status: PlatformStatus | null;
     // Route query; ?field=<field> focuses that field (Doctor links).
     query: string;
 };
@@ -266,6 +290,7 @@ type PlatformDetailProps = {
 export const PlatformDetail = ( {
     card,
     platform,
+    status,
     query,
 }: PlatformDetailProps ) => {
     const { data, replaceSettings } = useAppData();
@@ -310,6 +335,42 @@ export const PlatformDetail = ( {
     const dirty = Object.keys( changes ).length > 0 || consentChanged;
     const dirtyRef = useRef( dirty );
     const lastPurchase = ( values.last_purchase ?? null ) as LastPurchase;
+    // Why the Dashboard says Needs attention, each cause the page has no notice of its own for (X re-setup and the Google split do).
+    const attentionNotes =
+        status?.state === 'attention'
+            ? ( status.notes ?? [] ).filter(
+                  ( cause ) =>
+                      ( cause.reason === 'finding' ||
+                          cause.reason === 'not_confirmed' ) &&
+                      cause.text
+              )
+            : [];
+    const [ confirmingSplit, setConfirmingSplit ] = useState( false );
+    const [ splitError, setSplitError ] = useState( '' );
+
+    // "Looks right" on the Google split: the What's new confirm, then the split is gone from the shared settings (and the status is fetched again).
+    const confirmSplit = () => {
+        setConfirmingSplit( true );
+        setSplitError( '' );
+        confirmWhatsNewItem( 'google_ads_id_split' )
+            // On the settings as they are now, so a save that finished meanwhile stays.
+            .then( () =>
+                replaceSettings( ( current ) => ( {
+                    ...current,
+                    platforms: {
+                        ...current.platforms,
+                        google: {
+                            ...( current.platforms?.google ?? {} ),
+                            ads_id_split: null,
+                        },
+                    },
+                } ) )
+            )
+            .catch( ( reason: unknown ) =>
+                setSplitError( errorMessage( reason ) )
+            )
+            .finally( () => setConfirmingSplit( false ) );
+    };
     const target = focusField( query );
     const section = focusSection( query );
 
@@ -797,7 +858,8 @@ export const PlatformDetail = ( {
                     <Status
                         card={ card }
                         lastPurchase={ lastPurchase }
-                        attention={ needsAttention( platform, values ) }
+                        attention={ needsAttention( platform, values, status ) }
+                        state={ status?.state ?? null }
                     />
                 </span>
                 <Button
@@ -830,12 +892,43 @@ export const PlatformDetail = ( {
                         </Notice>
                     ) }
 
+                    { attentionNotes.map( ( cause ) => (
+                        <Notice
+                            key={ cause.reason }
+                            variant="warning"
+                            role="status"
+                            data-testid="wcct-platform-attention"
+                        >
+                            <p className="m-0">
+                                { cause.text }{ ' ' }
+                                { cause.link && (
+                                    <a
+                                        href={ cause.link }
+                                        className="font-medium text-primary underline underline-offset-3"
+                                    >
+                                        { cause.link_label }
+                                    </a>
+                                ) }
+                            </p>
+                        </Notice>
+                    ) ) }
+
                     { resetup.length > 0 && ! readOnlyAll && (
                         <XResetupNotice platform={ id } events={ resetup } />
                     ) }
 
                     { split && id === 'google' && (
-                        <GoogleSplitNotice saved={ text( split.saved ) } />
+                        <GoogleSplitNotice
+                            saved={ text( split.saved ) }
+                            onConfirm={
+                                // Its confirm is What's new's, which only upgraded stores have.
+                                readOnlyAll || ! hasWhatsNew()
+                                    ? undefined
+                                    : confirmSplit
+                            }
+                            confirming={ confirmingSplit }
+                            error={ splitError }
+                        />
                     ) }
 
                     { connection

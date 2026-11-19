@@ -30,8 +30,12 @@ export type AppDataState = {
     // True while cached data is re-fetched; cards show their own skeletons.
     refreshing: boolean;
     refresh: () => void;
-    // Swap in the settings a save returned, so every page sees them without a refetch.
-    replaceSettings: ( settings: SettingsValues ) => void;
+    // Swap in the settings a save returned, so every page sees them without a refetch; a function changes the current ones.
+    replaceSettings: (
+        settings:
+            | SettingsValues
+            | ( ( current: SettingsValues ) => SettingsValues )
+    ) => void;
 };
 
 const AppDataContext = createContext< AppDataState | null >( null );
@@ -86,20 +90,34 @@ export const AppDataProvider = ( { children }: { children: ReactNode } ) => {
             } );
     }, [] );
 
-    const replaceSettings = useCallback( ( settings: SettingsValues ) => {
-        generation.current++;
-        setData( ( current ) =>
-            current
-                ? {
-                      ...current,
-                      settings: {
-                          ...settings,
-                          platforms: settings?.platforms ?? {},
-                      },
-                  }
-                : current
-        );
-    }, [] );
+    const replaceSettings = useCallback(
+        (
+            next:
+                | SettingsValues
+                | ( ( current: SettingsValues ) => SettingsValues )
+        ) => {
+            generation.current++;
+            setData( ( current ) => {
+                if ( ! current ) {
+                    return current;
+                }
+
+                const settings =
+                    typeof next === 'function'
+                        ? next( current.settings )
+                        : next;
+
+                return {
+                    ...current,
+                    settings: {
+                        ...settings,
+                        platforms: settings?.platforms ?? {},
+                    },
+                };
+            } );
+        },
+        []
+    );
 
     useEffect( () => {
         mounted.current = true;
