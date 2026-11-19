@@ -21,6 +21,7 @@ import { __, _n, sprintf } from '@wordpress/i18n';
  */
 import { useAppData } from '../../data/AppData';
 import { errorMessage } from '../../data/api';
+import { consentWarning } from '../../data/consentWarning';
 import {
     POPULAR,
     STEP_COUNT,
@@ -47,6 +48,7 @@ import type {
     PlatformValues,
     SchemaPlatform,
 } from '../../data/types';
+import { ConsentPluginWarning } from '../platforms/detail/Notices';
 import { ConnectPanel } from './ConnectPanel';
 import { PickTiles } from './PickTiles';
 import { StepLayout } from './StepLayout';
@@ -201,6 +203,10 @@ const Wizard = ( {
 
     // A re-run starts at Welcome, with the connected platforms picked and the saved Europe answer.
     const liveEu: EuAnswer = data.settings.consent_mode === true ? 'yes' : 'no';
+    // Shown with a Yes: no cookie plugin passes on the visitor's choice.
+    const consentGap = consentWarning(
+        data.schema.global.find( ( element ) => element.id === 'consent_mode' )
+    );
     const [ furthest, setFurthest ] = useState( () =>
         draft ? 1 : Math.max( 1, data.onboarding.step )
     );
@@ -711,7 +717,7 @@ const Wizard = ( {
                             ) }
                         />
                     </RadioGroup>
-                    { eu === 'yes' && (
+                    { eu === 'yes' && ! consentGap && (
                         <Notice
                             variant="info"
                             className="max-w-140"
@@ -725,11 +731,16 @@ const Wizard = ( {
                                     ) }
                                 </b>{ ' ' }
                                 { __(
-                                    'It works with a consent plugin that supports the WordPress Consent API, such as Complianz, CookieYes or Cookiebot. Without one, your tags wait for a choice that never comes and EU sales go untracked.',
+                                    'It works with a consent plugin that supports the WordPress Consent API, such as Complianz, CookieYes or Cookiebot.',
                                     'woocommerce-conversion-tracking'
                                 ) }
                             </p>
                         </Notice>
+                    ) }
+                    { eu === 'yes' && consentGap && (
+                        <div className="max-w-140">
+                            <ConsentPluginWarning warning={ consentGap } />
+                        </div>
                     ) }
                     { eu === 'no' && (
                         <p

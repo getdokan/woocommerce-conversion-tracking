@@ -25,6 +25,7 @@ import { __, sprintf } from '@wordpress/i18n';
  * Internal dependencies
  */
 import { useAppData } from '../../../data/AppData';
+import { consentWarning } from '../../../data/consentWarning';
 import {
     errorMessage,
     saveSettings,
@@ -82,7 +83,11 @@ import { RadioField, SelectField, SkipRolesField, SwitchRow } from './Fields';
 import { HelpContent } from './HelpColumn';
 import { IdField } from './IdField';
 import { CustomParameters, ExtraPixels } from './MetaPro';
-import { GoogleSplitNotice, XResetupNotice } from './Notices';
+import {
+    ConsentPluginWarning,
+    GoogleSplitNotice,
+    XResetupNotice,
+} from './Notices';
 
 type Draft = { fields: PlatformValues; consent: boolean };
 
@@ -658,6 +663,10 @@ export const PlatformDetail = ( {
         ( field ) => field.variant === PARAMETERS_VARIANT
     );
     const consentNotice = text( consentField?.notice );
+    // While the switch is on in the form, also before it is saved.
+    const consentGap = draft.consent
+        ? consentWarning( consentField, id )
+        : null;
     const resetup = resetupEvents(
         platform,
         draft.fields,
@@ -991,6 +1000,11 @@ export const PlatformDetail = ( {
                                     >
                                         { consentNotice }
                                     </p>
+                                ) }
+                                { consentGap && (
+                                    <ConsentPluginWarning
+                                        warning={ consentGap }
+                                    />
                                 ) }
                                 { errors.consent_mode && (
                                     <p className="m-0 mt-1 text-[13px] text-destructive">

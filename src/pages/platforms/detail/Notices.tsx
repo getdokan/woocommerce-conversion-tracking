@@ -12,6 +12,7 @@ import { __, sprintf } from '@wordpress/i18n';
 /**
  * Internal dependencies
  */
+import type { ConsentWarning } from '../../../data/consentWarning';
 import { controlId, type EventOption } from '../../../data/platformForm';
 
 /**
@@ -199,5 +200,41 @@ export const GoogleSplitNotice = ( {
                 ) }
             </div>
         ) }
+    </Notice>
+);
+
+/**
+ * "Respect cookie choices" is on but no cookie plugin passes on the visitor's choice.
+ *
+ * @param {Object}         props         Component props.
+ * @param {ConsentWarning} props.warning Title, text for this platform and the link.
+ */
+export const ConsentPluginWarning = ( {
+    warning,
+}: {
+    warning: ConsentWarning;
+} ) => (
+    <Notice
+        variant="warning"
+        role="status"
+        className="mt-2"
+        data-testid="wcct-consent-no-plugin"
+    >
+        <p className="m-0">
+            <b>{ warning.title }</b> { warning.message }
+            { warning.link && (
+                <>
+                    { ' ' }
+                    <a
+                        href={ warning.link.url }
+                        target="_blank"
+                        rel="noreferrer"
+                        className="underline"
+                    >
+                        { warning.link.label }
+                    </a>
+                </>
+            ) }
+        </p>
     </Notice>
 );

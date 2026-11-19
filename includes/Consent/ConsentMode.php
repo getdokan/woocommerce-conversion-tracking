@@ -334,6 +334,29 @@ class ConsentMode {
     }
 
     /**
+     * What is missing between the switch and the visitor's choice: nothing, no cookie plugin, or one that doesn't report choices.
+     *
+     * @return array { kind: '' | 'none' | 'silent', tools: string[] slugs of the silent tools }
+     */
+    public static function plugin_gap() {
+        $api = self::api();
+
+        if ( '' !== $api->get_consent_type() || ( $api->is_available() && self::consent_tool_active() ) ) {
+            return array(
+                'kind'  => '',
+                'tools' => array(),
+            );
+        }
+
+        $silent = self::silent_tools();
+
+        return array(
+            'kind'  => array() !== $silent ? 'silent' : 'none',
+            'tools' => $silent,
+        );
+    }
+
+    /**
      * Our Google consent default, skipped in the browser when a default is already in the dataLayer.
      *
      * @return string

@@ -13,6 +13,11 @@ class ConsentData {
     const REGIONS = array( 'AT', 'BE', 'BG', 'HR', 'CY', 'CZ', 'DK', 'EE', 'FI', 'FR', 'DE', 'GR', 'HU', 'IE', 'IT', 'LV', 'LT', 'LU', 'MT', 'NL', 'PL', 'PT', 'RO', 'SK', 'SI', 'ES', 'SE', 'IS', 'LI', 'NO', 'GB', 'CH' );
 
     /**
+     * Where the merchant finds the WP Consent API and the cookie plugins that work with it.
+     */
+    const PLUGINS_URL = 'https://wordpress.org/plugins/wp-consent-api/';
+
+    /**
      * Consent tools that can own Google consent mode, slug => name, in detection order.
      */
     const SOURCES = array(
