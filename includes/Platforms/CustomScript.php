@@ -132,7 +132,8 @@ class CustomScript {
      */
     public static function order_values( $order ): array {
         $coupons = $order->get_coupon_codes();
-        $number  = $order->get_order_number();
+        // The reference the platforms get, so the merchant's script reports the sale under the same one.
+        $number  = \StorePulse\ConversionTracking\Events\OrderReference::of( $order );
 
         $values = array(
             '{order_number}'   => $number,

@@ -179,7 +179,8 @@ class WCCT_Integration_Twitter extends WCCT_Integration {
                 // In this platform's value mode (#95).
                 'value'         => (float) $this->purchase_value( $order ),
                 'currency'      => Event::currency_code( $order->get_currency() ),
-                'conversion_id' => (string) $order->get_order_number(),
+                // The order number, as Google gets it; the order ID if a plugin empties it.
+                'conversion_id' => \StorePulse\ConversionTracking\Events\OrderReference::of( $order ),
                 'contents'      => $this->order_contents( $order ),
             )
         );

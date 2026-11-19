@@ -13,8 +13,14 @@ class WCCT_Test_Placeholder_Order {
 
     public $coupons = array( 'ctsave5' );
 
+    public $number = '3001';
+
+    public function get_id() {
+        return 3001;
+    }
+
     public function get_order_number() {
-        return '3001';
+        return $this->number;
     }
 
     public function get_total() {
@@ -196,6 +202,20 @@ class CustomScriptTest extends TestCase {
         $filled = CustomScript::fill( self::EVERY_PLACEHOLDER, array_merge( CustomScript::order_values( new WCCT_Test_Placeholder_Order() ), $customer ) );
 
         $this->assertSame( '3001|78.00|78|5|5|USD|cod|501|customer@example.com|Sam|Buyer|3001|ctsave5', $filled );
+    }
+
+    public function test_order_number_is_the_reference_the_platforms_get() {
+        $order         = new WCCT_Test_Placeholder_Order();
+        $order->number = ' WC-2025-0042 ';
+
+        $this->assertSame( 'WC-2025-0042', CustomScript::order_values( $order )['{order_number}'] );
+
+        // A plugin that empties the number: the order ID, as Ads, GA4 and X send (#139).
+        foreach ( array( '', '   ', null ) as $number ) {
+            $order->number = $number;
+
+            $this->assertSame( '3001', CustomScript::order_values( $order )['{order_number}'] );
+        }
     }
 
     public function test_order_id_is_the_order_number_and_used_coupons_lists_every_code() {

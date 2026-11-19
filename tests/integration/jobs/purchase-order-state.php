@@ -1,6 +1,6 @@
 <?php
 /**
- * Puts order 3001 in the state a test asks for (status, sent flags, fees, taxes, currency, value mode, a fixed salt for signed values). Runs before the page, inside its rolled-back transaction.
+ * Puts order 3001 in the state a test asks for (status, sent flags, fees, taxes, currency, value mode, order number, a fixed salt for signed values). Runs before the page, inside its rolled-back transaction.
  */
 
 // phpcs:disable
@@ -60,5 +60,16 @@ if ( ! empty( $wcct_state['value_mode'] ) ) {
         function () use ( $wcct_state ) {
             return $wcct_state['value_mode'];
         }
+    );
+}
+
+// The order number a custom order number plugin gives.
+if ( array_key_exists( 'order_number', $wcct_state ) ) {
+    add_filter(
+        'woocommerce_order_number',
+        function () use ( $wcct_state ) {
+            return $wcct_state['order_number'];
+        },
+        99
     );
 }

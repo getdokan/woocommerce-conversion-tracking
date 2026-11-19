@@ -451,7 +451,7 @@ class WCCT_Integration_GA4 extends WCCT_Integration {
 
         return WCCT_GA4_Data::purchase_params(
             $this->get_measurement_id(),
-            WCCT_GA4_Data::transaction_id( $order->get_order_number(), $order->get_id() ),
+            \StorePulse\ConversionTracking\Events\OrderReference::of( $order ),
             $order->get_currency(),
             $items,
             $order->get_total_tax(),
