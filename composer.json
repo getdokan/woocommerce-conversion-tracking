@@ -38,7 +38,10 @@
           "@test:integration"
         ],
         "test:unit": "phpunit",
-        "test:integration": "phpunit -c phpunit.integration.xml.dist",
+        "test:integration": [
+          "Composer\\Config::disableProcessTimeout",
+          "phpunit -c phpunit.integration.xml.dist"
+        ],
         "post-install-cmd": [
            "[ $COMPOSER_DEV_MODE -eq 0 ] || \"vendor/bin/mozart\" compose",
            "composer dump-autoload"
