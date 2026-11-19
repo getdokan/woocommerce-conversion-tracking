@@ -271,6 +271,130 @@ class MetricsRouteTest extends WCCT_Test_Rest_Case {
         $this->assertFalse( $results[ $count - 1 ], 'The quiet re-check is off' );
     }
 
+    public function test_a_settings_save_clears_a_fixed_doctor_warning_and_both_screens_agree() {
+        $save    = function ( array $platforms ) {
+            return array( 'request', 'POST', '/wcct/v1/settings', array( 'platforms' => $platforms ), 'admin' );
+        };
+        $status  = array( 'request', 'GET', '/wcct/v1/settings/status', null, 'admin' );
+        $steps   = array_merge(
+            self::settings(),
+            array(
+                // X and Google without their Purchase IDs, then the merchant's Doctor run, an hour ago.
+                $save( array( 'twitter' => array( 'purchase_event_id' => '' ), 'google' => array( 'purchase_label' => '' ) ) ),
+                array( 'request', 'POST', '/wcct/v1/doctor', array(), 'admin' ),
+                array( 'call', 'wcct_test_doctor_age', array( 3600 ) ),
+                self::get(),
+                $status,
+                // X gets its ID; Google still has none.
+                $save( array( 'twitter' => array( 'purchase_event_id' => 'tw-o8x2k-abc12' ) ) ),
+                self::get(),
+                $status,
+                array( 'request', 'GET', '/wcct/v1/doctor', null, 'admin' ),
+                array( 'option', 'wcct_doctor_results' ),
+            )
+        );
+        $results = array_slice( $this->rest( $steps, 'doctor-checks' ), count( self::settings() ) );
+        $states  = function ( array $platforms ) {
+            return array_map(
+                function ( $card ) {
+                    return $card['state'];
+                },
+                array_intersect_key( $platforms, array_flip( array( 'twitter', 'google' ) ) )
+            );
+        };
+        $x_found = function ( array $report ) {
+            return array_values( array_filter( array_column( $report['findings'], 'found' ), function ( $found ) {
+                return false !== strpos( $found, ' X ' );
+            } ) );
+        };
+
+        $this->assertSame( 200, $results[0]['status'] );
+        $this->assertSame( array( 'Your X Purchase event ID looks incomplete' ), $x_found( $results[1]['data'] ) );
+
+        $before = self::by_id( $results[3]['data']['platforms'] );
+
+        $this->assertSame( array( 'google' => 'attention', 'twitter' => 'attention' ), $states( $before ) );
+        $this->assertSame( 'Your X Purchase event ID looks incomplete', $before['twitter']['note']['text'] );
+        // The platform pages read the same status from their route.
+        $this->assertSame( $states( $before ), $states( $results[4]['data']['platforms'] ) );
+        $this->assertSame( array( 'finding', $before['twitter']['note'] ), array( $results[4]['data']['platforms']['twitter']['reason'], $results[4]['data']['platforms']['twitter']['note'] ) );
+
+        // After the save, without a run: X's warning is gone on the Dashboard, the platform pages and the Doctor page; Google's stays.
+        $this->assertSame( 200, $results[5]['status'] );
+
+        $after = self::by_id( $results[6]['data']['platforms'] );
+
+        $this->assertSame( array( 'google' => 'attention', 'twitter' => 'waiting' ), $states( $after ) );
+        $this->assertSame( $states( $after ), $states( $results[7]['data']['platforms'] ) );
+        $this->assertSame( array(), $x_found( $results[8]['data'] ) );
+        $this->assertSame( $before['google']['note'], $after['google']['note'] );
+        $this->assertSame( $results[2], $results[9]['time'], 'A re-check is not a merchant run' );
+    }
+
+    public function test_x_needs_attention_only_for_events_that_are_on_and_unlocked_on_both_screens() {
+        $x       = function ( array $events, array $flagged ) {
+            return array( 'set_option', 'wcct_settings_v3', array( 'platforms' => array( 'twitter' => array( 'pixel_id' => 'o8x2k', 'events' => $events, 'needs_resetup' => $flagged ) ) ) );
+        };
+        $status  = array( 'request', 'GET', '/wcct/v1/settings/status', null, 'admin' );
+        $steps   = array_merge(
+            self::settings(),
+            array(
+                // Free locks Add to cart; a flagged Purchase that's switched off needs nothing either.
+                $x( array( 'page_view', 'add_to_cart' ), array( 'add_to_cart', 'purchase' ) ),
+                self::get(),
+                $status,
+                $x( array( 'page_view', 'purchase' ), array( 'purchase' ) ),
+                self::get(),
+                $status,
+            )
+        );
+        $results = array_slice( $this->rest( $steps ), count( self::settings() ) );
+
+        $this->assertSame( 'waiting', self::by_id( $results[1]['data']['platforms'] )['twitter']['state'] );
+        $this->assertSame( 'waiting', $results[2]['data']['platforms']['twitter']['state'] );
+        $this->assertSame( 'attention', self::by_id( $results[4]['data']['platforms'] )['twitter']['state'] );
+        $this->assertSame( array( 'attention', 'needs_resetup' ), array( $results[5]['data']['platforms']['twitter']['state'], $results[5]['data']['platforms']['twitter']['reason'] ) );
+    }
+
+    public function test_the_status_route_reads_orders_fresh_as_the_dashboard_does() {
+        $steps   = array_merge(
+            self::settings(),
+            array(
+                array( 'call', 'wcct_test_log_clear' ),
+                // Meta's script blocked an hour ago: not confirmed.
+                self::order( array( 'rows' => self::rows( array( 'adwords', 'ga4', 'twitter', 'custom' ) ) ) ),
+                // A 60-second list from before that order.
+                array( 'set_option', '_transient_wcct_log_activity', array( 'at' => time(), 'orders' => array() ) ),
+                array( 'request', 'GET', '/wcct/v1/settings/status', null, 'admin' ),
+                self::get(),
+            )
+        );
+        $results = array_slice( $this->rest( $steps ), count( self::settings() ) );
+        $meta    = $results[3]['data']['platforms']['facebook'];
+
+        $this->assertSame( array( 'attention', 'not_confirmed' ), array( $meta['state'], $meta['reason'] ) );
+        $this->assertSame( self::by_id( $results[4]['data']['platforms'] )['facebook']['note'], $meta['note'] );
+    }
+
+    public function test_google_s_unchecked_ads_id_split_needs_attention_on_both_screens() {
+        $steps   = array_merge(
+            self::settings(),
+            array(
+                // The 3.0 migration split AW-123456789/CtPurchaseLabel; the fields still hold what it wrote.
+                array( 'set_option', 'wcct_migration_flags', array( 'google_ads_id_split' => array( 'saved' => 'AW-123456789/CtPurchaseLabel', 'ads_id' => 'AW-123456789', 'purchase_label' => 'CtPurchaseLabel' ) ) ),
+                self::get(),
+                array( 'request', 'GET', '/wcct/v1/settings/status', null, 'admin' ),
+            )
+        );
+        $results = array_slice( $this->rest( $steps ), count( self::settings() ) );
+        $google  = self::by_id( $results[1]['data']['platforms'] )['google'];
+
+        $this->assertSame( 'attention', $google['state'] );
+        $this->assertSame( array( 'We split your Google Ads ID into a conversion ID and a label. Check it looks right.', '#/platforms/google' ), array( $google['note']['text'], $google['note']['link'] ) );
+        $this->assertContains( 'ads-id-split-google', array_column( $results[1]['data']['next_steps'], 'id' ) );
+        $this->assertSame( array( 'attention', 'ads_id_split' ), array( $results[2]['data']['platforms']['google']['state'], $results[2]['data']['platforms']['google']['reason'] ) );
+    }
+
     public function test_the_badge_shows_99_plus_and_skips_a_count_cut_short() {
         $results = $this->rest(
             array_merge(

@@ -179,7 +179,8 @@ class WCCT_Integration_Twitter extends WCCT_Integration {
                 // In this platform's value mode (#95).
                 'value'         => (float) $this->purchase_value( $order ),
                 'currency'      => Event::currency_code( $order->get_currency() ),
-                'conversion_id' => (string) $order->get_order_number(),
+                // The order number, as Google gets it; the order ID if a plugin empties it.
+                'conversion_id' => \StorePulse\ConversionTracking\Events\OrderReference::of( $order ),
                 'contents'      => $this->order_contents( $order ),
             )
         );
@@ -217,15 +218,22 @@ class WCCT_Integration_Twitter extends WCCT_Integration {
             return $params;
         }
 
-        if ( $event->get_value() > 0 && '' !== $event->get_currency() ) {
-            $params['value']    = $event->get_value();
+        // Start checkout follows "Order value includes", as Purchase; add to cart is the product's price.
+        $checkout = $this->checkout_value();
+        $value    = null === $checkout ? $event->get_value() : (float) $checkout;
+
+        if ( $value > 0 && '' !== $event->get_currency() ) {
+            $params['value']    = $value;
             $params['currency'] = $event->get_currency();
         }
 
-        $contents = array();
+        $contents = $this->cart_contents( $event );
 
-        foreach ( \StorePulse\ConversionTracking\Events\ProductId::for_event( $event, $this->id ) as $product_id ) {
-            $contents[] = array( 'content_id' => (string) $product_id );
+        // Without a product to describe (a deleted one), the IDs alone.
+        if ( ! $contents ) {
+            foreach ( \StorePulse\ConversionTracking\Events\ProductId::for_event( $event, $this->id ) as $product_id ) {
+                $contents[] = array( 'content_id' => (string) $product_id );
+            }
         }
 
         if ( $contents ) {
@@ -233,6 +241,53 @@ class WCCT_Integration_Twitter extends WCCT_Integration {
         }
 
         return $params;
+    }
+
+    /**
+     * X contents for a cart event, with the fields Purchase sends
+     *
+     * @param Event $event Add to cart event (the lines one add brought) or start checkout event (every cart item).
+     *
+     * @return array
+     */
+    protected function cart_contents( $event ) {
+        $mode       = \StorePulse\ConversionTracking\Events\ProductId::mode_for( $this->id );
+        $this_add   = $event->get( 'lines' );
+        $whole_cart = $event->get( 'cart_lines' );
+        $lines      = is_array( $this_add ) && $this_add ? $this_add : $whole_cart;
+        $contents   = array();
+
+        foreach ( is_array( $lines ) ? $lines : array() as $line ) {
+            if ( ! isset( $line['product'] ) || ! $line['product'] instanceof WC_Product ) {
+                continue;
+            }
+
+            // A line just added has no cart price yet: the shop price its value is built from.
+            $price = isset( $line['price'] ) ? $line['price'] : wc_get_price_to_display( $line['product'] );
+
+            $contents[] = self::content( \StorePulse\ConversionTracking\Events\ProductId::value( $line['product'], $mode ), $line['product']->get_name(), $price, isset( $line['quantity'] ) ? $line['quantity'] : 1 );
+        }
+
+        return $contents;
+    }
+
+    /**
+     * One product in X contents
+     *
+     * @param mixed     $id       Product ID or SKU.
+     * @param string    $name     Product name.
+     * @param mixed     $price    Unit price.
+     * @param int|float $quantity Quantity.
+     *
+     * @return array
+     */
+    private static function content( $id, $name, $price, $quantity ) {
+        return array(
+            'content_id'    => (string) $id,
+            'content_name'  => $name,
+            'content_price' => Event::amount( $price, wc_get_price_decimals() ),
+            'num_items'     => (int) $quantity,
+        );
     }
 
     /**
@@ -251,12 +306,7 @@ class WCCT_Integration_Twitter extends WCCT_Integration {
                 continue;
             }
 
-            $contents[] = array(
-                'content_id'    => (string) \StorePulse\ConversionTracking\Events\ProductId::for_order_item( $item, $mode ),
-                'content_name'  => $item->get_name(),
-                'content_price' => Event::amount( $order->get_item_total( $item, false, false ), wc_get_price_decimals() ),
-                'num_items'     => (int) $item->get_quantity(),
-            );
+            $contents[] = self::content( \StorePulse\ConversionTracking\Events\ProductId::for_order_item( $item, $mode ), $item->get_name(), $order->get_item_total( $item, false, false ), $item->get_quantity() );
         }
 
         return $contents;

@@ -374,7 +374,7 @@ class Schema {
                 )
             ),
             self::section( 'facebook', 'facebook_advanced', __( 'Advanced settings', 'woocommerce-conversion-tracking' ), array( 'collapsible' => true, 'collapsed' => true ) ),
-            self::value_mode_field( 'facebook_advanced', 'facebook' ),
+            self::value_mode_field( 'facebook_advanced', 'facebook', array(), __( 'Sent with Start checkout and Purchase. Items only keeps ad results in line with product revenue. Fees count as items; tax is never part of items.', 'woocommerce-conversion-tracking' ) ),
             self::product_id_field( 'facebook_advanced' ),
             self::skip_roles_field( 'facebook_advanced' ),
         );
@@ -557,7 +557,7 @@ class Schema {
                 )
             ),
             self::section( 'twitter', 'twitter_advanced', __( 'Advanced settings', 'woocommerce-conversion-tracking' ), array( 'collapsible' => true, 'collapsed' => true ) ),
-            self::value_mode_field( 'twitter_advanced', 'twitter' ),
+            self::value_mode_field( 'twitter_advanced', 'twitter', array(), __( 'Sent with Start checkout and Purchase. Items only keeps ad results in line with product revenue. Fees count as items; tax is never part of items.', 'woocommerce-conversion-tracking' ) ),
             self::product_id_field( 'twitter_advanced' ),
             self::skip_roles_field( 'twitter_advanced' ),
         );
@@ -776,7 +776,7 @@ class Schema {
     }
 
     /**
-     * "Order value includes" for a platform's Purchase; the default follows the install type (D8).
+     * "Order value includes" for a platform's order values; the default follows the install type (D8).
      *
      * @param string $section      Section ID.
      * @param string $integration  Integration ID the mode is for.

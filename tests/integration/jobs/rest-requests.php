@@ -4,7 +4,9 @@
  *
  * Steps: [ 'request', method, path, body|null, user ], [ 'option', name ], [ 'set_option', name, value|null ], [ 'action', hook, arg ],
  * [ 'shutdown', class ] (runs that class's shutdown callbacks, returns how many), [ 'global', name ], [ 'call', callable, args ].
- * Users: admin, shop_manager, customer, subscriber, seller, logged_out. A string '{term:slug}' in a body becomes that product category's ID.
+ * Users: admin, shop_manager, customer, subscriber, seller, logged_out. A string '{term:slug}' in a body becomes that product category's ID,
+ * and a check-in value '{signed:84.00}' that value signed for the body's order and platform, as the thank-you page renders it
+ * ('{signed:84.00@facebook}' signs it for another platform).
  */
 
 // phpcs:disable
@@ -96,6 +98,38 @@ function wcct_test_query( $sql ) {
     global $wpdb;
 
     return $wpdb->get_results( str_replace( '{log}', \StorePulse\ConversionTracking\Log\OrderLog::table(), $sql ), ARRAY_A );
+}
+
+/**
+ * Hide columns of the order log from OrderLog::columns(), as a failed upgrade leaves them; null shows them again. For 'call' steps.
+ *
+ * @param string|string[]|null $column Column or columns.
+ *
+ * @return void
+ */
+function wcct_test_hide_log_column( $column ) {
+    static $filter = null;
+
+    if ( $filter ) {
+        remove_filter( 'query', $filter );
+        $filter = null;
+    }
+
+    // The next upsert reads the columns again.
+    ( function () {
+        self::$columns = array();
+    } )->bindTo( null, \StorePulse\ConversionTracking\Log\OrderLog::class )();
+
+    if ( $column ) {
+        $filter = function ( $sql ) use ( $column ) {
+            global $wpdb;
+
+            $columns = (array) $column;
+
+            return 'SHOW COLUMNS FROM ' . \StorePulse\ConversionTracking\Log\OrderLog::table() === $sql ? $sql . $wpdb->prepare( ' WHERE Field NOT IN (' . implode( ',', array_fill( 0, count( $columns ), '%s' ) ) . ')', $columns ) : $sql;
+        };
+        add_filter( 'query', $filter );
+    }
 }
 
 /**
@@ -235,6 +269,62 @@ function wcct_test_v3_from_v1() {
 }
 
 /**
+ * An admin page load as far as one class is concerned: its snapshot of the loaded plugins (plugins_loaded, which already fired), then its admin_init callbacks (all of admin_init needs a real admin screen), for 'call' steps.
+ *
+ * @param string $class Class name.
+ *
+ * @return int How many ran.
+ */
+function wcct_test_admin_init( $class ) {
+    $ran = 0;
+
+    foreach ( isset( $GLOBALS['wp_filter']['admin_init'] ) ? $GLOBALS['wp_filter']['admin_init']->callbacks : array() as $callbacks ) {
+        foreach ( $callbacks as $callback ) {
+            if ( is_array( $callback['function'] ) && $callback['function'][0] instanceof $class ) {
+                if ( method_exists( $callback['function'][0], 'snapshot' ) ) {
+                    $callback['function'][0]->snapshot();
+                }
+
+                call_user_func( $callback['function'] );
+                ++$ran;
+            }
+        }
+    }
+
+    return $ran;
+}
+
+/**
+ * Add a plugin to the active list, or take it off, without loading it, for 'call' steps.
+ *
+ * @param string $plugin Plugin basename.
+ * @param bool   $on     Whether it is active.
+ *
+ * @return void
+ */
+function wcct_test_active_plugin( $plugin, $on ) {
+    $active = array_values( array_diff( (array) get_option( 'active_plugins', array() ), array( $plugin ) ) );
+
+    update_option( 'active_plugins', $on ? array_merge( $active, array( $plugin ) ) : $active );
+}
+
+/**
+ * Move the merchant's last Doctor run back in time, so a later change to it shows, for 'call' steps.
+ *
+ * @param int $seconds Seconds.
+ *
+ * @return int The run's new time.
+ */
+function wcct_test_doctor_age( $seconds ) {
+    $stored         = get_option( 'wcct_doctor_results', array() );
+    $stored['time'] = (int) $stored['time'] - (int) $seconds;
+
+    update_option( 'wcct_doctor_results', $stored, false );
+
+    return $stored['time'];
+}
+
+/**
  * Forget every platform's last purchase, for 'call' steps.
  *
  * @return null
@@ -332,6 +422,10 @@ foreach ( $GLOBALS['wcct_job']['steps'] as $wcct_step ) {
     wp_set_current_user( $wcct_users[ $wcct_step[4] ] );
 
     $wcct_request = new WP_REST_Request( $wcct_step[1], $wcct_step[2] );
+
+    if ( isset( $wcct_step[3]['value'] ) && is_string( $wcct_step[3]['value'] ) && preg_match( '/^\{signed:([^@]*)(?:@(.+))?\}$/', $wcct_step[3]['value'], $wcct_match ) ) {
+        $wcct_step[3]['value'] = \StorePulse\ConversionTracking\Events\PurchaseConfirmation::signed_value( $wcct_step[3]['order_id'], isset( $wcct_match[2] ) ? $wcct_match[2] : $wcct_step[3]['platform'], $wcct_match[1] );
+    }
 
     if ( null !== $wcct_step[3] ) {
         $wcct_request->set_header( 'content-type', 'application/json' );

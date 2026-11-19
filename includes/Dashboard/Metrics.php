@@ -10,6 +10,7 @@ use StorePulse\ConversionTracking\Log\Activity;
 use StorePulse\ConversionTracking\Log\LastPurchase;
 use StorePulse\ConversionTracking\Log\OrderLog;
 use StorePulse\ConversionTracking\Log\Statuses;
+use StorePulse\ConversionTracking\Migration\WhatsNew;
 use StorePulse\ConversionTracking\Settings\Schema;
 use StorePulse\ConversionTracking\Settings\Store;
 use StorePulse\ConversionTracking\Settings\Values;
@@ -284,17 +285,64 @@ class Metrics {
 
         $orders    = Activity::orders( $now );
         $tally     = self::tally( $orders );
-        $schema    = Schema::get();
-        $values    = Values::get( $schema, Store::load() );
-        $connected = ConnectedAt::connected( $schema, $values );
-        $times     = ConnectedAt::get( $connected );
         $report    = Doctor::report();
         $findings  = self::open_findings( $report );
         $alerts    = Alerts::states();
+        $platforms = self::cards( Schema::get(), Store::load(), $tally, $now, $report );
+
+        $working = count( wp_list_filter( $platforms, array( 'state' => self::WORKING ) ) );
+
+        // The menu badge reads the same count for 60 seconds, or until a pause or settings save.
+        if ( ! empty( $alerts[ Types::NOT_CONFIRMED ] ) ) {
+            Badge::remember( $tally['not_confirmed'], Activity::truncated(), $now );
+        }
+
+        return array(
+            'since'                => gmdate( 'c', $now - OrderLog::RETENTION ),
+            'now'                  => gmdate( 'c', $now ),
+            'purchases'            => $tally['purchases'],
+            'sent'                 => $tally['sent'],
+            'not_confirmed'        => $tally['not_confirmed'],
+            'not_confirmed_by'     => array_filter( wp_list_pluck( $tally['platforms'], 'not_confirmed' ) ),
+            'no_checkin'           => $tally['no_checkin'],
+            'pending'              => $tally['pending'],
+            'waiting'              => $tally['waiting'],
+            'platforms_working'    => $working,
+            'platforms_connected'  => count( wp_list_filter( $platforms, array( 'connected' => true ) ) ),
+            'hourly'               => self::hourly_output( $orders, $now ),
+            'platforms'            => array_map( array( self::class, 'platform_output' ), $platforms ),
+            'not_confirmed_orders' => ! empty( $alerts[ Types::NOT_CONFIRMED ] ) ? $tally['not_confirmed_orders'] : array(),
+            'alerts'               => $alerts,
+            'doctor'               => array(
+                'ran_at'  => isset( $report['ran_at'] ) ? $report['ran_at'] : null,
+                'ran_ago' => isset( $report['ran_ago'] ) ? (string) $report['ran_ago'] : '',
+                'open'    => count( $findings ),
+                'new'     => ! empty( $alerts[ Alerts::DOCTOR ] ) && isset( $report['new'] ) ? (int) $report['new'] : 0,
+            ),
+            'next_steps'           => self::next_steps( $platforms, $findings, ! empty( $report['ran_at'] ) ),
+        );
+    }
+
+    /**
+     * Every platform's card, in schema order: the state and note the Dashboard and the platform pages show, from the same inputs.
+     *
+     * @param array      $schema Normalized schema.
+     * @param array      $doc    Stored settings.
+     * @param array      $tally  self::tally() of the window's orders.
+     * @param int        $now    Unix time.
+     * @param array|null $report Doctor::report(), null to read it.
+     *
+     * @return array[]
+     */
+    public static function cards( array $schema, array $doc, array $tally, $now, $report = null ) {
+        $values    = Values::get( $schema, $doc );
+        $connected = ConnectedAt::connected( $schema, $values );
+        $times     = ConnectedAt::get( $connected );
+        $split     = WhatsNew::google_split( $doc );
         $platforms = array();
         $fixes     = array();
 
-        foreach ( $findings as $finding ) {
+        foreach ( self::open_findings( is_array( $report ) ? $report : Doctor::report() ) as $finding ) {
             $id = self::finding_platform( $finding );
 
             if ( '' !== $id && ! isset( $fixes[ $id ] ) ) {
@@ -318,46 +366,73 @@ class Metrics {
                 'not_confirmed' => $counts['not_confirmed'],
                 'last_purchase' => self::last_purchase( array_merge( array( $id ), (array) $platform['integrations'] ), $now ),
                 'connected_at'  => isset( $times[ $id ] ) && $times[ $id ] ? gmdate( 'c', $times[ $id ] ) : null,
-                'needs_resetup' => ! empty( $own['needs_resetup'] ),
+                'needs_resetup' => 'twitter' === $id ? (bool) WhatsNew::x_resetup( $id, isset( $doc['platforms'][ $id ] ) && is_array( $doc['platforms'][ $id ] ) ? $doc['platforms'][ $id ] : array(), $schema ) : ! empty( $own['needs_resetup'] ),
+                'ads_id_split'  => 'google' === $id && null !== $split,
                 'finding'       => isset( $fixes[ $id ] ) ? $fixes[ $id ] : null,
             );
 
-            $card['needs_fix'] = $card['needs_resetup'] || null !== $card['finding'];
+            $card['needs_fix'] = $card['needs_resetup'] || $card['ads_id_split'] || null !== $card['finding'];
             $card['state']     = self::state( $card );
+            $card['reason']    = self::ATTENTION === $card['state'] ? self::reason( $card ) : '';
             $card['note']      = self::note( $card, isset( $times[ $id ] ) ? $times[ $id ] : 0, $now );
             $platforms[]       = $card;
         }
 
-        $working = count( wp_list_filter( $platforms, array( 'state' => self::WORKING ) ) );
+        return $platforms;
+    }
 
-        // The menu badge reads the same count for 60 seconds, or until a pause or settings save.
-        if ( ! empty( $alerts[ Types::NOT_CONFIRMED ] ) ) {
-            Badge::remember( $tally['not_confirmed'], Activity::truncated(), $now );
+    /**
+     * Why a card needs attention, in the order its note tells: not_confirmed, needs_resetup, ads_id_split or finding.
+     *
+     * @param array $card Card.
+     *
+     * @return string
+     */
+    public static function reason( array $card ) {
+        $reasons = self::reasons( $card );
+
+        return $reasons ? $reasons[0] : '';
+    }
+
+    /**
+     * Every reason a card needs attention, in note order.
+     *
+     * @param array $card Card.
+     *
+     * @return string[]
+     */
+    private static function reasons( array $card ) {
+        return array_values(
+            array_filter(
+                array( 'not_confirmed', 'needs_resetup', 'ads_id_split', 'finding' ),
+                function ( $reason ) use ( $card ) {
+                    return ! empty( $card[ $reason ] );
+                }
+            )
+        );
+    }
+
+    /**
+     * A card's status for the platform pages: state, reason (see reason()), note, and notes (one per reason, each with its reason) so no cause is hidden behind another.
+     *
+     * @param array $card Card from cards().
+     *
+     * @return array
+     */
+    public static function status( array $card ) {
+        $notes = array();
+
+        if ( self::ATTENTION === $card['state'] ) {
+            foreach ( self::reasons( $card ) as $reason ) {
+                $notes[] = array_merge( array( 'reason' => $reason ), self::attention_note( $card, $reason ) );
+            }
         }
 
         return array(
-            'since'                => gmdate( 'c', $now - OrderLog::RETENTION ),
-            'now'                  => gmdate( 'c', $now ),
-            'purchases'            => $tally['purchases'],
-            'sent'                 => $tally['sent'],
-            'not_confirmed'        => $tally['not_confirmed'],
-            'not_confirmed_by'     => array_filter( wp_list_pluck( $tally['platforms'], 'not_confirmed' ) ),
-            'no_checkin'           => $tally['no_checkin'],
-            'pending'              => $tally['pending'],
-            'waiting'              => $tally['waiting'],
-            'platforms_working'    => $working,
-            'platforms_connected'  => count( $connected ),
-            'hourly'               => self::hourly_output( $orders, $now ),
-            'platforms'            => array_map( array( self::class, 'platform_output' ), $platforms ),
-            'not_confirmed_orders' => ! empty( $alerts[ Types::NOT_CONFIRMED ] ) ? $tally['not_confirmed_orders'] : array(),
-            'alerts'               => $alerts,
-            'doctor'               => array(
-                'ran_at'  => isset( $report['ran_at'] ) ? $report['ran_at'] : null,
-                'ran_ago' => isset( $report['ran_ago'] ) ? (string) $report['ran_ago'] : '',
-                'open'    => count( $findings ),
-                'new'     => ! empty( $alerts[ Alerts::DOCTOR ] ) && isset( $report['new'] ) ? (int) $report['new'] : 0,
-            ),
-            'next_steps'           => self::next_steps( $platforms, $findings, ! empty( $report['ran_at'] ) ),
+            'state'  => $card['state'],
+            'reason' => $card['reason'],
+            'note'   => $card['note'],
+            'notes'  => $notes,
         );
     }
 
@@ -396,6 +471,16 @@ class Metrics {
                     'text'       => sprintf( __( 'Give %s a new purchase event ID; the old codes were retired.', 'woocommerce-conversion-tracking' ), $platform['name'] ),
                     'link'       => '#/platforms/' . $platform['id'],
                     /* translators: %s: platform name, for example X */
+                    'link_label' => sprintf( __( 'Open %s', 'woocommerce-conversion-tracking' ), $platform['name'] ),
+                );
+            }
+
+            if ( ! empty( $platform['ads_id_split'] ) ) {
+                $steps[] = array(
+                    'id'         => 'ads-id-split-' . $platform['id'],
+                    'text'       => __( 'Check the conversion ID and label we split from your Google Ads ID.', 'woocommerce-conversion-tracking' ),
+                    'link'       => '#/platforms/' . $platform['id'],
+                    /* translators: %s: platform name, for example Google */
                     'link_label' => sprintf( __( 'Open %s', 'woocommerce-conversion-tracking' ), $platform['name'] ),
                 );
             }
@@ -469,6 +554,48 @@ class Metrics {
     }
 
     /**
+     * The note for one reason a card needs attention (see reasons()).
+     *
+     * @param array  $card   Card.
+     * @param string $reason Reason.
+     *
+     * @return array text, link, link_label.
+     */
+    private static function attention_note( array $card, $reason ) {
+        if ( 'not_confirmed' === $reason ) {
+            return array(
+                /* translators: %s: number of purchases */
+                'text'       => sprintf( _n( "We couldn't confirm %s purchase in the last 24 hours.", "We couldn't confirm %s purchases in the last 24 hours.", $card['not_confirmed'], 'woocommerce-conversion-tracking' ), number_format_i18n( $card['not_confirmed'] ) ),
+                'link'       => '#/log?tab=not-confirmed',
+                'link_label' => __( 'See the orders', 'woocommerce-conversion-tracking' ),
+            );
+        }
+
+        if ( 'needs_resetup' === $reason ) {
+            return array(
+                /* translators: %s: platform name, for example X */
+                'text'       => sprintf( __( '%s retired the old event codes, so purchases need a new event ID.', 'woocommerce-conversion-tracking' ), $card['name'] ),
+                'link'       => '#/platforms/' . $card['id'],
+                'link_label' => __( 'Fix it', 'woocommerce-conversion-tracking' ),
+            );
+        }
+
+        if ( 'ads_id_split' === $reason ) {
+            return array(
+                'text'       => __( 'We split your Google Ads ID into a conversion ID and a label. Check it looks right.', 'woocommerce-conversion-tracking' ),
+                'link'       => '#/platforms/' . $card['id'],
+                'link_label' => __( 'Fix it', 'woocommerce-conversion-tracking' ),
+            );
+        }
+
+        return array(
+            'text'       => isset( $card['finding']['found'] ) ? (string) $card['finding']['found'] : '',
+            'link'       => self::finding_step( $card['finding'], '' )['link'],
+            'link_label' => __( 'Fix it', 'woocommerce-conversion-tracking' ),
+        );
+    }
+
+    /**
      * The line under a platform card's name.
      *
      * @param array $card         Platform card.
@@ -486,29 +613,7 @@ class Metrics {
                     'link_label' => '',
                 );
             case self::ATTENTION:
-                if ( $card['not_confirmed'] ) {
-                    return array(
-                        /* translators: %s: number of purchases */
-                        'text'       => sprintf( _n( "We couldn't confirm %s purchase in the last 24 hours.", "We couldn't confirm %s purchases in the last 24 hours.", $card['not_confirmed'], 'woocommerce-conversion-tracking' ), number_format_i18n( $card['not_confirmed'] ) ),
-                        'link'       => '#/log?tab=not-confirmed',
-                        'link_label' => __( 'See the orders', 'woocommerce-conversion-tracking' ),
-                    );
-                }
-
-                if ( $card['needs_resetup'] ) {
-                    return array(
-                        /* translators: %s: platform name, for example X */
-                        'text'       => sprintf( __( '%s retired the old event codes, so purchases need a new event ID.', 'woocommerce-conversion-tracking' ), $card['name'] ),
-                        'link'       => '#/platforms/' . $card['id'],
-                        'link_label' => __( 'Fix it', 'woocommerce-conversion-tracking' ),
-                    );
-                }
-
-                return array(
-                    'text'       => isset( $card['finding']['found'] ) ? (string) $card['finding']['found'] : '',
-                    'link'       => self::finding_step( $card['finding'], '' )['link'],
-                    'link_label' => __( 'Fix it', 'woocommerce-conversion-tracking' ),
-                );
+                return self::attention_note( $card, $card['reason'] );
             case self::WORKING:
                 if ( ! $card['last_purchase'] ) {
                     return null;

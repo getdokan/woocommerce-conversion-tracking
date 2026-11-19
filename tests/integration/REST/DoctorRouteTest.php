@@ -251,4 +251,139 @@ class DoctorRouteTest extends WCCT_Test_Rest_Case {
         $this->assertSame( 1, $results[8] );
         $this->assertCount( 1, $results[9] );
     }
+
+    public function test_a_settings_save_or_a_pause_rechecks_at_once_and_the_alert_switch_only_keeps_the_badge_off() {
+        $save    = array( 'request', 'POST', '/wcct/v1/settings', array( 'alert_doctor_new' => false ), 'admin' );
+        $results = $this->doctor(
+            array(
+                // Before the merchant's first run: nothing recorded.
+                $save,
+                array( 'option', 'wcct_doctor_results' ),
+                array( 'request', 'POST', '/wcct/v1/doctor', array(), 'admin' ),
+                // A plugin shows up; the next save (alert off) re-checks without lighting the badge.
+                array( 'set_option', 'wcct_test_plugin_found', 'PixelYourSite' ),
+                $save,
+                array( 'request', 'GET', '/wcct/v1/doctor', null, 'admin' ),
+                array( 'option', 'wcct_doctor_new' ),
+                // It goes again; a pause re-checks too.
+                array( 'set_option', 'wcct_test_plugin_found', '' ),
+                array( 'request', 'POST', '/wcct/v1/settings/pause', array( 'platform' => 'facebook', 'paused' => true ), 'admin' ),
+                array( 'request', 'GET', '/wcct/v1/doctor', null, 'admin' ),
+                // Alert on: a save's new finding lights the badge.
+                array( 'set_option', 'wcct_test_plugin_found', 'PixelYourSite' ),
+                array( 'request', 'POST', '/wcct/v1/settings', array( 'alert_doctor_new' => true ), 'admin' ),
+                array( 'request', 'GET', '/wcct/v1/doctor', null, 'admin' ),
+                array( 'set_option', 'wcct_settings_v3', null ),
+            )
+        );
+
+        $this->assertSame( 200, $results[0]['status'] );
+        $this->assertNull( $results[1] );
+        $this->assertContains( 'PixelYourSite is also active', array_column( $results[5]['data']['findings'], 'found' ) );
+        $this->assertSame( array( 0, null ), array( $results[5]['data']['new'], $results[6] ) );
+        $this->assertSame( 200, $results[8]['status'] );
+        $this->assertNotContains( 'PixelYourSite is also active', array_column( $results[9]['data']['findings'], 'found' ) );
+        $this->assertContains( 'PixelYourSite is also active', array_column( $results[12]['data']['findings'], 'found' ) );
+        $this->assertSame( 1, $results[12]['data']['new'] );
+    }
+
+    public function test_a_dismissed_warning_stays_dismissed_through_re_checks_even_if_its_cause_goes_and_comes_back() {
+        $save    = array( 'request', 'POST', '/wcct/v1/settings', array( 'alert_doctor_new' => true ), 'admin' );
+        $plugin  = function ( array $report ) {
+            foreach ( $report['findings'] as $finding ) {
+                if ( 'test-plugin' === $finding['check'] ) {
+                    return array( $finding['dismissed'], $finding['new'] );
+                }
+            }
+
+            return null;
+        };
+        $first   = $this->doctor(
+            array(
+                array( 'set_option', 'wcct_test_plugin_found', 'PixelYourSite' ),
+                array( 'request', 'POST', '/wcct/v1/doctor', array(), 'admin' ),
+            )
+        );
+        $hash    = $first[1]['data']['findings'][0]['hash'];
+        $results = $this->doctor(
+            array(
+                array( 'set_option', 'wcct_test_plugin_found', 'PixelYourSite' ),
+                array( 'request', 'POST', '/wcct/v1/doctor', array(), 'admin' ),
+                array( 'request', 'POST', '/wcct/v1/doctor/dismiss', array( 'hash' => $hash ), 'admin' ),
+                // Still there: stays dismissed, not new.
+                $save,
+                array( 'request', 'GET', '/wcct/v1/doctor', null, 'admin' ),
+                // Gone, then back (as with a pause and resume): still dismissed, not new.
+                array( 'set_option', 'wcct_test_plugin_found', '' ),
+                $save,
+                array( 'set_option', 'wcct_test_plugin_found', 'PixelYourSite' ),
+                $save,
+                array( 'request', 'GET', '/wcct/v1/doctor', null, 'admin' ),
+                array( 'set_option', 'wcct_settings_v3', null ),
+            )
+        );
+
+        $this->assertSame( array( true, false ), $plugin( $results[4]['data'] ) );
+        $this->assertSame( array( true, false ), $plugin( $results[9]['data'] ) );
+    }
+
+    public function test_switching_respect_cookie_choices_on_clears_the_consent_note_in_the_same_save() {
+        $results = $this->doctor(
+            array(
+                array( 'request', 'POST', '/wcct/v1/doctor', array(), 'admin' ),
+                array( 'request', 'POST', '/wcct/v1/settings', array( 'consent_mode' => true ), 'admin' ),
+                array( 'request', 'GET', '/wcct/v1/doctor', null, 'admin' ),
+                array( 'set_option', 'wcct_settings_v3', null ),
+                array( 'set_option', 'wcct_consent_mode', null ),
+            )
+        );
+
+        $this->assertContains( 'consent-off', array_column( $results[0]['data']['findings'], 'check' ) );
+        $this->assertSame( 200, $results[1]['status'] );
+        $this->assertNotContains( 'consent-off', array_column( $results[2]['data']['findings'], 'check' ) );
+    }
+
+    public function test_a_plugin_list_change_rechecks_once_on_the_next_admin_load_without_lighting_the_badge() {
+        $recheck = 'StorePulse\\ConversionTracking\\Doctor\\Recheck';
+        $pys     = 'pixelyoursite/pixelyoursite.php';
+        $results = $this->doctor(
+            array(
+                array( 'set_option', 'wcct_settings_v3', array( 'alert_doctor_new' => true ) ),
+                array( 'set_option', 'wcct_doctor_plugins', null ),
+                array( 'set_option', 'wcct_test_plugin_found', 'PixelYourSite' ),
+                array( 'call', 'wcct_test_active_plugin', array( $pys, true ) ),
+                // An admin load records the plugins it runs with.
+                array( 'call', 'wcct_test_admin_init', array( $recheck ) ),
+                array( 'request', 'POST', '/wcct/v1/doctor', array(), 'admin' ),
+                array( 'set_option', 'wcct_doctor_new', null ),
+                // Deactivated: the next admin load runs without it.
+                array( 'call', 'wcct_test_active_plugin', array( $pys, false ) ),
+                array( 'set_option', 'wcct_test_plugin_found', '' ),
+                array( 'call', 'wcct_test_admin_init', array( $recheck ) ),
+                array( 'request', 'GET', '/wcct/v1/doctor', null, 'admin' ),
+                // Once: an unchanged list doesn't re-check again.
+                array( 'set_option', 'wcct_test_plugin_found', 'PixelYourSite' ),
+                array( 'call', 'wcct_test_admin_init', array( $recheck ) ),
+                array( 'request', 'GET', '/wcct/v1/doctor', null, 'admin' ),
+                // Back, as after a plugin update's brief deactivation: the warning shows again, not as new.
+                array( 'call', 'wcct_test_active_plugin', array( $pys, true ) ),
+                array( 'call', 'wcct_test_admin_init', array( $recheck ) ),
+                array( 'request', 'GET', '/wcct/v1/doctor', null, 'admin' ),
+                array( 'option', 'wcct_doctor_new' ),
+                array( 'call', 'wcct_test_active_plugin', array( $pys, false ) ),
+                array( 'set_option', 'wcct_settings_v3', null ),
+                array( 'set_option', 'wcct_doctor_plugins', null ),
+            )
+        );
+        $found   = function ( $index ) use ( $results ) {
+            return in_array( 'PixelYourSite is also active', array_column( $results[ $index ]['data']['findings'], 'found' ), true );
+        };
+
+        $this->assertSame( 1, $results[4] );
+        $this->assertTrue( $found( 5 ) );
+        $this->assertFalse( $found( 10 ) );
+        $this->assertFalse( $found( 13 ) );
+        $this->assertTrue( $found( 16 ) );
+        $this->assertNull( $results[17] );
+    }
 }

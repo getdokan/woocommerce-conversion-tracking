@@ -44,7 +44,7 @@ class LastPurchase {
         $value = array(
             'last_purchase_at' => null === $time ? time() : (int) $time,
             'order_id'         => (int) $order->get_id(),
-            'order_number'     => method_exists( $order, 'get_order_number' ) ? (string) $order->get_order_number() : (string) $order->get_id(),
+            'order_number'     => \StorePulse\ConversionTracking\Events\OrderReference::of( $order ),
         );
 
         // Not autoloaded: only the dashboard reads it.

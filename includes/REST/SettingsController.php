@@ -4,8 +4,9 @@ namespace StorePulse\ConversionTracking\REST;
 
 use StorePulse\ConversionTracking\Consent\ConsentMode;
 use StorePulse\ConversionTracking\Consent\PluginWarning;
+use StorePulse\ConversionTracking\Dashboard\Metrics;
+use StorePulse\ConversionTracking\Log\Activity;
 use StorePulse\ConversionTracking\Log\LastPurchase;
-use StorePulse\ConversionTracking\Migration\Flags;
 use StorePulse\ConversionTracking\Migration\WhatsNew;
 use StorePulse\ConversionTracking\Platforms\Pause;
 use StorePulse\ConversionTracking\Settings\Schema;
@@ -72,6 +73,19 @@ class SettingsController extends Controller {
                             'required'    => true,
                         ),
                     ),
+                ),
+            )
+        );
+
+        // Each platform's status as its Dashboard card shows it; only the platform pages read it, so other screens don't pay for the order window.
+        register_rest_route(
+            $this->namespace,
+            '/' . $this->rest_base . '/status',
+            array(
+                array(
+                    'methods'             => WP_REST_Server::READABLE,
+                    'callback'            => array( $this, 'get_status' ),
+                    'permission_callback' => array( $this, 'permissions_check' ),
                 ),
             )
         );
@@ -161,6 +175,27 @@ class SettingsController extends Controller {
     }
 
     /**
+     * Each platform's status: state, reason, note and every reason's note, as the Dashboard card shows them.
+     *
+     * @param WP_REST_Request $request Request.
+     *
+     * @return WP_REST_Response
+     */
+    public function get_status( $request ) {
+        $statuses = array();
+        $now      = time();
+
+        // Fresh, as the Dashboard reads them.
+        Activity::reset();
+
+        foreach ( Metrics::cards( Schema::get(), Store::load(), Metrics::tally( Activity::orders( $now ) ), $now ) as $card ) {
+            $statuses[ $card['id'] ] = Metrics::status( $card );
+        }
+
+        return rest_ensure_response( array( 'platforms' => (object) $statuses ) );
+    }
+
+    /**
      * Pause or resume tracking on one platform; takes effect at once, without a settings save.
      *
      * @param WP_REST_Request $request Request.
@@ -199,12 +234,9 @@ class SettingsController extends Controller {
             $values['platforms'][ $id ]['last_purchase'] = self::last_purchase( array_merge( array( (string) $id ), (array) $platform['integrations'] ) );
         }
 
-        // "We split your Google Ads ID" on the Google page, until the merchant changes the split fields.
+        // "We split your Google Ads ID" on the Google page, until the merchant changes the split fields or confirms them on What's new.
         if ( isset( $values['platforms']['google'] ) ) {
-            $google = isset( $doc['platforms']['google'] ) && is_array( $doc['platforms']['google'] ) ? $doc['platforms']['google'] : array();
-
-            // "Looks right" on What's new closes it here too.
-            $values['platforms']['google']['ads_id_split'] = in_array( Flags::GOOGLE_ADS_ID_SPLIT, WhatsNew::confirmed(), true ) ? null : Flags::google_split( Flags::all(), $google );
+            $values['platforms']['google']['ads_id_split'] = WhatsNew::google_split( $doc );
         }
 
         return $values;

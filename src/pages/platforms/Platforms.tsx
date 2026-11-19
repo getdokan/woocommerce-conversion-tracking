@@ -15,6 +15,7 @@ import { __, sprintf } from '@wordpress/i18n';
  */
 import { useAppData } from '../../data/AppData';
 import { needsAttention } from '../../data/platformForm';
+import { usePlatformStatuses } from '../../data/platformStatus';
 import {
     platformCards,
     platformLogoUrl,
@@ -358,11 +359,14 @@ const Platforms = ( { id, query }: { id: string; query: string } ) => {
     const schema = current?.locked
         ? undefined
         : data?.schema.platforms.find( ( platform ) => platform.id === id );
+    // As the Dashboard cards say; fetched again after a save or a pause.
+    const statuses = usePlatformStatuses( data?.settings );
     const attention = ( data?.schema.platforms ?? [] )
         .filter( ( platform ) =>
             needsAttention(
                 platform,
-                data?.settings.platforms[ platform.id ] ?? {}
+                data?.settings.platforms[ platform.id ] ?? {},
+                statuses?.[ platform.id ] ?? null
             )
         )
         .map( ( platform ) => platform.id );
@@ -386,6 +390,7 @@ const Platforms = ( { id, query }: { id: string; query: string } ) => {
                             key={ current.id }
                             card={ current }
                             platform={ schema }
+                            status={ statuses?.[ current.id ] ?? null }
                             query={ query }
                         />
                     ) }

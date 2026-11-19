@@ -493,7 +493,7 @@ window.wcctConsentConfig = {"api":false,"bridge":false,"cookiePrefix":"wp_consen
 <!-- body -->
 
 <!-- footer -->
-<script data-no-optimize="1">window.wcctPurchaseSent = window.wcctPurchaseSent || function (url, platform, orderId, key, eventId, category) {
+<script data-no-optimize="1">window.wcctPurchaseSent = window.wcctPurchaseSent || function (url, platform, orderId, key, eventId, category, value) {
     var sent = window.wcctPurchaseSent, all = sent.all = sent.all || {}, id = platform + ":" + orderId;
     if (all[id]) return all[id];
     var order = window.wcctOrder, done = false, missed = "";
@@ -520,7 +520,7 @@ window.wcctConsentConfig = {"api":false,"bridge":false,"cookiePrefix":"wp_consen
             if (window.console) console.warn("wcct: no order key on this page, the purchase check-in was skipped");
             return;
         }
-        var body = "order_id=" + encodeURIComponent(orderId) + "&key=" + encodeURIComponent(key) + "&platform=" + encodeURIComponent(platform) + "&loaded=" + (loaded ? 1 : 0) + "&consent=" + consentState() + "&event_id=" + encodeURIComponent(eventId || "") + "&reason=" + reason + "&load=" + load;
+        var body = "order_id=" + encodeURIComponent(orderId) + "&key=" + encodeURIComponent(key) + "&platform=" + encodeURIComponent(platform) + "&loaded=" + (loaded ? 1 : 0) + "&consent=" + consentState() + "&event_id=" + encodeURIComponent(eventId || "") + "&reason=" + reason + "&load=" + load + "&value=" + encodeURIComponent(value || "");
         if (!unloading && window.fetch) return post(url, body, true);
         try {
             if (navigator.sendBeacon && navigator.sendBeacon(url, new Blob([body], { type: "application/x-www-form-urlencoded" }))) return;
@@ -556,7 +556,7 @@ window.wcctConsentConfig = {"api":false,"bridge":false,"cookiePrefix":"wp_consen
     };
     return confirm;
 };
-window.wcctPurchaseSent("{home}/wp-json/wcct/v1/events", "custom", 3001, "wc_order_ctguest0001", "wcct_3001_purchase", "marketing");</script><script type="text/plain" data-wcct-consent="marketing">ctCustom('purchase', { id: '', email: '', first: '', last: '', number: '3001', total: '78.00', subtotal: '78', discount: '5', shipping: '5', currency: 'USD', payment: 'cod', coupons: 'ctsave5' });</script><script type="text/plain" data-wcct-consent="marketing" data-no-optimize="1">window.wcctPurchaseSent = window.wcctPurchaseSent || function (url, platform, orderId, key, eventId, category) {
+window.wcctPurchaseSent("{home}/wp-json/wcct/v1/events", "custom", 3001, "wc_order_ctguest0001", "wcct_3001_purchase", "marketing", "");</script><script type="text/plain" data-wcct-consent="marketing">ctCustom('purchase', { id: '', email: '', first: '', last: '', number: '3001', total: '78.00', subtotal: '78', discount: '5', shipping: '5', currency: 'USD', payment: 'cod', coupons: 'ctsave5' });</script><script type="text/plain" data-wcct-consent="marketing" data-no-optimize="1">window.wcctPurchaseSent = window.wcctPurchaseSent || function (url, platform, orderId, key, eventId, category, value) {
     var sent = window.wcctPurchaseSent, all = sent.all = sent.all || {}, id = platform + ":" + orderId;
     if (all[id]) return all[id];
     var order = window.wcctOrder, done = false, missed = "";
@@ -583,7 +583,7 @@ window.wcctPurchaseSent("{home}/wp-json/wcct/v1/events", "custom", 3001, "wc_ord
             if (window.console) console.warn("wcct: no order key on this page, the purchase check-in was skipped");
             return;
         }
-        var body = "order_id=" + encodeURIComponent(orderId) + "&key=" + encodeURIComponent(key) + "&platform=" + encodeURIComponent(platform) + "&loaded=" + (loaded ? 1 : 0) + "&consent=" + consentState() + "&event_id=" + encodeURIComponent(eventId || "") + "&reason=" + reason + "&load=" + load;
+        var body = "order_id=" + encodeURIComponent(orderId) + "&key=" + encodeURIComponent(key) + "&platform=" + encodeURIComponent(platform) + "&loaded=" + (loaded ? 1 : 0) + "&consent=" + consentState() + "&event_id=" + encodeURIComponent(eventId || "") + "&reason=" + reason + "&load=" + load + "&value=" + encodeURIComponent(value || "");
         if (!unloading && window.fetch) return post(url, body, true);
         try {
             if (navigator.sendBeacon && navigator.sendBeacon(url, new Blob([body], { type: "application/x-www-form-urlencoded" }))) return;
@@ -619,7 +619,7 @@ window.wcctPurchaseSent("{home}/wp-json/wcct/v1/events", "custom", 3001, "wc_ord
     };
     return confirm;
 };
-window.wcctPurchaseSent("{home}/wp-json/wcct/v1/events", "custom", 3001, "wc_order_ctguest0001", "wcct_3001_purchase", "")();</script>
+window.wcctPurchaseSent("{home}/wp-json/wcct/v1/events", "custom", 3001, "wc_order_ctguest0001", "wcct_3001_purchase", "", "")();</script>
 <!-- footer: wc_enqueue_js -->
 
 <!-- scripts -->

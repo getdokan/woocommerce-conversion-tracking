@@ -95,11 +95,19 @@ class EventFactory {
         );
 
         if ( $cart instanceof \WC_Cart ) {
-            $ids = array();
+            $ids   = array();
+            $lines = array();
 
             foreach ( $cart->get_cart() as $item ) {
                 if ( isset( $item['data'] ) && $item['data'] instanceof \WC_Product ) {
-                    $ids[] = $item['data']->get_id();
+                    $ids[]    = $item['data']->get_id();
+                    $quantity = self::quantity( isset( $item['quantity'] ) ? $item['quantity'] : 1 );
+                    $lines[]  = array(
+                        'product'  => $item['data'],
+                        'quantity' => $quantity,
+                        // The unit price after discounts, without tax, as an order item's on Purchase.
+                        'price'    => isset( $item['line_total'] ) && is_numeric( $item['line_total'] ) ? (float) $item['line_total'] / $quantity : (float) $item['data']->get_price(),
+                    );
                 }
             }
 
@@ -107,33 +115,75 @@ class EventFactory {
             $args['tax']         = $cart->get_total_tax();
             $args['shipping']    = $cart->get_shipping_total();
             $args['product_ids'] = $ids;
+            // Under its own key: the add to cart event's 'lines' are what one add brought, these are the whole cart.
+            $args['data']        = array( 'cart_lines' => $lines );
         }
 
         return new Event( $name, $args );
     }
 
     /**
-     * Add to cart event for the product just added; the value is its shop price times the quantity.
+     * Add to cart event for one add: the shopper's product and any lines other plugins added with it, valued at their cart prices.
      *
-     * @param \WC_Product $product  Product or variation added.
-     * @param int|float   $quantity Quantity added.
+     * @param array|\WC_Product $lines    The add's lines, [ 'product' => cart line product, 'quantity' => quantity added ], the shopper's first; a line's product carries the cart price. A product alone also works.
+     * @param int|float         $quantity Quantity, when a product alone is given.
      *
      * @return Event
      */
-    public static function add_to_cart( $product, $quantity = 1 ) {
-        $quantity = is_numeric( $quantity ) && $quantity > 0 ? 0 + $quantity : 1;
+    public static function add_to_cart( $lines, $quantity = 1 ) {
+        if ( $lines instanceof \WC_Product ) {
+            $lines = array(
+                array(
+                    'product'  => $lines,
+                    'quantity' => $quantity,
+                ),
+            );
+        }
+
+        $lines = is_array( $lines ) ? $lines : array();
+        $value = 0.0;
+        $ids   = array();
+        $items = array();
+
+        foreach ( $lines as $line ) {
+            if ( ! isset( $line['product'] ) || ! $line['product'] instanceof \WC_Product ) {
+                continue;
+            }
+
+            $line_quantity = self::quantity( isset( $line['quantity'] ) ? $line['quantity'] : 1 );
+            $value        += (float) wc_get_price_to_display( $line['product'], array( 'qty' => $line_quantity ) );
+            $ids[]         = $line['product']->get_id();
+            $items[]       = array(
+                'product'  => $line['product'],
+                'quantity' => $line_quantity,
+            );
+        }
 
         return new Event(
             Event::ADD_TO_CART,
             array(
-                'value'       => wc_get_price_to_display( $product, array( 'qty' => $quantity ) ),
+                'value'       => $value,
                 'currency'    => get_woocommerce_currency(),
                 'decimals'    => wc_get_price_decimals(),
-                'product'     => $product,
-                'product_ids' => array( $product->get_id() ),
-                'data'        => array( 'quantity' => $quantity ),
+                'product'     => $items ? $items[0]['product'] : null,
+                'product_ids' => $ids,
+                'data'        => array(
+                    'quantity' => $items ? $items[0]['quantity'] : 1,
+                    'lines'    => $items,
+                ),
             )
         );
+    }
+
+    /**
+     * A positive quantity, 1 when missing.
+     *
+     * @param mixed $quantity Quantity.
+     *
+     * @return int|float
+     */
+    public static function quantity( $quantity ) {
+        return is_numeric( $quantity ) && $quantity > 0 ? 0 + $quantity : 1;
     }
 
     /**

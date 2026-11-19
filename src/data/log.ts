@@ -44,6 +44,17 @@ export type LogPlatform = {
     event_id: string;
     // No check-in from this platform while others checked in: listed, never judged.
     unknown: boolean;
+    // The Purchase value each integration was sent; empty for older entries and the custom script.
+    values: LogValue[];
+};
+
+export type LogValue = {
+    integration: string;
+    // GA4 or Google Ads within Google; empty for other platforms.
+    label: string;
+    value: string;
+    // The value in the order's currency, for example $99.00.
+    amount: string;
 };
 
 export type LogOrder = {

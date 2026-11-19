@@ -59,7 +59,7 @@
 <!-- body -->
 
 <!-- footer -->
-<script>ctCustom('purchase', { number: '3002', id: '3002', total: '23.00', subtotal: '18', discount: '0', shipping: '5', currency: 'USD', payment: 'cod', coupons: '', customer: '501', email: 'customer@example.com', first: 'Sam', last: 'Buyer' });</script><script data-no-optimize="1">window.wcctPurchaseSent = window.wcctPurchaseSent || function (url, platform, orderId, key, eventId, category) {
+<script>ctCustom('purchase', { number: '3002', id: '3002', total: '23.00', subtotal: '18', discount: '0', shipping: '5', currency: 'USD', payment: 'cod', coupons: '', customer: '501', email: 'customer@example.com', first: 'Sam', last: 'Buyer' });</script><script data-no-optimize="1">window.wcctPurchaseSent = window.wcctPurchaseSent || function (url, platform, orderId, key, eventId, category, value) {
     var sent = window.wcctPurchaseSent, all = sent.all = sent.all || {}, id = platform + ":" + orderId;
     if (all[id]) return all[id];
     var order = window.wcctOrder, done = false, missed = "";
@@ -86,7 +86,7 @@
             if (window.console) console.warn("wcct: no order key on this page, the purchase check-in was skipped");
             return;
         }
-        var body = "order_id=" + encodeURIComponent(orderId) + "&key=" + encodeURIComponent(key) + "&platform=" + encodeURIComponent(platform) + "&loaded=" + (loaded ? 1 : 0) + "&consent=" + consentState() + "&event_id=" + encodeURIComponent(eventId || "") + "&reason=" + reason + "&load=" + load;
+        var body = "order_id=" + encodeURIComponent(orderId) + "&key=" + encodeURIComponent(key) + "&platform=" + encodeURIComponent(platform) + "&loaded=" + (loaded ? 1 : 0) + "&consent=" + consentState() + "&event_id=" + encodeURIComponent(eventId || "") + "&reason=" + reason + "&load=" + load + "&value=" + encodeURIComponent(value || "");
         if (!unloading && window.fetch) return post(url, body, true);
         try {
             if (navigator.sendBeacon && navigator.sendBeacon(url, new Blob([body], { type: "application/x-www-form-urlencoded" }))) return;
@@ -122,7 +122,7 @@
     };
     return confirm;
 };
-window.wcctPurchaseSent("{home}/wp-json/wcct/v1/events", "custom", 3002, "wc_order_ctcustomer01", "wcct_3002_purchase", "")();</script>
+window.wcctPurchaseSent("{home}/wp-json/wcct/v1/events", "custom", 3002, "wc_order_ctcustomer01", "wcct_3002_purchase", "", "")();</script>
 <!-- footer: wc_enqueue_js -->
 
 <!-- scripts -->
