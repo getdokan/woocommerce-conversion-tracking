@@ -303,6 +303,8 @@ class ConsentMode {
             'api'          => $api->is_available(),
             'bridge'       => $owns && $api->is_available(),
             'cookiePrefix' => $api->get_cookie_prefix(),
+            // No tool can report a choice (the "No cookie plugin found" warning): platforms get no consent signal, the log records none.
+            'noTool'       => '' !== self::plugin_gap()['kind'],
             'type'         => $type,
             'typeExpected' => ConsentData::type_expected( $api->is_available(), $type, self::signals() ),
         );
@@ -387,6 +389,18 @@ class ConsentMode {
             . "    g('consent', 'default', " . $json . ");\n"
             . "    g('set', 'ads_data_redaction', true);\n"
             . "})();\n";
+    }
+
+    /**
+     * Like sync_js(), but silent while no consent tool reports a choice, so the platform gets no consent signal instead of a made-up one.
+     *
+     * @param string $category Consent category.
+     * @param string $body     Callback body; granted and first are in scope.
+     *
+     * @return string
+     */
+    public static function choice_js( $category, $body ) {
+        return self::runtime_call( 'choice', $category, 'function (granted, first) { ' . $body . ' }' );
     }
 
     /**

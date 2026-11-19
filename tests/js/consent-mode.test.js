@@ -513,6 +513,121 @@ test( 'revoking later calls sync with denied again', () => {
     assert.deepEqual( calls, [ true, false ] );
 } );
 
+test( 'no consent tool: choice() sends nothing and the signal is none, while tags still fire', () => {
+    const { win, doc } = fakePage();
+    const consent = lib.create( win, { api: false, noTool: true } );
+    const calls = [];
+
+    consent.choice( 'marketing', ( granted, first ) => calls.push( [ granted, first ] ) );
+    consent.when( 'marketing', () => calls.push( 'fired' ) );
+    doc.dispatch( 'DOMContentLoaded' );
+
+    assert.deepEqual( calls, [ 'fired' ] );
+    assert.equal( consent.signal( 'marketing' ), 'none' );
+} );
+
+test( 'no consent tool with the consent API: resolving with no type sends nothing either', () => {
+    const { win, doc } = fakePage();
+    const consent = lib.create( win, { api: true, noTool: true, typeExpected: false } );
+    const calls = [];
+
+    consent.choice( 'marketing', ( granted, first ) => calls.push( [ granted, first ] ) );
+    doc.dispatch( 'DOMContentLoaded' );
+
+    assert.deepEqual( calls, [] );
+    assert.equal( consent.allows( 'marketing' ), true );
+    assert.equal( consent.signal( 'marketing' ), 'none' );
+} );
+
+test( 'no consent tool, then a banner reports a choice: choice() starts with a default carrying it', () => {
+    const { win, doc } = fakePage();
+    const consent = lib.create( win, { api: true, noTool: true, typeExpected: false } );
+    const calls = [];
+
+    consent.choice( 'marketing', ( granted, first ) => calls.push( [ granted, first ] ) );
+    doc.dispatch( 'DOMContentLoaded' );
+    doc.dispatch( 'wp_listen_for_consent_change', { marketing: 'deny' } );
+    doc.dispatch( 'wp_listen_for_consent_change', { marketing: 'allow' } );
+
+    assert.deepEqual( calls, [ [ false, true ], [ true, false ] ] );
+    assert.equal( consent.signal( 'marketing' ), 'granted' );
+} );
+
+test( 'with a consent tool choice() works as sync(): denied default, then the visitor\'s choice', () => {
+    const { win, doc } = fakePage();
+    const consent = lib.create( win, { api: true, typeExpected: true } );
+    const given = {};
+    const calls = [];
+
+    win.wp_consent_type = 'optin';
+    win.wp_has_consent = ( category ) => !! given[ category ];
+
+    consent.choice( 'marketing', ( granted, first ) => calls.push( [ granted, first ] ) );
+    doc.dispatch( 'wp_consent_type_defined' );
+    assert.equal( consent.signal( 'marketing' ), 'denied' );
+
+    given.marketing = true;
+    doc.dispatch( 'wp_listen_for_consent_change', { marketing: 'allow' } );
+
+    assert.deepEqual( calls, [ [ false, true ], [ true, false ] ] );
+    assert.equal( consent.signal( 'marketing' ), 'granted' );
+} );
+
+test( 'no consent tool, then a banner sets a type after the page resolved: choice() starts with its default', () => {
+    const { win, doc } = fakePage( { cookie: 'wp_consent_marketing=allow' } );
+    const consent = lib.create( win, { api: true, noTool: true, typeExpected: false } );
+    const calls = [];
+
+    consent.choice( 'marketing', ( granted, first ) => calls.push( [ granted, first ] ) );
+    doc.dispatch( 'DOMContentLoaded' );
+    assert.deepEqual( calls, [] );
+
+    win.wp_consent_type = 'optin';
+    win.wp_has_consent = () => true;
+    doc.dispatch( 'wp_consent_type_defined' );
+
+    assert.deepEqual( calls, [ [ true, true ] ] );
+    assert.equal( consent.signal( 'marketing' ), 'granted' );
+} );
+
+test( 'no consent tool: a choice for another category leaves marketing without a signal', () => {
+    const { win, doc } = fakePage();
+    const consent = lib.create( win, { api: true, noTool: true, typeExpected: false } );
+    const calls = [];
+
+    consent.choice( 'marketing', ( granted, first ) => calls.push( [ granted, first ] ) );
+    doc.dispatch( 'DOMContentLoaded' );
+    doc.dispatch( 'wp_listen_for_consent_change', { statistics: 'allow' } );
+
+    assert.deepEqual( calls, [] );
+    assert.equal( consent.signal( 'marketing' ), 'none' );
+    assert.equal( consent.signal( 'statistics' ), 'granted' );
+} );
+
+test( 'no consent tool: a deny before the page resolves is kept, not reset to allowed', () => {
+    const { win, doc } = fakePage();
+    const consent = lib.create( win, { api: true, noTool: true, typeExpected: false } );
+    const calls = [];
+
+    consent.choice( 'marketing', ( granted, first ) => calls.push( [ granted, first ] ) );
+    doc.dispatch( 'wp_listen_for_consent_change', { marketing: 'deny' } );
+    doc.dispatch( 'DOMContentLoaded' );
+
+    assert.deepEqual( calls, [ [ false, true ] ] );
+    assert.equal( consent.allows( 'marketing' ), false );
+    assert.equal( consent.signal( 'marketing' ), 'denied' );
+} );
+
+test( 'sync() is unchanged with no consent tool: it still reports granted', () => {
+    const { win } = fakePage();
+    const consent = lib.create( win, { api: false, noTool: true } );
+    const calls = [];
+
+    consent.sync( 'marketing', ( granted, first ) => calls.push( [ granted, first ] ) );
+
+    assert.deepEqual( calls, [ [ true, true ] ] );
+} );
+
 test( 'the file runs inline in a browser and sets window.wcctConsent', () => {
     const fs = require( 'node:fs' );
     const path = require( 'node:path' );

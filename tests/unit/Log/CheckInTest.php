@@ -47,6 +47,10 @@ class CheckInTest extends TestCase {
         $this->assertSame( 'hidden', CheckIn::normalise( array( 'loaded' => 0, 'reason' => 'hidden' ) )['reason'] );
     }
 
+    public function test_no_consent_tool_is_recorded_as_none() {
+        $this->assertSame( 'none', CheckIn::normalise( array( 'loaded' => '1', 'consent' => 'none' ) )['consent'] );
+    }
+
     public function test_a_first_hand_over_writes_sent_at() {
         $this->assertSame(
             array(

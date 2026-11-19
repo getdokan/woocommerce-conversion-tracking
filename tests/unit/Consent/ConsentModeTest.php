@@ -206,9 +206,31 @@ class ConsentModeTest extends TestCase {
         $this->assertStringContainsString( "g('consent', 'default', {\"ad_storage\":\"denied\",\"analytics_storage\":\"denied\",\"ad_user_data\":\"denied\",\"ad_personalization\":\"denied\",\"region\":[\"AT\",", $js );
         $this->assertStringContainsString( "\"GB\",\"CH\"],\"wait_for_update\":500});", $js );
         $this->assertStringContainsString( "g('set', 'ads_data_redaction', true);", $js );
-        $this->assertStringContainsString( 'window.wcctConsentConfig = {"api":true,"bridge":true,"cookiePrefix":"wp_consent","type":"","typeExpected":false};', $js );
+        $this->assertStringContainsString( 'window.wcctConsentConfig = {"api":true,"bridge":true,"cookiePrefix":"wp_consent","noTool":true,"type":"","typeExpected":false};', $js );
         $this->assertStringContainsString( 'root.wcctConsent = lib.create(', $js );
         $this->assertLessThan( strpos( $js, 'wcctConsentConfig' ), strpos( $js, "'consent', 'default'" ) );
+    }
+
+    /**
+     * @dataProvider no_tool_cases
+     */
+    public function test_the_runtime_knows_when_no_consent_tool_can_report_a_choice( $api, $type, array $tools, $no_tool ) {
+        $this->turn_on();
+        ConsentMode::use_api( new WCCT_Test_Fake_Consent_Api( $api, $type ) );
+        $this->with_tools( $tools );
+
+        $this->assertStringContainsString( '"noTool":' . ( $no_tool ? 'true' : 'false' ) . ',', ConsentMode::head_script() );
+    }
+
+    public function no_tool_cases() {
+        return array(
+            'no cookie plugin, no consent API'         => array( false, '', array(), true ),
+            'consent API without a banner'             => array( true, '', array(), true ),
+            'a banner that never reports a type'       => array( true, '', array( 'real-cookie-banner' => array() ), true ),
+            'a banner without the consent API'         => array( false, '', array( 'complianz' => array() ), true ),
+            'a banner that reports one in the browser' => array( true, '', array( 'complianz' => array() ), false ),
+            'a type set on the server'                 => array( true, 'optin', array(), false ),
+        );
     }
 
     public function test_a_server_side_consent_type_is_passed_and_expected() {
@@ -384,6 +406,7 @@ class ConsentModeTest extends TestCase {
 
     public function test_js_helpers_are_empty_with_the_switch_off() {
         $this->assertSame( '', ConsentMode::sync_js( 'marketing', 'x();' ) );
+        $this->assertSame( '', ConsentMode::choice_js( 'marketing', 'x();' ) );
         $this->assertSame( '', ConsentMode::when_js( 'marketing', 'x();' ) );
         $this->assertSame( '', ConsentMode::script_js( 'marketing', '//example.com/a.js' ) );
         $this->assertSame( '', ConsentMode::wrap_js( 'marketing', 'wcfbq' ) );
@@ -393,6 +416,7 @@ class ConsentModeTest extends TestCase {
         $this->turn_on();
 
         $this->assertSame( 'if (window.wcctConsent) { window.wcctConsent.sync("marketing", function (granted, first) { x(); }); }', ConsentMode::sync_js( 'marketing', 'x();' ) );
+        $this->assertSame( 'if (window.wcctConsent) { window.wcctConsent.choice("marketing", function (granted, first) { x(); }); }', ConsentMode::choice_js( 'marketing', 'x();' ) );
         $this->assertSame( 'if (window.wcctConsent) { window.wcctConsent.when("statistics", function () { x(); }); }', ConsentMode::when_js( 'statistics', 'x();' ) );
         $this->assertSame( 'if (window.wcctConsent) { window.wcctConsent.script("marketing", "//example.com/a.js"); }', ConsentMode::script_js( 'marketing', '//example.com/a.js' ) );
         $this->assertSame( 'if (window.wcctConsent) { window.wcctConsent.script("marketing", "//example.com/a.js", function () { x(); }); }', ConsentMode::script_js( 'marketing', '//example.com/a.js', 'x();' ) );
