@@ -305,12 +305,18 @@ class WCCT_Integration_Facebook extends WCCT_Integration {
      */
     public function initiate_checkout() {
         $product_ids = $this->get_content_ids_from_cart( WC()->cart->get_cart() );
+        // What "Order value includes" says, as Purchase; the cart total only without a cart event.
+        $value       = $this->checkout_value();
+
+        if ( null === $value ) {
+            $value = WC()->cart->total ? WC()->cart->total : 0;
+        }
 
         return $this->track( 'InitiateCheckout', array(
             'num_items'    => WC()->cart->get_cart_contents_count(),
             'content_ids'  => self::content_ids( $product_ids ),
             'content_type' => 'product',
-            'value'        => WC()->cart->total ? WC()->cart->total : 0,
+            'value'        => $value,
             'currency'     => get_woocommerce_currency()
         ) );
     }

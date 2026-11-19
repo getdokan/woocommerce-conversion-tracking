@@ -391,11 +391,35 @@ abstract class WCCT_Integration {
      * @return string
      */
     protected function purchase_value( $order ) {
-        $event = $this->purchase_event( $order );
-
-        $this->event_value = number_format( $event->get_value_for( ValueMode::for_platform( $this->id ), $this->id ), $event->get_decimals(), '.', '' );
+        $this->event_value = $this->value_in_mode( $this->purchase_event( $order ) );
 
         return $this->event_value;
+    }
+
+    /**
+     * An order or cart event's value in this platform's value mode, as a decimal string
+     *
+     * @param Event $event Event.
+     *
+     * @return string
+     */
+    private function value_in_mode( Event $event ) {
+        return number_format( $event->get_value_for( ValueMode::for_platform( $this->id ), $this->id ), $event->get_decimals(), '.', '' );
+    }
+
+    /**
+     * Start checkout value in this platform's value mode, as a decimal string; null without a cart event
+     *
+     * @return string|null
+     */
+    protected function checkout_value() {
+        $event = $this->current_event;
+
+        if ( ! $event || Event::BEGIN_CHECKOUT !== $event->get_name() ) {
+            return null;
+        }
+
+        return $this->value_in_mode( $event );
     }
 
     /**

@@ -5,7 +5,7 @@ namespace StorePulse\ConversionTracking\Events;
 use StorePulse\ConversionTracking\Install;
 
 /**
- * Per-platform order value mode: what the Purchase value includes.
+ * Per-platform order value mode: what the Purchase and Start checkout values include.
  */
 class ValueMode {
 
@@ -102,7 +102,7 @@ class ValueMode {
     }
 
     /**
-     * The Purchase value for a mode, from the order total, its tax and its shipping.
+     * The order value for a mode, from the order (or cart) total, its tax and its shipping.
      *
      * @param float  $total    Order total.
      * @param float  $tax      Total tax, shipping and fee tax included.
