@@ -121,7 +121,7 @@ test.describe.serial('Platforms pages', () => {
         // In the help column (it also renders in the narrow-screen drawer): why some events may not arrive, with the way to the log (#137).
         const blockers = page.getByTestId('wcct-platform-help').getByTestId('wcct-blockers-note');
 
-        await expect(blockers).toHaveText("Shoppers' cookie choices, privacy settings and ad blockers may impact tracking, so some visits and purchases may not reach Meta. The Activity log shows the purchases we couldn't confirm.");
+        await expect(blockers).toHaveText("Shoppers' cookie choices, privacy settings and ad blockers may impact tracking, so some visits and purchases may not reach Meta. The Activity log shows, for each order, whether we could confirm it was sent.");
         await expect(blockers.getByRole('link', { name: 'Activity log' })).toHaveAttribute('href', '#/log');
         await expect(save(page)).toBeDisabled();
 

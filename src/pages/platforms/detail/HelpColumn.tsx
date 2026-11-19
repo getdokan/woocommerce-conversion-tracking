@@ -62,7 +62,7 @@ const Steps = ( { children }: { children: ReactNode } ) => (
 );
 
 /**
- * Any platform: shoppers' cookie choices and blockers may keep events from arriving; the log shows which purchases.
+ * Any platform: shoppers' cookie choices and blockers may keep events from arriving; the log says what was confirmed per order.
  *
  * @param {Object} props      Component props.
  * @param {string} props.name Platform name, like Meta.
@@ -79,7 +79,7 @@ const Blockers = ( { name }: { name: string } ) => (
                 sprintf(
                     /* translators: %s: platform name, like Meta */
                     __(
-                        "Shoppers' cookie choices, privacy settings and ad blockers may impact tracking, so some visits and purchases may not reach %s. The <log>Activity log</log> shows the purchases we couldn't confirm.",
+                        "Shoppers' cookie choices, privacy settings and ad blockers may impact tracking, so some visits and purchases may not reach %s. The <log>Activity log</log> shows, for each order, whether we could confirm it was sent.",
                         'woocommerce-conversion-tracking'
                     ),
                     name
@@ -141,7 +141,6 @@ const MetaHelp = () => (
                 ) }
             </p>
         </Block>
-        <Blockers name={ __( 'Meta', 'woocommerce-conversion-tracking' ) } />
     </>
 );
 
@@ -374,51 +373,41 @@ const MicrosoftHelp = () => (
 );
 
 /**
- * The help content of a platform page.
+ * A platform's own help.
  *
  * @param {Object} props    Component props.
  * @param {string} props.id Platform ID.
  */
-export const HelpContent = ( { id }: { id: string } ) => {
+const PlatformHelp = ( { id }: { id: string } ) => {
     if ( id === 'facebook' ) {
         return <MetaHelp />;
     }
 
     if ( id === 'google' ) {
-        return (
-            <>
-                <GoogleHelp />
-                <Blockers
-                    name={ __( 'Google', 'woocommerce-conversion-tracking' ) }
-                />
-            </>
-        );
+        return <GoogleHelp />;
     }
 
     if ( id === 'twitter' ) {
-        return (
-            <>
-                <XHelp />
-                <Blockers
-                    name={ __( 'X', 'woocommerce-conversion-tracking' ) }
-                />
-            </>
-        );
+        return <XHelp />;
     }
 
     if ( id === 'bing_ads' ) {
-        return (
-            <>
-                <MicrosoftHelp />
-                <Blockers
-                    name={ __(
-                        'Microsoft Advertising',
-                        'woocommerce-conversion-tracking'
-                    ) }
-                />
-            </>
-        );
+        return <MicrosoftHelp />;
     }
 
     return <AfterSave />;
 };
+
+/**
+ * The help content of a platform page: the platform's own help, then why some events may not arrive.
+ *
+ * @param {Object} props      Component props.
+ * @param {string} props.id   Platform ID.
+ * @param {string} props.name Platform name, as in the page's heading.
+ */
+export const HelpContent = ( { id, name }: { id: string; name: string } ) => (
+    <>
+        <PlatformHelp id={ id } />
+        <Blockers name={ name } />
+    </>
+);

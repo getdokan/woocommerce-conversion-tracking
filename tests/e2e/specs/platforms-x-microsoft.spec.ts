@@ -212,6 +212,7 @@ test.describe.serial('X and Microsoft pages', () => {
 
         await expect(detail.getByRole('heading', { name: 'Microsoft Advertising' })).toBeVisible();
         await expect(page.getByTestId('wcct-platform-help')).toContainText('Where to find your UET tag ID');
+        await expect(page.getByTestId('wcct-platform-help').getByTestId('wcct-blockers-note')).toContainText('may not reach Microsoft');
 
         const tag = field(page, 'bing_ads', 'tag_id');
 
