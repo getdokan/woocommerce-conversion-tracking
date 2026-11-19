@@ -1,12 +1,22 @@
 <?php
 /**
- * Puts order 3001 in the state a test asks for (status, sent flags, fees, taxes, currency, value mode). Runs before the page, inside its rolled-back transaction.
+ * Puts order 3001 in the state a test asks for (status, sent flags, fees, taxes, currency, value mode, order number, a fixed salt for signed values). Runs before the page, inside its rolled-back transaction.
  */
 
 // phpcs:disable
 
 $wcct_state = isset( $GLOBALS['wcct_job']['before_args'] ) ? $GLOBALS['wcct_job']['before_args'] : array();
 $wcct_order = wc_get_order( 3001 );
+
+// A known salt, so a test can check the check-in's signed value.
+if ( ! empty( $wcct_state['salt'] ) ) {
+    add_filter(
+        'salt',
+        function () use ( $wcct_state ) {
+            return $wcct_state['salt'];
+        }
+    );
+}
 
 if ( ! empty( $wcct_state['status'] ) ) {
     $wcct_order->set_status( $wcct_state['status'] );
@@ -50,5 +60,16 @@ if ( ! empty( $wcct_state['value_mode'] ) ) {
         function () use ( $wcct_state ) {
             return $wcct_state['value_mode'];
         }
+    );
+}
+
+// The order number a custom order number plugin gives.
+if ( array_key_exists( 'order_number', $wcct_state ) ) {
+    add_filter(
+        'woocommerce_order_number',
+        function () use ( $wcct_state ) {
+            return $wcct_state['order_number'];
+        },
+        99
     );
 }

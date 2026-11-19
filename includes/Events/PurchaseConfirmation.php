@@ -11,6 +11,11 @@ use StorePulse\ConversionTracking\Log\CheckIn;
 class PurchaseConfirmation {
 
     /**
+     * A Purchase value the check-in logs: a plain decimal, up to 20 digits and 18 decimals.
+     */
+    const VALUE_PATTERN = '-?[0-9]{1,20}(?:\.[0-9]{1,18})?';
+
+    /**
      * Give up waiting for a platform library after this many milliseconds; the next page view sends again.
      */
     const WAIT_MS = 30000;
@@ -40,12 +45,14 @@ class PurchaseConfirmation {
     }
 
     /**
-     * Defines window.wcctPurchaseSent(url, platform, orderId, key, eventId, category): one confirm function per platform and order, which checks in once handed over; confirm.when(check, category) waits for check() and consent.
+     * Defines window.wcctPurchaseSent(url, platform, orderId, key, eventId, category, value): one confirm function per platform and order, which checks in once handed over; confirm.when(check, category) waits for check() and consent.
+     *
+     * The value is the Purchase value the page rendered for the platform, for the Activity log; empty when it renders none.
      *
      * @return string
      */
     public static function helper() {
-        return 'window.wcctPurchaseSent = window.wcctPurchaseSent || function (url, platform, orderId, key, eventId, category) {
+        return 'window.wcctPurchaseSent = window.wcctPurchaseSent || function (url, platform, orderId, key, eventId, category, value) {
     var sent = window.wcctPurchaseSent, all = sent.all = sent.all || {}, id = platform + ":" + orderId;
     if (all[id]) return all[id];
     var order = window.wcctOrder, done = false, missed = "";
@@ -72,7 +79,7 @@ class PurchaseConfirmation {
             if (window.console) console.warn("wcct: no order key on this page, the purchase check-in was skipped");
             return;
         }
-        var body = "order_id=" + encodeURIComponent(orderId) + "&key=" + encodeURIComponent(key) + "&platform=" + encodeURIComponent(platform) + "&loaded=" + (loaded ? 1 : 0) + "&consent=" + consentState() + "&event_id=" + encodeURIComponent(eventId || "") + "&reason=" + reason + "&load=" + load;
+        var body = "order_id=" + encodeURIComponent(orderId) + "&key=" + encodeURIComponent(key) + "&platform=" + encodeURIComponent(platform) + "&loaded=" + (loaded ? 1 : 0) + "&consent=" + consentState() + "&event_id=" + encodeURIComponent(eventId || "") + "&reason=" + reason + "&load=" + load + "&value=" + encodeURIComponent(value || "");
         if (!unloading && window.fetch) return post(url, body, true);
         try {
             if (navigator.sendBeacon && navigator.sendBeacon(url, new Blob([body], { type: "application/x-www-form-urlencoded" }))) return;
@@ -116,19 +123,70 @@ class PurchaseConfirmation {
      * @param string    $platform Platform ID.
      * @param \WC_Order $order    Order.
      * @param string    $category Consent category reported with the check-in, empty for marketing.
+     * @param string    $value    Purchase value the page rendered for the platform, empty for none.
      *
      * @return string
      */
-    public static function callback( $platform, $order, $category = '' ) {
+    public static function callback( $platform, $order, $category = '', $value = '' ) {
         return sprintf(
-            'window.wcctPurchaseSent(%s, %s, %s, %s, %s, %s)',
+            'window.wcctPurchaseSent(%s, %s, %s, %s, %s, %s, %s)',
             self::encode( CheckIn::url() ),
             self::encode( (string) $platform ),
             self::encode( (int) $order->get_id() ),
             self::encode( (string) $order->get_order_key() ),
             self::encode( Event::new_event_id( Event::PURCHASE, (int) $order->get_id() ) ),
-            self::encode( (string) $category )
+            self::encode( (string) $category ),
+            self::encode( self::signed_value( (int) $order->get_id(), (string) $platform, $value ) )
         );
+    }
+
+    /**
+     * The value with its signature for the order and platform, "84.00:<hash>", so a check-in can't log another; empty for none.
+     *
+     * @param int    $order_id Order ID.
+     * @param string $platform Platform ID.
+     * @param string $value    Decimal string.
+     *
+     * @return string
+     */
+    public static function signed_value( $order_id, $platform, $value ) {
+        $value = (string) $value;
+
+        if ( ! preg_match( '/^' . self::VALUE_PATTERN . '\z/', $value ) ) {
+            return '';
+        }
+
+        return $value . ':' . self::value_signature( $order_id, $platform, $value );
+    }
+
+    /**
+     * The value of a signed value posted with a check-in, empty unless the page rendered it for this order and platform.
+     *
+     * @param int    $order_id Order ID.
+     * @param string $platform Platform ID.
+     * @param mixed  $signed   Posted value, see signed_value().
+     *
+     * @return string Decimal string or empty.
+     */
+    public static function verified_value( $order_id, $platform, $signed ) {
+        if ( ! is_string( $signed ) || ! preg_match( '/^(' . self::VALUE_PATTERN . '):([0-9a-f]{32})\z/', $signed, $match ) ) {
+            return '';
+        }
+
+        return hash_equals( self::value_signature( $order_id, (string) $platform, $match[1] ), $match[2] ) ? $match[1] : '';
+    }
+
+    /**
+     * Signature of a value for an order and platform.
+     *
+     * @param int    $order_id Order ID.
+     * @param string $platform Platform ID.
+     * @param string $value    Decimal string.
+     *
+     * @return string 32 hex characters.
+     */
+    private static function value_signature( $order_id, $platform, $value ) {
+        return wp_hash( 'wcct_value|' . (int) $order_id . '|' . $platform . '|' . $value );
     }
 
     /**
@@ -138,11 +196,12 @@ class PurchaseConfirmation {
      * @param \WC_Order $order    Order.
      * @param string    $check    JS expression, true once the platform library has taken the event.
      * @param string    $category Consent category the event needs (wcctConsent), empty for none.
+     * @param string    $value    Purchase value the page rendered for the platform, empty for none.
      *
      * @return string
      */
-    public static function confirm_script( $platform, $order, $check = '', $category = '' ) {
-        $callback = self::callback( $platform, $order, $category );
+    public static function confirm_script( $platform, $order, $check = '', $category = '', $value = '' ) {
+        $callback = self::callback( $platform, $order, $category, $value );
         $check    = trim( (string) $check );
         $category = (string) $category;
 

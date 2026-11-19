@@ -5,6 +5,8 @@ namespace StorePulse\ConversionTracking\REST;
 use StorePulse\ConversionTracking\Log\Activity;
 use StorePulse\ConversionTracking\Log\OrderLog;
 use StorePulse\ConversionTracking\Log\Statuses;
+use StorePulse\ConversionTracking\Platforms\Pause;
+use StorePulse\ConversionTracking\Platforms\Registry;
 use WP_REST_Request;
 use WP_REST_Response;
 use WP_REST_Server;
@@ -141,6 +143,7 @@ class LogController extends Controller {
                 'consent'       => $platform['consent'],
                 'event_id'      => $platform['event_id'],
                 'unknown'       => ! empty( $platform['unknown'] ),
+                'values'        => self::values( isset( $platform['values'] ) ? $platform['values'] : array(), $platform['integrations'], $order['currency'] ),
             );
         }
 
@@ -164,6 +167,60 @@ class LogController extends Controller {
             'settles_at'         => self::iso( $order['settles_at'] ),
             'platforms'          => $platforms,
         );
+    }
+
+    /**
+     * The value each integration of a platform was sent, in the order's currency, in the platform's integration order.
+     *
+     * @param string[] $values       Integration ID => decimal string.
+     * @param string[] $integrations Integration IDs.
+     * @param string   $currency     Currency code.
+     *
+     * @return array[] integration, label (the integration's name when the platform groups several, else empty), value and amount.
+     */
+    private static function values( array $values, array $integrations, $currency ) {
+        $list = array();
+        $rank = array_flip( array_keys( Pause::INTEGRATIONS ) );
+
+        // In the grouped order (GA4 before Google Ads), whatever order the integrations checked in.
+        usort(
+            $integrations,
+            function ( $a, $b ) use ( $rank ) {
+                return ( isset( $rank[ $a ] ) ? $rank[ $a ] : count( $rank ) ) - ( isset( $rank[ $b ] ) ? $rank[ $b ] : count( $rank ) );
+            }
+        );
+
+        foreach ( $integrations as $id ) {
+            if ( ! isset( $values[ $id ] ) || ! is_numeric( $values[ $id ] ) ) {
+                continue;
+            }
+
+            $list[] = array(
+                'integration' => (string) $id,
+                'label'       => isset( Pause::INTEGRATIONS[ $id ] ) ? self::integration_name( (string) $id ) : '',
+                'value'       => (string) $values[ $id ],
+                'amount'      => self::amount( $values[ $id ], $currency ),
+            );
+        }
+
+        return $list;
+    }
+
+    /**
+     * An integration's name for the log: GA4 shortened, as on the 3.0 screens; else the integration's own name, or its ID.
+     *
+     * @param string $id Integration ID.
+     *
+     * @return string
+     */
+    private static function integration_name( $id ) {
+        if ( 'ga4' === $id ) {
+            return __( 'GA4', 'woocommerce-conversion-tracking' );
+        }
+
+        $all = function_exists( 'wcct_init' ) && isset( wcct_init()->manager ) ? Registry::normalise( wcct_init()->manager->get_integrations() ) : array();
+
+        return isset( $all[ $id ] ) ? (string) $all[ $id ]->get_name() : $id;
     }
 
     /**
@@ -301,6 +358,19 @@ class LogController extends Controller {
                                         'unknown'       => array(
                                             'description' => __( 'No check-in from this platform while others checked in: listed, never judged.', 'woocommerce-conversion-tracking' ),
                                             'type'        => 'boolean',
+                                        ),
+                                        'values'        => array(
+                                            'description' => __( 'The Purchase value each of the platform\'s integrations was sent, when its check-in recorded one.', 'woocommerce-conversion-tracking' ),
+                                            'type'        => 'array',
+                                            'items'       => array(
+                                                'type'       => 'object',
+                                                'properties' => array(
+                                                    'integration' => $text,
+                                                    'label'       => $text,
+                                                    'value'       => $text,
+                                                    'amount'      => $text,
+                                                ),
+                                            ),
                                         ),
                                     ),
                                 ),

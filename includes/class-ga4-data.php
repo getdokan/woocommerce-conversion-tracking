@@ -177,9 +177,7 @@ class WCCT_GA4_Data {
      * @return string
      */
     public static function transaction_id( $order_number, $order_id ) {
-        $transaction_id = is_scalar( $order_number ) ? trim( (string) $order_number ) : '';
-
-        return '' !== $transaction_id ? $transaction_id : (string) abs( (int) $order_id );
+        return \StorePulse\ConversionTracking\Events\OrderReference::from( $order_number, $order_id );
     }
 
     /**

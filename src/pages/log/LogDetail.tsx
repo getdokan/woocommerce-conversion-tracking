@@ -20,6 +20,7 @@ import {
     eventLabel,
     handOverStep,
     orderStatusText,
+    sentValueText,
     statusLabel,
 } from './text';
 
@@ -119,6 +120,12 @@ const PlatformResult = ( {
 } ) => {
     let steps: ReactNode = null;
     let note: ReactNode = null;
+    const sentValue = sentValueText( platform );
+    const valueStep = sentValue ? (
+        <Step>
+            <span data-testid="wcct-log-sent-value">{ sentValue }</span>
+        </Step>
+    ) : null;
 
     switch ( platform.status ) {
         case 'confirmed':
@@ -277,7 +284,11 @@ const PlatformResult = ( {
                       )
                     : platform.name }
             </h3>
-            <Timeline>{ steps }</Timeline>
+            <Timeline>
+                { steps }
+                { /* Whatever the status: Google can be not confirmed while GA4 was sent. */ }
+                { valueStep }
+            </Timeline>
             { note }
         </div>
     );

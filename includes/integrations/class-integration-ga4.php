@@ -192,7 +192,17 @@ class WCCT_Integration_GA4 extends WCCT_Integration {
             return '';
         }
 
-        $params = $this->get_event_params( array( $this->get_product_item( $event->get_product(), $event->get( 'quantity', 1 ) ) ) );
+        // Every line of the click; each line's product carries its cart price, so a $0 gift is not sent at its shop price.
+        $lines = $event->get( 'lines' );
+        $items = array();
+
+        foreach ( is_array( $lines ) ? $lines : array() as $line ) {
+            if ( isset( $line['product'] ) && $line['product'] instanceof WC_Product ) {
+                $items[] = $this->get_product_item( $line['product'], isset( $line['quantity'] ) ? $line['quantity'] : 1 );
+            }
+        }
+
+        $params = $this->get_event_params( $items );
 
         return '(window.wcctGtag || function () { (window.dataLayer = window.dataLayer || []).push(arguments); })(\'event\', \'add_to_cart\', ' . $this->encode( $params ) . ');';
     }
@@ -284,8 +294,9 @@ class WCCT_Integration_GA4 extends WCCT_Integration {
                 $order = $this->get_purchase_order( $page_event->get_order() );
 
                 if ( $order ) {
-                    $confirms[ count( $events ) ] = $this->purchase_sent_callback( $order );
-                    $events[]                     = array( 'purchase', $this->get_purchase_params( $order, $page_event ) );
+                    $params                       = $this->get_purchase_params( $order, $page_event );
+                    $confirms[ count( $events ) ] = $this->purchase_sent_callback( $order, number_format( (float) $params['value'], wc_get_price_decimals(), '.', '' ) );
+                    $events[]                     = array( 'purchase', $params );
                 }
             }
         }
@@ -440,7 +451,7 @@ class WCCT_Integration_GA4 extends WCCT_Integration {
 
         return WCCT_GA4_Data::purchase_params(
             $this->get_measurement_id(),
-            WCCT_GA4_Data::transaction_id( $order->get_order_number(), $order->get_id() ),
+            \StorePulse\ConversionTracking\Events\OrderReference::of( $order ),
             $order->get_currency(),
             $items,
             $order->get_total_tax(),

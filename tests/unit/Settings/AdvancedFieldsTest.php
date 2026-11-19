@@ -62,4 +62,17 @@ class AdvancedFieldsTest extends TestCase {
         $this->assertNotEmpty( Schema::fields( $platforms['google']['schema'] )['value_mode']['kept_note'], 'Google Ads kept the total too' );
         $this->assertStringContainsString( 'Analytics always gets the product total, without fees', Schema::fields( $platforms['google']['schema'] )['value_mode']['description'] );
     }
+
+    public function test_value_mode_names_the_events_it_is_sent_with() {
+        $platforms = Schema::get()['platforms'];
+
+        // Meta and X send a value with Start checkout too (#136).
+        foreach ( array( 'facebook', 'twitter' ) as $platform ) {
+            $this->assertStringStartsWith( 'Sent with Start checkout and Purchase.', Schema::fields( $platforms[ $platform ]['schema'] )['value_mode']['description'], $platform );
+        }
+
+        $this->assertStringStartsWith( 'Sent with the Ads conversion', Schema::fields( $platforms['google']['schema'] )['value_mode']['description'] );
+        // Platforms whose Start checkout has no value, like Pro's Microsoft Advertising.
+        $this->assertStringStartsWith( 'Sent with Purchase.', Schema::value_mode_field( 'bing_ads_advanced', 'bing_ads' )['description'] );
+    }
 }

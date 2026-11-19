@@ -23,15 +23,27 @@ class CheckInTest extends TestCase {
 
     public function test_fields_are_cleaned_to_known_values() {
         $this->assertSame(
-            array( 'loaded' => true, 'consent' => 'denied', 'reason' => '', 'event_id' => 'wcct_9_purchase', 'load' => 'k3x9a' ),
-            CheckIn::normalise( array( 'loaded' => '1', 'consent' => 'denied', 'reason' => 'timeout', 'event_id' => 'wcct_9_purchase', 'load' => 'k3x9a' ) )
+            array( 'loaded' => true, 'consent' => 'denied', 'reason' => '', 'event_id' => 'wcct_9_purchase', 'load' => 'k3x9a', 'value' => '84.00:' . str_repeat( 'a', 32 ) ),
+            CheckIn::normalise( array( 'loaded' => '1', 'consent' => 'denied', 'reason' => 'timeout', 'event_id' => 'wcct_9_purchase', 'load' => 'k3x9a', 'value' => '84.00:' . str_repeat( 'a', 32 ) ) )
         );
         $this->assertSame(
-            array( 'loaded' => false, 'consent' => 'off', 'reason' => '', 'event_id' => 'scriptalert1', 'load' => 'ab' ),
+            array( 'loaded' => false, 'consent' => 'off', 'reason' => '', 'event_id' => 'scriptalert1', 'load' => 'ab', 'value' => '' ),
             CheckIn::normalise( array( 'loaded' => 'yes', 'consent' => 'maybe', 'reason' => 'blocked', 'event_id' => '<script>alert(1)', 'load' => 'a-b' ) )
         );
         $this->assertSame( 64, strlen( CheckIn::normalise( array( 'event_id' => str_repeat( 'a', 100 ) ) )['event_id'] ) );
         $this->assertSame( 32, strlen( CheckIn::normalise( array( 'load' => str_repeat( 'b', 40 ) ) )['load'] ) );
+
+        // A value is a signed plain decimal or nothing: never cut to fit, so the log never shows another number.
+        foreach ( array( '0', '-5.5', '12345678901234567890.123456789012345678' ) as $kept ) {
+            $kept .= ':' . str_repeat( 'f', 32 );
+            $this->assertSame( $kept, CheckIn::normalise( array( 'value' => $kept ) )['value'] );
+        }
+
+        $hash = ':' . str_repeat( 'f', 32 );
+
+        foreach ( array( '84.00', '1e5' . $hash, '12.' . $hash, '.5' . $hash, '1,000.00' . $hash, ' 12.00' . $hash, '123456789012345678901' . $hash, '1.1234567890123456789' . $hash, 'abc' . $hash, '84.00' . $hash . "\n", '84.00:' . str_repeat( 'f', 31 ), '84.00:' . str_repeat( 'F', 32 ), 12.5, array( '84.00' . $hash ) ) as $dropped ) {
+            $this->assertSame( '', CheckIn::normalise( array( 'value' => $dropped ) )['value'] );
+        }
         $this->assertSame( 'hidden', CheckIn::normalise( array( 'loaded' => 0, 'reason' => 'hidden' ) )['reason'] );
     }
 

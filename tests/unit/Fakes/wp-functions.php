@@ -209,3 +209,9 @@ if ( ! function_exists( 'number_format_i18n' ) ) {
         return number_format( (float) $number, (int) $decimals );
     }
 }
+
+if ( ! function_exists( 'wp_hash' ) ) {
+    function wp_hash( $data, $scheme = 'auth' ) {
+        return hash_hmac( 'md5', $data, 'wcct-test-salt-' . $scheme );
+    }
+}

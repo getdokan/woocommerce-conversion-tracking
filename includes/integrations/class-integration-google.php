@@ -199,17 +199,19 @@ class WCCT_Integration_Google extends WCCT_Integration {
             return;
         }
 
-        $code = $this->build_event( 'conversion', array(
+        $value = $this->purchase_value( $order );
+        $code  = $this->build_event( 'conversion', array(
             'send_to'        => sprintf( "%s/%s", $account_id, $label ),
-            'transaction_id' => $order_id,
-            'value'          => (float) $this->purchase_value( $order ),
+            // The order number the merchant sees, the same reference GA4 gets (#139).
+            'transaction_id' => \StorePulse\ConversionTracking\Events\OrderReference::of( $order ),
+            'value'          => (float) $value,
             'currency'       => $order->get_currency(),
             'event_callback' => self::CALLBACK_PLACEHOLDER,
             'event_timeout'  => 60000,
         ) );
 
         // gtag.js calls event_callback once it has sent the conversion; the flag is written then.
-        $code = str_replace( '"' . self::CALLBACK_PLACEHOLDER . '"', $this->purchase_sent_callback( $order ), $code );
+        $code = str_replace( '"' . self::CALLBACK_PLACEHOLDER . '"', $this->purchase_sent_callback( $order, $value ), $code );
 
         $user_data = $this->user_data_script( $order );
 

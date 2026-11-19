@@ -127,6 +127,12 @@ Yes. Turn on "Respect cookie choices" and tags wait for the visitor's consent. G
 
 Yes. Use the Custom script page to paste that platform's tag and choose where it runs.
 
+= Do free gifts and BOGO items send their own Add to cart? =
+
+No. Adding a product sends one Add to cart, valued at cart prices (the grouped product form sends one for each product picked). Items another plugin adds during that click join it: bundle items and ticked add-ons count with their price, and free gifts are left out. A free item counts as the shopper's only when it comes from an add to cart request for that product: the product form, WooCommerce's AJAX add or the Store API. Any other free item a plugin adds, on a page load, a coupon, a quantity change or another request, is a gift and sends nothing. StoreGrowth BOGO gifts never send their own. A priced item a plugin adds on its own, such as an order bump, sends its own Add to cart at its cart price.
+
+Plugins can change this. Set `wcct_auto_added` to true in an item's cart item data to leave it out, or return false from the `wcct_track_add_to_cart` filter (cart item key, cart item, whether it was added during another add). For free products added through a plugin's own add to cart request, return true from `wcct_track_free_add_to_cart` (whether it counts, product ID, variation ID).
+
 = Where do I buy or manage Pro? =
 
 Pro is sold on [WooCommerce.com](https://woocommerce.com/products/woocommerce-conversion-tracking-pro/). Manage your subscription from your WooCommerce.com account.
