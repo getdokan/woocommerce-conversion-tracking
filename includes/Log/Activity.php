@@ -183,6 +183,7 @@ class Activity {
             'currency'       => (string) $order->get_currency(),
             'renewal'        => self::is_renewal( $order ),
             'counted_before' => PurchaseGate::counted_before( $order ),
+            'parent'         => (int) $order->get_parent_id(),
         );
     }
 
@@ -296,7 +297,7 @@ class Activity {
     }
 
     /**
-     * Orders created before the window that checked in in it, keyed by ID.
+     * Orders the query didn't read that checked in in the window (created before it, or sub-orders), keyed by ID, up to the read limit.
      *
      * @param int         $since  Unix time.
      * @param \WC_Order[] $loaded Orders already read, by ID.
@@ -353,16 +354,20 @@ class Activity {
             return array();
         }
 
-        $limit  = self::limit();
-        $orders = wc_get_orders(
-            array(
-                'type'         => 'shop_order',
-                'date_created' => '>=' . (int) $since,
-                'orderby'      => 'date',
-                'order'        => 'DESC',
-                'limit'        => $limit,
-            )
+        $query = array(
+            'type'         => 'shop_order',
+            'date_created' => '>=' . (int) $since,
+            'orderby'      => 'date',
+            'order'        => 'DESC',
+            'limit'        => self::limit(),
         );
+
+        // Sub-orders never use up the limit; one that checked in is read by checked_in_since() while the limit has room.
+        if ( Statuses::skips_sub_orders() ) {
+            $query['parent'] = 0;
+        }
+
+        $orders = wc_get_orders( $query );
         $keyed  = array();
 
         foreach ( is_array( $orders ) ? $orders : array() as $order ) {

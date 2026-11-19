@@ -135,12 +135,12 @@ function wcct_test_hide_log_column( $column ) {
 /**
  * An order for the Activity log tests, for 'call' steps: placed $props['age'] seconds ago from the checkout, paid by cash on delivery.
  *
- * @param array $props status, created_via, age, thankyou_age (null for no thank-you page visit), renewal, rows (each: platform, loaded, columns, age; see wcct_test_log_row()).
+ * @param array $props status, created_via, age, thankyou_age (null for no thank-you page visit), renewal, parent (parent order ID, as Dokan's sub-orders), rows (each: platform, loaded, columns, age; see wcct_test_log_row()).
  *
  * @return int Order ID.
  */
 function wcct_test_log_order( array $props = array() ) {
-    $props = array_merge( array( 'status' => 'processing', 'created_via' => 'checkout', 'age' => 3600, 'thankyou_age' => 3595, 'renewal' => false, 'rows' => array() ), $props );
+    $props = array_merge( array( 'status' => 'processing', 'created_via' => 'checkout', 'age' => 3600, 'thankyou_age' => 3595, 'renewal' => false, 'parent' => 0, 'rows' => array() ), $props );
     $order = new WC_Order();
 
     $order->set_currency( 'USD' );
@@ -162,6 +162,8 @@ function wcct_test_log_order( array $props = array() ) {
     if ( $props['renewal'] ) {
         $order->update_meta_data( '_subscription_renewal', 99 );
     }
+
+    $order->set_parent_id( (int) $props['parent'] );
 
     $order->save();
 
@@ -204,6 +206,42 @@ function wcct_test_log_row( $order_id, $platform, $loaded, array $columns = arra
             ),
             $columns
         )
+    );
+}
+
+/**
+ * A multi-vendor purchase as Dokan splits it: the parent (checked in on every platform) and its sub-orders (created by dokan 10 seconds later, so they're the newest orders; never on a thank-you page), for 'call' steps.
+ *
+ * @param int $count Sub-orders.
+ *
+ * @return array parent (order ID) and subs (sub-order ID => its saved parent ID).
+ */
+function wcct_test_log_multi_vendor_order( $count ) {
+    $parent = wcct_test_log_order( array( 'rows' => array( array( 'facebook', true ), array( 'adwords', true ), array( 'ga4', true ), array( 'twitter', true ), array( 'custom', true ) ) ) );
+    $subs   = array();
+
+    for ( $i = 0; $i < $count; $i++ ) {
+        $id          = wcct_test_log_order( array( 'created_via' => 'dokan', 'age' => 3590, 'thankyou_age' => null, 'parent' => $parent ) );
+        $subs[ $id ] = wc_get_order( $id )->get_parent_id();
+    }
+
+    return array( 'parent' => $parent, 'subs' => $subs );
+}
+
+/**
+ * Filter the Activity log for the rest of the job: the order read limit, or whether sub-orders are skipped; for 'call' steps.
+ *
+ * @param string $hook  wcct_log_order_limit or wcct_log_skip_sub_orders.
+ * @param mixed  $value Value returned.
+ *
+ * @return bool
+ */
+function wcct_test_log_filter( $hook, $value ) {
+    return add_filter(
+        $hook,
+        function () use ( $value ) {
+            return $value;
+        }
     );
 }
 

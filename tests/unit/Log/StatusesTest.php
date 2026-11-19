@@ -317,6 +317,9 @@ class StatusesTest extends TestCase {
             'created before 3.0 counted it'           => array( array( 'counted_before' => true ), array() ),
             'checkout draft'                          => array( array( 'status' => 'checkout-draft' ), array() ),
             'unpaid, never reached the thank-you page' => array( array( 'status' => 'pending', 'paid' => 0, 'thankyou' => 0 ), array() ),
+            'sub-order of a multi-vendor purchase'    => array( array( 'parent' => 1311, 'thankyou' => 0 ), array() ),
+            // Only a check-in of its own lists a sub-order; the query skips the rest (Activity::recent()).
+            'sub-order on a thank-you page, no check-in' => array( array( 'parent' => 1311 ), array() ),
         );
     }
 
@@ -325,6 +328,21 @@ class StatusesTest extends TestCase {
      */
     public function test_excluded_orders_show_nothing( array $order, array $rows ) {
         $this->assertNull( Statuses::evaluate( self::order( $order ), $rows, self::ACTIVE, array(), self::NOW ) );
+    }
+
+    public function test_a_sub_order_that_checked_in_itself_is_listed() {
+        $result = Statuses::evaluate( self::order( array( 'parent' => 1311 ) ), array( self::row( 'facebook', true ) ), array( 'facebook' ), array(), self::NOW );
+
+        $this->assertSame( Statuses::CONFIRMED, $result['status'] );
+    }
+
+    public function test_sub_orders_are_listed_when_the_filter_keeps_them() {
+        $GLOBALS['wcct_test_filters']['wcct_log_skip_sub_orders'] = function () {
+            return false;
+        };
+
+        $this->assertNotNull( Statuses::evaluate( self::order( array( 'parent' => 1311, 'thankyou' => 0 ) ), array(), self::ACTIVE, array(), self::NOW ) );
+        $this->assertFalse( Statuses::skips_sub_orders() );
     }
 
     public function test_an_unpaid_status_filtered_out_of_the_sending_ones_is_skipped() {
