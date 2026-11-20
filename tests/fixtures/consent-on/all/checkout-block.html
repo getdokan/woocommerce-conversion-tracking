@@ -608,7 +608,7 @@ window.wcctConsentConfig = {"api":false,"bridge":false,"cookiePrefix":"wp_consen
             t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,
             document,'script','https://connect.facebook.net/en_US/fbevents.js');
 
-            if (window.wcctConsent) { window.wcctConsent.sync("marketing", function (granted, first) { fbq('consent', granted ? 'grant' : 'revoke'); }); }fbq('init', '111111111111111', {});fbq('track', 'PageView', {}, { eventID: wcctMeta.eventId() });if (window.wcctConsent) { window.wcctConsent.when("marketing", function () { window.wcctMeta && wcctMeta.start(); }); }        </script>
+            if (window.wcctConsent) { window.wcctConsent.choice("marketing", function (granted, first) { fbq('consent', granted ? 'grant' : 'revoke'); }); }fbq('init', '111111111111111', {});fbq('track', 'PageView', {}, { eventID: wcctMeta.eventId() });if (window.wcctConsent) { window.wcctConsent.when("marketing", function () { window.wcctMeta && wcctMeta.start(); }); }        </script>
         <script data-no-optimize="1">if (window.wcctConsent) { window.wcctConsent.wrap("wcfbq", "marketing"); }</script>
 <script async data-no-optimize="1" data-cfasync="false" src="https://www.googletagmanager.com/gtag/js?id=G-CTTEST1234"></script>
 <script data-no-optimize="1" data-cfasync="false">

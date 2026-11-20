@@ -85,10 +85,11 @@ class ConsentPageOutputTest extends WCCT_Test_Page_Case {
         $this->assertLessThan( strpos( $html, 'googletagmanager.com/gtag/js' ), strpos( $html, "'consent', 'default'" ) );
     }
 
+    // choice(): no grant or revoke at all while no consent tool reports a choice (#151).
     public function test_meta_is_revoked_before_init_and_x_does_not_load_uwt_js_itself() {
         $output = $this->output_of( $this->request( 'all', 'home' ) );
 
-        $this->assertMatchesRegularExpression( "/wcctConsent\\.sync\\(\"marketing\", function \\(granted, first\\) \\{ fbq\\('consent', granted \\? 'grant' : 'revoke'\\); \\}\\); \\}fbq\\('init'/", $output );
+        $this->assertMatchesRegularExpression( "/wcctConsent\\.choice\\(\"marketing\", function \\(granted, first\\) \\{ fbq\\('consent', granted \\? 'grant' : 'revoke'\\); \\}\\); \\}fbq\\('init'/", $output );
         $this->assertStringContainsString( 'window.wcctConsent.wrap("wcfbq", "marketing");', $output );
         $this->assertStringContainsString( 'window.wcctConsent.script("marketing", "https://static.ads-twitter.com/uwt.js");', $output );
     }

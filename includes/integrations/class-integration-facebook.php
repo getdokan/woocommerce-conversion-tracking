@@ -246,8 +246,8 @@ class WCCT_Integration_Facebook extends WCCT_Integration {
             document,'script','https://connect.facebook.net/en_US/fbevents.js');
 
             <?php
-            // With consent mode on: revoke before init until marketing consent, grant on consent.
-            echo $this->consent_sync_js( "fbq('consent', granted ? 'grant' : 'revoke');" ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+            // With consent mode on: revoke before init until marketing consent, grant on consent; nothing while no consent tool reports a choice (#151).
+            echo $this->consent_choice_js( "fbq('consent', granted ? 'grant' : 'revoke');" ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
 
             echo $this->build_event( esc_js( $facebook_pixel_id ), $this->get_advanced_matching(), 'init' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- JSON from wp_json_encode().
 
