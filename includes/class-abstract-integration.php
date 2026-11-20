@@ -454,6 +454,17 @@ abstract class WCCT_Integration {
     }
 
     /**
+     * Like consent_sync_js(), but silent while no consent tool reports a choice (ConsentMode::choice_js()); empty with consent mode off
+     *
+     * @param string $body Callback body.
+     *
+     * @return string
+     */
+    protected function consent_choice_js( $body ) {
+        return \StorePulse\ConversionTracking\Consent\ConsentMode::choice_js( $this->get_consent_category(), $body );
+    }
+
+    /**
      * JavaScript calling a callback with (granted, first) now and on every consent change; empty with consent mode off
      *
      * @param string $body Callback body.

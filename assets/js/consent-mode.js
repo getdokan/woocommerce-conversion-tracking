@@ -113,7 +113,7 @@
     function create(win, config) {
         var doc = win.document;
         var prefix = config.cookiePrefix || 'wp_consent';
-        var state = {}, waiting = [], listeners = [], scripts = {};
+        var state = {}, waiting = [], listeners = [], scripts = {}, choices = [], chosen = {};
         var resolved = false, timedOut = false, lastUpdate = '';
         var api = {};
 
@@ -124,6 +124,18 @@
         // Same rule as the API's wp_has_consent(): wp_consent_type when a banner set it, else the fallback.
         function consentType() {
             return (win.wp_consent_type !== undefined ? win.wp_consent_type : (win.wp_fallback_consent_type || config.type)) || '';
+        }
+
+        // No consent tool can report a choice for the category (server: no cookie plugin, or one that doesn't use the WP Consent API) and none reported one here.
+        function noChoice(category) {
+            return !!config.noTool && !consentType() && !chosen[category];
+        }
+
+        // Start the choice() callers that were silent once a choice exists, also when it left the state as it was.
+        function startChoices() {
+            for (var i = 0; i < choices.length; i++) {
+                choices[i].report(api.allows(choices[i].category), true);
+            }
         }
 
         function hasConsent(category) {
@@ -204,9 +216,13 @@
             }
 
             for (var i = 0; i < categories.length; i++) {
-                set(categories[i], resolvedAllows(type, hasConsent, categories[i]));
+                // Without a type, a choice a banner already reported stands.
+                if (type || !chosen[categories[i]]) {
+                    set(categories[i], resolvedAllows(type, hasConsent, categories[i]));
+                }
             }
 
+            startChoices();
             sendGoogle(googleUpdateForType(type, hasConsent, cookieValue));
         }
 
@@ -274,9 +290,12 @@
 
             for (var category in detail) {
                 if (Object.prototype.hasOwnProperty.call(detail, category)) {
+                    chosen[category] = true;
                     set(category, detail[category] === 'allow');
                 }
             }
+
+            startChoices();
 
             sendGoogle(googleUpdateForChange(detail));
         }
@@ -303,6 +322,37 @@
                     fn(granted, false);
                 }
             });
+        };
+
+        // Like sync(), but silent while no consent tool reports a choice: no consent signal is better than a made-up one. The first call has first = true.
+        api.choice = function (category, fn) {
+            var called = false;
+            var entry = {
+                category: category,
+                report: function (granted, onlyFirst) {
+                    if (noChoice(category) || (onlyFirst && called)) {
+                        return;
+                    }
+
+                    var first = !called;
+
+                    called = true;
+                    fn(granted, first);
+                }
+            };
+
+            choices.push(entry);
+            entry.report(api.allows(category), false);
+            listeners.push(function (changed, granted) {
+                if (changed === category) {
+                    entry.report(granted, false);
+                }
+            });
+        };
+
+        // The visitor's choice for a category: granted, denied, or none while no consent tool reports one.
+        api.signal = function (category) {
+            return noChoice(category) ? 'none' : (api.allows(category) ? 'granted' : 'denied');
         };
 
         // Replace window[name] with a version that holds its calls until the category is allowed.

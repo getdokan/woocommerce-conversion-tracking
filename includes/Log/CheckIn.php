@@ -23,9 +23,9 @@ class CheckIn {
     const THROTTLE = 60;
 
     /**
-     * Consent states the browser reports: allowed, refused, or no consent layer on the page.
+     * Consent states the browser reports: allowed, refused, no consent layer on the page (off), or no consent tool to ask (none).
      */
-    const CONSENT = array( 'granted', 'denied', 'off' );
+    const CONSENT = array( 'granted', 'denied', 'off', 'none' );
 
     /**
      * Why a platform wasn't handed over: no hand-over within the wait, or the page was hidden first.

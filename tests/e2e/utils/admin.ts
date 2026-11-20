@@ -11,6 +11,9 @@ export const SHOP_MANAGER = { user: 'ct_e2e_shop_manager', password: 'password' 
 
 export async function login(page: Page, user: string, password: string): Promise<void> {
     await page.goto('/wp-login.php');
+    // wp-login.php focuses and selects the username field 200ms after load. Typing
+    // before that can land the password in the username field on a slow runner.
+    await expect(page.locator('#user_login')).toBeFocused();
     await page.locator('#user_login').fill(user);
     await page.locator('#user_pass').fill(password);
     await page.locator('#wp-submit').click();

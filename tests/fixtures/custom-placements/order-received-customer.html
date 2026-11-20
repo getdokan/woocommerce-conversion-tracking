@@ -69,8 +69,9 @@
     if (!key && order && order.key && (!+order.id || String(order.id) === String(orderId))) key = order.key;
     var consentState = function () {
         var consent = window.wcctConsent;
-        if (!consent || !consent.allows) return "off";
-        try { return consent.allows(category || "marketing") ? "granted" : "denied"; } catch (e) { return "off"; }
+        if (!consent || !consent.signal) return "off";
+        // granted, denied, or none: no consent tool reported a choice, so nobody granted anything.
+        try { return consent.signal(category || "marketing"); } catch (e) { return "off"; }
     };
     var post = function (target, body, retry) {
         var fallback = function () { if (retry) post("{home}/wp-admin/admin-ajax.php", "action=wcct_events&" + body, false); };

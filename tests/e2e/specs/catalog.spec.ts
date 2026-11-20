@@ -1,6 +1,6 @@
 import type { Page, Route } from '@playwright/test';
 import { test, expect } from '../utils/fixtures';
-import { APP_PATH, isProActive, loginAsAdmin, openApp, wcctAdminData } from '../utils/admin';
+import { APP_PATH, isProActive, login as logInAs, loginAsAdmin, openApp, wcctAdminData } from '../utils/admin';
 
 // The catalog route, not catalog/anything.
 const CATALOG_ROUTE = /wcct(\/|%2F)v1(\/|%2F)catalog(\?|&|$)/;
@@ -375,11 +375,7 @@ test.describe('Catalog page', () => {
                 const context = await browser.newContext({ baseURL });
                 const manager = await context.newPage();
 
-                await manager.goto('/wp-login.php');
-                await manager.locator('#user_login').fill('ct-e2e-manager');
-                await manager.locator('#user_pass').fill('ct-e2e-manager-pass');
-                await manager.locator('#wp-submit').click();
-                await expect(manager.locator('#wpadminbar')).toBeVisible();
+                await logInAs(manager, 'ct-e2e-manager', 'ct-e2e-manager-pass');
                 await manager.goto(`${APP_PATH}#/catalog`);
                 await expect(manager.getByTestId('wcct-feed-status')).toBeVisible({ timeout: 30_000 });
 
