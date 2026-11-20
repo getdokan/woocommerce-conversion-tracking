@@ -17,10 +17,17 @@ jobs:
                 php-version: '7.4'
                 coverage: none
                 tools: composer:v2
+            - name: Setup Node 22
+              uses: actions/setup-node@v4
+              with:
+                node-version: '22'
+                cache: 'npm'
             - name: Build
               run: |
                 composer install
                 composer install --no-dev -o
+                npm ci
+                npm run build
             - name: Install SVN ( Subversion )
               run: |
                 sudo apt-get update

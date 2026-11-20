@@ -10,4 +10,7 @@
             <directory suffix="Test.php">tests/unit</directory>
         </testsuite>
     </testsuites>
+    <extensions>
+        <extension class="WCCT_Test_Reset_Statics" />
+    </extensions>
 </phpunit>

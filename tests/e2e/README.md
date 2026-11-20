@@ -1,0 +1,131 @@
+# End-to-end tests
+
+Playwright tests that place real guest orders in a throwaway WooCommerce store and check what the tracking tags send.
+
+The store runs in Docker with [wp-env](https://www.npmjs.com/package/@wordpress/env): WordPress, WooCommerce, the Storefront theme, this plugin and, when mapped in, Pro. Every spec runs with two automatic fixtures:
+
+- **`tracker`** answers every request that leaves the test site, so no test reaches a real ad platform. It records each request to a platform host (Meta, Google, X, Microsoft) with its URL, body, referer and the page that sent it.
+- **`jsErrors`** fails the test on any uncaught exception or `console.error` on any page.
+
+`specs/purchase.spec.ts` places one order on classic checkout and one on block checkout, paid by cash on delivery, and fails unless every tag with a test ID in `config/test-ids.json` (Meta, GA4, Google Ads, X) sent its Purchase hit.
+
+`specs/order-key.spec.ts` places the same guest orders and fails when any request to a platform host, from the thank-you page or the next page view, has `wc_order_` or `key=` in its URL, body or referer. It also checks that the thank-you page shows the order on first load, that Google gets a cleaned page location on a page with order parameters but no order key (an archive's `order=desc` survives), and that no platform gets the key on a funnel page whose URL carries one. With Pro mapped in, X's optional events (Add to cart, Start checkout, Registration) and Microsoft are seeded too, so their requests are checked as well.
+
+`specs/add-to-cart.spec.ts` adds to the cart from the product form, a shop-page AJAX button and a block Product Button (the `/block-shop/` page), and expects exactly one add to cart hit per tag, also after one more page view. Its last test turns on the `ct-e2e-page-cache.php` mu-plugin (a worst-case page cache that serves the same HTML to every browser) and checks a second browser never sends the first browser's add to cart. `specs/sign-up.spec.ts` signs up on My account and at classic checkout and expects one Meta `CompleteRegistration`, and none on the next page view.
+
+`specs/custom-scripts.spec.ts` turns on the Custom script's three placements for its browser (the `ct_e2e_custom_scripts` cookie of `ct-e2e-helpers.php`), each sending a hit to `custom.ct-e2e.test`, and expects the header script once on every page, the thank-you script once per order (none after a reload) with the order placeholders filled, and the sign-up script once per new account.
+`specs/custom-script-page.spec.ts` covers the Custom script page (`#/platforms/custom`, #106): the three placements, the 11 placeholders and the customer details switch (off on this store); an administrator switches on each placement, inserts a placeholder at the cursor and saves, and a guest then gets the header, thank-you and sign-up hits. It also checks the empty-script error, the placeholder hints, the unsaved changes prompt and a stubbed 409 (migration still running), and that an administrator without `unfiltered_html` (the `ct_e2e_no_unfiltered_html` cookie of `ct-e2e-helpers.php`) sees the page read-only and gets 403 from the settings route. With Pro mapped, a granted shop manager gets the same read-only page. It resets the Custom script before and after.
+`specs/google.spec.ts` checks Google as one platform (#92): one `gtag.js` load with the GA4 ID and one `config` each for GA4 and Google Ads, one GA4 `search` with `search_term` on a product search (none on a blog search), and one Ads conversion per order that a reload of the thank-you page doesn't repeat. `specs/sign-up.spec.ts` also expects one GA4 `sign_up` per new account and, with Pro, one Ads conversion under the Registration label (#87).
+`specs/enhanced-conversions.spec.ts` (Pro only) turns on Google's Enhanced conversions for its browser (the `ct_e2e_enhanced_conversions` cookie of `ct-e2e-helpers.php`) and places guest orders: with "Respect cookie choices" on and marketing consent given (`ct_e2e_consent=optin` with `wp_consent_marketing=allow`), the AW- config has `allow_enhanced_conversions`, the Ads conversion carries the hashed email and phone (the stub's `em` parameter) and `user_data` is set before the conversion, with no plain email or phone in the tracking scripts; with Respect cookie choices off it is set without a consent check; with consent refused, and on a funnel thank-you page without the order key check (`/?ct_e2e_thankyou=<order ID>` fires `woocommerce_thankyou` after the order received page was aborted), the conversion goes without `user_data`.
+`specs/check-in.spec.ts` places a guest order and expects one handed-over row per platform in the order log (`wcct_order_log`) within 10 seconds, with the sent flags set; with Meta's script blocked it expects Meta's row as not handed over and no Meta flag; with the route answering 403 (the `ct_e2e_block_rest` cookie) it expects the rows and flags through the admin-ajax fallback; with "Respect cookie choices" on and consent denied (the `ct_e2e_consent=optin` cookie: consent mode on plus the stub WP Consent API in `mu-plugins/ct-e2e-consent.php`) it expects Meta, X and Custom to check in only as not handed over, with `consent=denied` and no flag; and it opens the setup wizard's test link and expects one seen ping. It reads the log through the test-only `ct-e2e/v1` routes in `mu-plugins/ct-e2e-helpers.php`.
+
+`specs/activity-log.spec.ts` covers the Activity log (#113, #114): it places a guest order that every platform confirms, one with Meta's script blocked and one whose thank-you page never loads (the redirect is aborted), creates an order in admin, moves them past the 10-minute settle time (`ct-e2e/v1/order-log/<id>/age`, which also moves the store's count-once cutoff), and expects "Counted once", "Not confirmed on Meta" with its detail, "No check-in" under All only, and no admin order. It also checks a not handed over check-in reads "Checking" before the 10 minutes are up, the tabs and `?tab=` links, the dialog below 1100 px, and the empty and error states (stubbed responses).
+
+`specs/dashboard.spec.ts` covers the Dashboard (#117, #118): it places a guest order every platform confirms, one with Meta's script blocked and one whose thank-you page never loads, moves them past the 10-minute settle time, and checks that the stat cards, the hourly chart's summary, the quiet No check-in line, the Not confirmed card (naming the order and Meta), Meta's Needs attention card, the filter chips, what to do next and the count bubble on the Conversion Tracking menu item all follow `wcct/v1/metrics`. It switches both Settings > Alerts switches off (with the unsaved changes prompt), checks that the card, the menu badge and "Doctor found something new" go away while the count and the Activity log keep the status, and switches them back on. With a stubbed route it checks the Working, Needs attention (with Fix it) and Waiting for first event cards and an empty what to do next.
+
+`specs/begin-checkout.spec.ts` loads block and classic checkout and checks that Meta `InitiateCheckout` and GA4 `begin_checkout` are each sent once, and none on the thank-you page. With Pro active, setup also saves X's Start checkout event ID and a Microsoft UET tag (`config/checkout-ids.json`), and the spec checks their hits too; `utils/stubs` has stand-ins for X's `uwt.js` and Microsoft's `bat.js` too.
+
+`specs/v3-only.spec.ts` sets the store up only through `wcct/v1/settings` (no `wcct_settings`, as the wizard and the Platforms pages leave a new store; `ct-e2e/v1/state` deletes the 2.x and 3.0 settings and the pauses first and restores them after), then expects Meta's PageView, X's and (with Pro) Microsoft's base tags on the home page, a Purchase hit from every tag with a test ID, and one handed-over check-in per platform.
+
+`specs/meta-pixels.spec.ts` (#88, #90) saves a second and third Meta pixel and three custom parameters through `wcct/v1/settings`, as the 3.0 Meta page does (the 2.x option never sees them), and expects `fbq('init')` once per pixel, each event once per pixel that has it on through its own `trackSingle` (`trackSingleCustom` for View category) with one event ID across the pixels, no Purchase for the pixel with Purchase off, and the custom parameters in the custom data. It adds to a YITH WooCommerce Wishlist with both of YITH's rendering methods (the `ct_e2e_yith_rendering` cookie of `mu-plugins/ct-e2e-wishlist.php`) and through a WooCommerce Wishlists stand-in (the `ct_e2e_wc_wishlists` cookie, same file), and expects one Add to wishlist per pixel with the product's ID, none again on the next page view. With Pro switched off it expects one pixel, no custom parameters and no View category or Add to wishlist. YITH is installed by `.wp-env.json` but switched on only while this spec runs.
+
+`specs/pause.spec.ts` pauses Meta and then Google on their platform pages (the confirmation, Keep tracking and Escape, the Paused state and Resume) and checks, with the page cache on, that a page cached before the pause is purged and comes back without that platform's tags, and that they come back after Resume.
+
+`specs/platforms.spec.ts` covers the Meta and Google pages (#101, #104): the Pixel ID format check as you type, the Recommended / All / Custom presets derived from the event switches, the Google mode showing only the IDs it needs, the short-label hint and the help column, and Advanced settings (Order value includes, Product ID sent, Skip these roles as a preset or picked roles, the GT- Google tag ID) with the "Customised" mark in the list. After each save a fresh shopper gets the new pixel with the SKU as content ID, Google's `gtag.js` for the GT- tag with the SKU in `view_item`, and the logged-in admin no Meta hits once Meta skips administrators. It also checks Respect cookie choices as one switch on every page with the consent tool line (the `ct_e2e_consent_source` cookie), `?field=` links focusing their field (also inside Advanced settings), the unsaved changes prompt, a stubbed 409 while the update to 3.0 runs, read-only fields (the `ct_e2e_readonly_platforms` cookie) refused with 403, and, with Pro, a granted shop manager saving Meta. It restores `wcct_settings_v3` and the consent switch afterwards. `specs/admin-shell.spec.ts` checks that the 2.x `?tab=` links open the app page that replaced them.
+
+`specs/platforms-x-microsoft.spec.ts` covers the X and Microsoft pages (#102): an X upgrader whose Purchase (and, with Pro, Add to cart) needs a new event ID sees the re-setup notice naming them and "Needs attention" until each has a valid `tw-` ID; rows wait for their ID and typing one turns the row on; on Free the other event IDs are locked. After the save a shopper's guest order sends the base tag and the new Purchase event ID (and Add to cart's, with Pro). With Pro it saves Microsoft's UET tag ID and events and checks the shopper's page load goes to the new tag; on Free it checks the locked Microsoft page and its upgrade link. It also checks Google's "We split your Google Ads ID" notice (a `wcct_migration_flags` entry set through `ct-e2e/v1/state`) until the label changes. Run it with and without Pro.
+
+`specs/meta-pro-editors.spec.ts` covers Meta Pro's editors (#105): on Free the locked rows with their WooCommerce.com links, and a post of `pixels` or `custom_parameters` saving nothing; with Pro, extra pixels (the ID check, a repeated pixel, per-pixel events, ten at most, Remove) and custom parameters (the field name checks, five per event, coupon and customer type with Purchase only), each saved and refused by the settings route as the page does, and a shopper's View product going to each pixel that has it on, with the custom parameter merged. Run it with and without Pro.
+
+`specs/settings.spec.ts` covers Settings > Integration access and Settings > Plan. On Free (no Pro mapped) it checks the locked access preview, the plan comparison with no price, and that every Upgrade, See pricing, Compare plans and plugins-list Get PRO link opens the WooCommerce.com product page. With Pro it checks Manage subscription, the confirmation before a role is granted (Cancel and Escape leave it off), the save, the Dokan vendor warning, and that a granted shop manager (`ct_e2e_shop_manager` / `password`, seeded by setup) sees the list read-only and gets 403 from the access route. Run it once without and once with Pro to cover both.
+
+`specs/version-guard.spec.ts` reads the Pro state the app gets: with a Pro older than 3.0 mapped in (Pro 1.1.4), it checks the Update Pro notice, that Settings > Plan and the top bar show Pro as paused, and that the old catalog feed still returns the CSV; otherwise that no notice shows. Setup and the specs count Pro only when it is 3.0 or later, so the whole suite also runs with Pro 1.1.4 mapped in: old Pro stays paused and Free's own tags must pass unchanged.
+`specs/doctor.spec.ts` covers the Tracking Doctor: the first visit runs the checks ("Everything looks good", Working collapsed), findings first with Dismiss and Undo, a changed finding coming back, Check again on one finding, the confirmation before an action that opens another plugin, and the dashboard's "Doctor found something new" after Hello Dolly is activated. Its sample checks (`mu-plugins/ct-e2e/doctor-checks.php`) are registered only with the `ct_e2e_doctor` cookie; `ct_e2e_consent=on|off` sets consent mode and `/wp-admin/?ct_e2e_doctor_reset=1` forgets every run. It runs with `ct_e2e_doctor_checks=consent-off`, so Lite's other checks stay out of its counts.
+`specs/doctor-checks.spec.ts` covers Lite's seven checks (#116): with store states from the `ct_e2e_doctor_state` cookie (`mu-plugins/ct-e2e/doctor-states.php`: Meta for WooCommerce, PixelYourSite and GTM4WP reported active, a malformed Pixel ID and a missing Ads label, X's Purchase off, one purchase sent twice; applied to REST requests only, nothing written) plus `ct_e2e_consent=on`, it checks each finding's title, why, tags, steps and action; with consent mode on and a consent type set (`ct_e2e_consent=optin`, `mu-plugins/ct-e2e-consent.php`) it checks the Working lines.
+
+`specs/onboarding.spec.ts` covers the setup wizard. It activates the plugin from the Plugins screen on a store reset to "new" and expects one redirect to the wizard, and none after a bulk activation or for an upgrade from 2.x. It walks the wizard: the picked tiles, the format checks on Connect, Skip for now back to the dashboard checklist, Continue setup resuming at the furthest step, the Europe answer setting Respect cookie choices, and Finish saving through the settings and onboarding routes. It also checks the prompt before leaving with an unsaved ID and the retry after a 409 while the update to 3.0 runs. The Verify step (#120) is passed by opening its test link in a second, logged-out browser with the page cache on (the home page a cache hit, the test link its own address): the step turns green, shows the hint and Try again after a minute without a ping (Playwright's fake clock), picks the open test up again after a reload, turns green through admin-ajax when the host blocks guest REST (`ct_e2e_block_rest`), and explains a blocked Meta script while Continue stays off. Settings > Setup > Run setup wizard again works on a draft: Close without saving, and closing the window halfway, leave every `wcct_` option but the test link as it was (`ct-e2e/v1/options`), and finishing saves the new Pixel ID and the Europe answer, asking first when Meta's ID was saved elsewhere meanwhile. It reads and restores the store through the test-only `ct-e2e/v1/state` route in `mu-plugins/ct-e2e-helpers.php`, so the other specs keep their seeded settings.
+
+`specs/whats-new.spec.ts` covers What's new (#124). It turns the store into a 2.x store through `ct-e2e/v1/state` (2.x settings, the 1.1.x feed login with a password, no 3.0 settings), so the next admin page runs the real migration. It expects that page to send the administrator to `#/whats-new` once, the Needs attention items for the split Google Ads ID and X's missing event ID with links to their fields, Meta listed as still paused, no customer item for a Custom script using `{customer_email}`, and the "Your previous settings" download (the snapshot, without the feed password). It also checks the dashboard's "Updated to 3.0" banner and the Help menu link until "Done, show me the dashboard", "Everything carried over" for a clean upgrade, the old-Pro banner with a Pro older than 3.0 mapped in (or Pro's variations note with Pro 3.0), and that a store that started on 3.0 has no What's new. The store's options are put back after each test.
+
+## Run it locally
+
+You need Docker and Node 22.13 or newer. The plugin also needs its Composer packages and its built admin bundles, so run `composer install` and `npm ci && npm run build` in the plugin root once.
+
+```sh
+cd tests/e2e
+npm install
+npx playwright install chromium
+npm run env:start   # starts the store at http://localhost:8894 and seeds it
+npm test
+npm run env:stop
+```
+
+`npm run env:start` runs `npm run env:setup` after start. That script (`setup/setup.sh` and `setup/seed.php`) activates the plugins, sets pretty permalinks, enables cash on delivery, creates the product and the classic checkout page, and saves the tracking settings with the test IDs in the 2.x shape, then runs the migration, so the store runs on the 3.0 settings (`wcct_settings_v3`) from the start. It is safe to run again on its own: it starts the 3.0 settings over.
+
+Other scripts: `test:headed`, `test:ui`, `test:debug`, `test:report`, `env:reset` (empty database, then setup), `env:destroy`. Use `WP_BASE_URL` to point the tests at another URL, and `WP_ENV_PORT` to start wp-env on another port (set `WP_BASE_URL` to match).
+
+### With Pro
+
+Create `tests/e2e/.wp-env.override.json` (it is git-ignored) that maps your Pro checkout, then run `npm run env:start` again:
+
+```json
+{
+    "mappings": {
+        "wp-content/plugins/wc-conversion-tracking-pro": "../../../wc-conversion-tracking-pro"
+    }
+}
+```
+
+The path above works when Pro sits next to this plugin in `wp-content/plugins`. Setup activates Pro whenever it is mapped in.
+
+### Real platform libraries
+
+The tracker serves small stand-ins for `fbevents.js`, `gtag.js`, X's `uwt.js` and Microsoft's `bat.js` (`utils/stubs`). They turn `fbq()`, `gtag()`, `twq()` and `uetq` calls into hits like the real libraries send (`facebook.com/tr?ev=…`, `google-analytics.com/g/collect?en=…`, `googleadservices.com/pagead/conversion/…`, `analytics.twitter.com/1/i/adsct?txn_id=…`, `bat.bing.com/action/0?…`), reading the page URL and referrer from the browser the same way; after `gtag('set', 'user_data', …)` the stub adds gtag.js's `em` parameter (`tv.1~em.<hash>~pn.<hash>`) to Ads conversions. The `fbevents.js` stand-in also keeps every `fbq()` call of the page in `window.ctE2eFbqCalls`, so a spec can check the method (`trackSingle`, `init`). To use the real libraries instead, run `CT_E2E_LIVE_TAGS=1 npm test`. Their hits are still answered locally.
+
+## Layout
+
+| Path | What it is |
+| --- | --- |
+| `.wp-env.json` | The store. WordPress and WooCommerce versions are pinned here; CI uses the current releases unless asked for the pinned ones. |
+| `setup/` | Seeding, run inside the wp-env cli container. |
+| `mu-plugins/ct-e2e-helpers.php` | Test-site helpers: the `ct_e2e_checkout=classic` cookie makes the shortcode page the checkout page, the `ct_e2e_custom_scripts` cookie turns on the Custom script placements, the `ct_e2e_no_unfiltered_html` cookie takes `unfiltered_html` away from the logged-in user, the `ct_e2e_readonly_platforms` cookie makes Meta's fields and Respect cookie choices read-only, the `ct_e2e_consent_source` cookie reports a consent tool that owns Google consent, wordpress.org calls are blocked, `ct-e2e/v1/state` (administrators) reads and sets the setup and migration options and switches plugins without a page view, `ct-e2e/v1/options` lists every Conversion Tracking option, the `ct_e2e_enhanced_conversions` cookie turns on Google's Enhanced conversions, and `/?ct_e2e_thankyou=<order ID>` fires `woocommerce_thankyou` like a funnel thank-you page. |
+| `mu-plugins/ct-e2e/doctor-checks.php` | Sample Tracking Doctor checks, loaded by the helpers when the `ct_e2e_doctor` cookie is set. |
+| `mu-plugins/ct-e2e/doctor-states.php` | Cookie-only Doctor store states and the `ct_e2e_doctor_checks` limit, loaded by the helpers when either cookie is set. |
+| `mu-plugins/ct-e2e-consent.php` | The one consent stub: with the `ct_e2e_consent=optin` cookie, turns on Respect cookie choices with a minimal opt-in WP Consent API (a category is allowed only when its `wp_consent_<category>` cookie is `allow`); `wp_set_consent('marketing', 'allow')` in the page is the shopper accepting. |
+| `mu-plugins/ct-e2e-wishlist.php` | The `ct_e2e_yith_rendering` cookie (`php-templates` or `react-components`) picks YITH WooCommerce Wishlist's rendering method; the `ct_e2e_wc_wishlists` cookie stands in for WooCommerce Wishlists (not free to download): `/?ct_e2e_wishlist_add=<product>` fires its `woocommerce_wishlist_add_item` action and redirects to the product, as its form post does. The action's arguments are taken from a public source copy of WooCommerce Wishlists 2.2.9, `WC_Wishlists_Wishlist_Item_Collection::add_item()`: `do_action( 'woocommerce_wishlist_add_item', $cart_item_key, $product_id, $quantity, $variation_id, $variation, $cart_item_data, $wishlist_id )`; the plugin class is `WC_Wishlists_Plugin`. Not yet checked against a licensed current release: QA to confirm. |
+| `mu-plugins/ct-e2e-page-cache.php` | With the `ct_e2e_page_cache` cookie, caches logged-out GET pages per URL and serves them to every browser (`X-CT-Cache: HIT`); `/?ct_e2e_page_cache_flush=1` empties it, and so does `litespeed_purge_all`, as LiteSpeed Cache's own purge does. |
+| `config/test-ids.json` | Test IDs. A tag listed here is enabled in the store and must send a Purchase hit. |
+| `utils/fixtures.ts` | `test` and `expect` with the `tracker` and `jsErrors` fixtures. Import these in every spec. |
+| `utils/network.ts` | The tracker: `platformRequests(platform?)`, `purchaseHits(tag)`, `expectPurchase(tag)`, `eventHits(tag, event)`. |
+| `utils/platforms.ts` | Platform hosts and the test IDs. |
+| `utils/checkout.ts` | `addProductToCart()` and `placeGuestOrder(page, 'classic' \| 'block')`. |
+| `specs/` | The tests. |
+
+## Writing a spec
+
+```ts
+import { test, expect } from '../utils/fixtures';
+import { placeGuestOrder } from '../utils/checkout';
+
+test('the GA4 purchase carries the order number', async ({ page, tracker }) => {
+    const order = await placeGuestOrder(page, 'block');
+    const [hit] = await tracker.expectPurchase('ga4');
+
+    expect(hit.params.some(p => p.get('ep.transaction_id') === String(order.id))).toBe(true);
+});
+```
+
+`tracker.platformRequests()` returns every captured request with `url`, `postData`, `referer` and `pageUrl`, which is what a check like the order-key test needs.
+
+To check a new platform, add its test ID to `config/test-ids.json`, save it in `setup/seed.php`, and add its Purchase check to `PURCHASE` in `utils/network.ts`.
+
+## CI
+
+`.github/workflows/e2e.yml` runs the suite on every pull request and on pushes to `develop`, `master` and `feature/ct-revamp`. It builds the plugin like a release, checks out Pro next to it (the branch with the same name, else `develop`), starts wp-env on the current WordPress and WooCommerce, and uploads the Playwright report, traces and `debug.log` when a test fails. Fork pull requests cannot read secrets, so they test without Pro.
+
+Pull requests in `wc-conversion-tracking-pro` start this workflow through their `e2e-on-lite.yml` and get its result back as the `e2e` status.
+
+Secrets:
+
+- `CT_PRO_TOKEN` (this repository): fine-grained token with Contents: Read and Commit statuses: Read and write on `getdokan/wc-conversion-tracking-pro`.
+- `CT_LITE_DISPATCH_TOKEN` (`wc-conversion-tracking-pro`): fine-grained token with Actions: Read and write on this repository.

@@ -8,10 +8,11 @@
  *    have the same version.
  * 2. Installs composer packages without dev dependencies (Mozart output in
  *    dependencies/ is kept), unless --skip-composer is passed.
- * 3. Zips the plugin into build/woocommerce-conversion-tracking-v<version>.zip,
+ * 3. Checks that the JS bundles are built into dist/ (`npm run build`).
+ * 4. Zips the plugin into build/woocommerce-conversion-tracking-v<version>.zip,
  *    leaving out everything listed in .distignore. .distignore is also used
  *    by the WordPress.org deploy, so both builds ship the same files.
- * 4. Restores the dev composer packages, also when the build fails.
+ * 5. Restores the dev composer packages, also when the build fails.
  */
 
 const fs = require( 'fs' );
@@ -24,6 +25,7 @@ const SLUG = 'woocommerce-conversion-tracking';
 const MAIN_FILE = 'conversion-tracking.php';
 const BUILD_DIR = path.join( ROOT, 'build' );
 const SKIP_COMPOSER = process.argv.includes( '--skip-composer' );
+const DIST_ENTRIES = [ 'index', 'components', 'plugin-ui' ];
 
 /**
  * Read a version with a regex from a file in the plugin root
@@ -161,6 +163,12 @@ async function main() {
 
         if ( fs.existsSync( installed ) && ( JSON.parse( fs.readFileSync( installed, 'utf8' ) )[ 'dev-package-names' ] || [] ).length ) {
             throw new Error( 'vendor/ has dev packages. Run "composer install --no-dev -o" first, or build without --skip-composer.' );
+        }
+
+        const missing = DIST_ENTRIES.filter( ( entry ) => ! fs.existsSync( path.join( ROOT, 'dist', `${ entry }.asset.php` ) ) );
+
+        if ( missing.length ) {
+            throw new Error( `dist/ is missing ${ missing.join( ', ' ) }. Run "npm run build" first.` );
         }
 
         const files = collectFiles( rules );

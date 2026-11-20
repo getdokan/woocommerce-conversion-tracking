@@ -1,0 +1,66 @@
+/*
+ * CT additions on top of plugin-ui (TOKENS-PROPOSAL.md, "need a yes" in #71), scoped to .wcct-app.
+ * Pending PM approval: change or drop them here only.
+ * The color-mix() helpers in the prototype's tokens.css are Tailwind opacity modifiers here (bg-primary/10).
+ */
+
+.wcct-app {
+    /* PRO affordance: plugin-ui TopBar's default proBadgeBg. */
+    --pro: #ffbc00;
+    --pro-foreground: var(--foreground);
+
+    /* Secondary text straight on the WP admin grey #f0f0f1 (5.78:1); --muted-foreground is 4.16:1 there. */
+    --page-muted-foreground: oklch(0.48 0 0);
+
+    /* Status tone map; `bad` is for Activity log rows only. */
+    --tone-ok-bg: #d1fae5;
+    --tone-ok-fg: #047857;
+    --tone-ok-dot: #10b981;
+    --tone-warn-bg: #fef3c7;
+    --tone-warn-fg: #b45309;
+    --tone-warn-dot: #f59e0b;
+    --tone-bad-bg: #ffe4e6;
+    --tone-bad-fg: #be123c;
+    --tone-bad-dot: #f43f5e;
+    --tone-off-bg: #f3f4f6;
+    --tone-off-fg: #4b5563;
+    --tone-off-dot: #9ca3af;
+
+    /* Notice colours from the prototype's tokens.css: CT doesn't load plugin-ui's styles.css, so these were unset. */
+    /* Don't use plugin-ui's Alert variant="info": its text would be --info-foreground, low contrast on the info background. */
+    --info: oklch(0.623 0.214 255.09);
+    --info-foreground: oklch(0.42 0.16 255);
+    --warning: oklch(0.769 0.188 70.08);
+    --warning-foreground: oklch(0.21 0.034 32);
+}
+
+/* Utilities for the additions: bg-pro, text-page-muted-foreground, bg-tone-ok-bg, text-tone-ok-fg, ... */
+@theme inline {
+    --color-pro: var(--pro);
+    --color-pro-foreground: var(--pro-foreground);
+    --color-page-muted-foreground: var(--page-muted-foreground);
+    --color-tone-ok-bg: var(--tone-ok-bg);
+    --color-tone-ok-fg: var(--tone-ok-fg);
+    --color-tone-ok-dot: var(--tone-ok-dot);
+    --color-tone-warn-bg: var(--tone-warn-bg);
+    --color-tone-warn-fg: var(--tone-warn-fg);
+    --color-tone-warn-dot: var(--tone-warn-dot);
+    --color-tone-bad-bg: var(--tone-bad-bg);
+    --color-tone-bad-fg: var(--tone-bad-fg);
+    --color-tone-bad-dot: var(--tone-bad-dot);
+    --color-tone-off-bg: var(--tone-off-bg);
+    --color-tone-off-fg: var(--tone-off-fg);
+    --color-tone-off-dot: var(--tone-off-dot);
+}
+
+/*
+ * Focus: a solid 2px --ring outline, 2px out, instead of plugin-ui's ring-3 ring-ring/50 glow (2.05:1).
+ * Layered !important outranks the unlayered !important utilities, including outline-none.
+ */
+@layer base {
+    .wcct-app :focus-visible {
+        outline: 2px solid var(--ring) !important;
+        outline-offset: 2px !important;
+        --tw-ring-shadow: 0 0 #0000 !important;
+    }
+}

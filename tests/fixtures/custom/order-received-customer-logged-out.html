@@ -1,0 +1,64 @@
+<!-- wcct-fixture: custom/order-received-customer-logged-out -->
+<!-- page: is_checkout is_order_received_page -->
+<!-- head -->
+<script data-cfasync="false" data-no-defer="1" data-no-optimize="1" id="wcct-order-url">
+(function (window, document) {
+            var cleanUrl = function (url) {
+                    var names = ["key","order","order_id","order-pay","order_key"], numeric = ["order"];
+                    try {
+                        url = String(url);
+                        var hashPos = url.indexOf('#');
+                        var hash = hashPos > -1 ? url.substring(hashPos) : '';
+                        var base = hashPos > -1 ? url.substring(0, hashPos) : url;
+                        var queryPos = base.indexOf('?');
+                        if (queryPos == -1) return url;
+                        var pairs = base.substring(queryPos + 1).split('&'), kept = [];
+                        for (var i = 0; i < pairs.length; i++) {
+                            var pair = pairs[i];
+                            try { pair = decodeURIComponent(pair.replace(/\+/g, ' ')); } catch (e) {}
+                            pair = pair.toLowerCase();
+                            var name = pair.split('=')[0], value = pair.substring(name.length + 1);
+                            var drop = names.indexOf(name) > -1 && (numeric.indexOf(name) == -1 || /^\d+$/.test(value));
+                            if (!drop && pair.indexOf('wc_order_') == -1) kept.push(pairs[i]);
+                        }
+                        return base.substring(0, queryPos) + (kept.length ? '?' + kept.join('&') : '') + hash;
+                    } catch (e) {
+                        return String(url).split('?')[0];
+                    }
+                };
+            var decode = function (value) {
+                try { return decodeURIComponent(value.replace(/\+/g, ' ')); } catch (e) { return value; }
+            };
+            try {
+                var href = window.location.href, key = '';
+                var match = /[?&](?:key|order_key)=([^&#]*)/.exec(href);
+                if (match) {
+                    key = decode(match[1]);
+                } else {
+                    // Funnel pages may carry the key under another name.
+                    var any = /[?&][^=&#]*=([^&#]*wc_order_[^&#]*)/i.exec(href);
+                    key = any ? decode(any[1]) : '';
+                }
+                window.wcctOrder = { id: 3002, key: key };
+                var cleaned = cleanUrl(href);
+                if (cleaned == href || !window.history || !window.history.replaceState) return;
+                window.history.replaceState(window.history.state, '', cleaned);
+                // Forms that post back to this page (the create account block) still need the key.
+                document.addEventListener('submit', function (e) {
+                    var form = e.target, action = form && form.getAttribute ? form.getAttribute('action') : null;
+                    if (form && form.tagName == 'FORM' && (!action || action.charAt(0) == '#')) form.action = href.split('#')[0] + (action || '');
+                }, true);
+            } catch (e) {}
+        })(window, document);
+</script>
+
+<!-- Starting: Conversion Tracking for WooCommerce (https://wordpress.org/plugins/woocommerce-conversion-tracking/) -->
+<!-- End: Conversion Tracking for WooCommerce Codes -->
+
+<!-- body -->
+
+<!-- footer -->
+
+<!-- footer: wc_enqueue_js -->
+
+<!-- scripts -->

@@ -1,0 +1,147 @@
+*** Conversion Tracking for WooCommerce Changelog ***
+
+= Version 2.1.6 (06 Oct, 2026) =
+
+- **New:** Google Analytics 4 integration with view item, add to cart, begin checkout and purchase events
+- **Fix:** Deferred plugin class and translation loading to avoid early textdomain notices
+- **Update:** Improved data handling on the order received page
+- **Update:** WordPress 7.1.2 and WooCommerce 11.1.2 compatibility
+
+= Version 2.1.5 (02 Feb, 2026) =
+
+- **Update:** Removed Perfect Audience integration as the service is discontinued
+
+= Version 2.1.4 (13 Oct, 2025) =
+
+- **Update:** Update plugin name.
+
+= Version 2.1.1 (26 Aug, 2025) =
+
+- **fix:** Resolved "Constant WCCT_VERSION already defined" warning caused by multiple plugin initializations in Conversion Tracking for WooCommerce.
+- **Update:** Added missing 'Requires PHP' header
+- **Update:** WordPress 6.8.2 compatibility
+- **chore:** Updated Appsero SDK to the latest version for improved stability and performance.
+- **chore:** Refactored codebase with Mozart to ensure better dependency management and prevent conflicts with other plugins.
+
+= Version 2.1.0 (09 Dec, 2024) =
+
+- **Update:** Added support for High Performance Order Storage in WooCommerce
+- **Update:** WordPress 6.7.1 compatibility
+
+= Version 2.0.12 (16 Jan, 2024) =
+
+- **Update:** WordPress 6.4.2 compatibility
+- **Fix:** Updated Appsero Client Library to the latest version which will fix a security issue
+- **Fix:** Fixed a Broken Access Control vulnerability in Conversion Tracking for WooCommerce Plugin that allowed lower privileged users to install and activate a new plugin via an ajax action without a nonce parameter.
+
+= Version 2.0.11 (15 Sep, 2023) =
+
+- **Update:** WordPress 6.3.1 compatibility
+- **Fix:** Updated Appsero Client Library to the latest version which will fix a security issue
+- **Update:** Added HPOS (High Performance Order Storage) support
+
+= Version 2.0.10 (2 June, 2022) =
+
+ * **Fix:** WordPress 6.0 compatibility
+
+= Version 2.0.9 (6 October, 2021) =
+
+ * **Fix:** Perfect Audience breaking checkbox section issue.
+ * **Fix:** WordPress 5.8 compatibility
+ * **Fix:** Latest WooCommerce 5.7 compatibility
+
+= Version 2.0.8 (10 June, 2020) =
+
+ * **Fix:** Dismissable HA notice, was introduced in v2.0.7.
+ * **Fix:** Removed discount notice as it was deprecated.
+
+= Version 2.0.7 (2 May, 2020) =
+
+ * **Fix:** Removed unnecessary usage of `wp_kses_post()`, which was breaking the plugin.
+ * **Improved:** Added WordPress 5.4 compatibility.
+ * **Improved:** Added WooCommerce 4.0 compatibility.
+ * **Improved:** Removed the v2.0 welcome notice, which isn't relevant anymore.
+
+= Version 2.0.6 (02-January-2020) =
+
+* [fix] Missing  ajax addToCart value of facebook
+* [fix] php-cs-fixer: Sanitization and nonce verification
+
+= Version 2.0.4 (21-August-2019) =
+
+* [fix] Happyaddons dismissable banner
+* [fix] Getting started link doesn't work
+* [tweak] Change from Google Adwords to Google Ads
+
+= Version 2.0.3 (05-August-2019) =
+* [fix] AddToCart Event doesn't work for ajax
+* [new] Add happy addons banner
+
+= Version 2.0.2 (29-April-2019) =
+
+* [fix] Missing value of product price
+
+= Version 2.0.1 (04-April-2019) =
+
+ * [fix] Added plugin require notice
+
+
+= Version 2.0 (22-February-2018) =
+
+ * Major version released
+ * Individual gateway integrations
+ * More streamlined and user friendly UI
+
+
+= Version 1.2.5 (28-December-2017) =
+
+ * Added plugin action links for Docs and Settings.
+ * Added a survey for next version features.
+ * Updated WooCommerce compatibility version tags.
+
+= 1.2.4 - 01-Aug-2017 =
+
+ * [fix] The tracker option won't go away. Sorry!
+
+= 1.2.3 - 31-July-2017 =
+
+ * [improvement] WooCommerce v3.0 compatibility
+ * [new] Added new shortcodes: `{customer_id}`, `{customer_email}`, `{customer_first_name}`, `{customer_last_name}`, `{payment_method}`
+ * [new] Added weDevs Insights class
+
+= 1.2.2 - 10-Feb-2017 =
+
+* Updated with plugin slug as the textdomain
+* Integration class PHP compatibility
+
+= 1.2.1 - 9-June-2016 =
+
+* [fix] Fatal error on thank you page when without parameters
+
+= 1.2 - 10-April-2016 =
+
+* [new] Order number variable `{order_number}` added on checkout page
+
+= 1.1 - 08-Jan-2016 =
+
+* [new] Dynamic values on product and checkout script
+
+= 1.0 - 08/07/2015 =
+
+* [fix] Removed product specific codes from product single page, should show only on checkout. My bad!
+
+= 0.3 - 31/05/2015 =
+
+* [fix] Product specific code only loads on product page itself, not checkout
+
+= 0.2 - 30/05/2015 =
+
+* Renamed position option "In Footer" to "Inside Body Tag", may be was confusing to users.
+
+= 0.1.1 - 06/04/2014 =
+
+* Added position parameter for display position control
+
+= 0.1 - 27/03/2014 =
+
+* Initial release
