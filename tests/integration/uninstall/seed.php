@@ -12,6 +12,7 @@ $free_options = array(
     'wcct_settings_v3'            => array( 'platforms' => array() ),
     'wcct_dismissable_notice'     => 'closed',
     'wcct_paused_platforms'       => array( 'twitter' ),
+    'wcct_paused_since'           => array( 'twitter' => 1700000000 ),
     'wcct_consent_mode'           => 'on',
     'wcct_install_type'           => 'upgrade',
     'wcct_migration_done'         => '3.0.0',

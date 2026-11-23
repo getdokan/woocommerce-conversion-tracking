@@ -1,6 +1,6 @@
 <?php
 /**
- * Deletes Conversion Tracking's data when the plugin is deleted; Pro's data stays while Pro is installed.
+ * Deletes Conversion Tracking's data when the plugin is deleted; Pro's data and the settings Pro shares stay while Pro is installed.
  *
  * @package WooCommerce Conversion Tracking
  */

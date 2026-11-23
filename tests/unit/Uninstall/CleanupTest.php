@@ -69,10 +69,14 @@ class CleanupTest extends TestCase {
         $this->assertSame( $names, Cleanup::options( $names, false, self::SLUG ) );
     }
 
-    public function test_with_pro_installed_pro_options_stay() {
+    public function test_with_pro_installed_pro_options_and_the_shared_settings_stay() {
         $names = array_merge( self::FREE_OPTIONS, self::PRO_OPTIONS );
 
-        $this->assertSame( self::FREE_OPTIONS, Cleanup::options( $names, true, self::SLUG ) );
+        $this->assertSame( array_values( array_diff( self::FREE_OPTIONS, Cleanup::SHARED_OPTIONS ) ), Cleanup::options( $names, true, self::SLUG ) );
+    }
+
+    public function test_without_pro_the_shared_settings_go() {
+        $this->assertSame( Cleanup::SHARED_OPTIONS, Cleanup::options( Cleanup::SHARED_OPTIONS, false, self::SLUG ) );
     }
 
     public function test_other_plugins_options_are_never_deleted() {

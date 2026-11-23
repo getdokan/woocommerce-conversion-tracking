@@ -49,6 +49,11 @@ class Cleanup {
     const PRO_PREFIXES = array( 'wcct_pro_', 'wcct_feed_' );
 
     /**
+     * Settings Free and Pro share (Pro keeps its platforms in wcct_settings_v3); kept while Pro is installed.
+     */
+    const SHARED_OPTIONS = array( 'wcct_settings_v3', 'wcct_paused_platforms', 'wcct_paused_since', 'wcct_consent_mode' );
+
+    /**
      * User meta keys, as a LIKE pattern: the pending sign-up flag.
      */
     const USER_META_PATTERN = '\_wcct\_%';
@@ -110,7 +115,7 @@ class Cleanup {
                 continue;
             }
 
-            if ( $pro_installed && self::is_pro( self::unprefixed( $name ) ) ) {
+            if ( $pro_installed && ( self::is_pro( self::unprefixed( $name ) ) || in_array( $name, self::SHARED_OPTIONS, true ) ) ) {
                 continue;
             }
 

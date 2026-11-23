@@ -19,6 +19,9 @@ $is_pro = function ( $name ) {
     return in_array( $name, array( 'wcct_permissions', 'wcct_data_feed', 'wcct_secret_feed_password' ), true ) || 0 === strpos( $name, 'wcct_pro_' ) || 0 === strpos( $name, 'wcct_feed_' );
 };
 
+// Settings Free and Pro share, in option_name order as the query returns them.
+$shared = array( 'wcct_consent_mode', 'wcct_paused_platforms', 'wcct_paused_since', 'wcct_settings_v3' );
+
 $wcct      = $wpdb->esc_like( 'wcct_' ) . '%';
 $any_wcct  = '%' . $wpdb->esc_like( 'wcct_' ) . '%';
 $transient = $wpdb->esc_like( '_transient_' ) . $any_wcct;
@@ -44,15 +47,18 @@ $options = $wpdb->get_col(
         $site_tran
     )
 );
-$pro_left  = array_values( array_filter( $options, $is_pro ) );
-$free_left = array_values( array_diff( $options, $pro_left ) );
+$pro_left    = array_values( array_filter( $options, $is_pro ) );
+$shared_left = array_values( array_intersect( $options, $shared ) );
+$free_left   = array_values( array_diff( $options, $pro_left, $shared_left ) );
 
 $expect( 'Free options left', 'free' === $kept ? count( $free_left ) > 0 : $free_left, 'free' === $kept ? true : array() );
 $expect( 'Pro options left', 'pro' === $kept ? count( $pro_left ) > 0 : $pro_left, 'pro' === $kept ? true : array() );
 
 if ( 'free' === $kept ) {
-    $expect( 'Free options kept', array_values( array_diff( array( 'wcct_settings', 'wcct_settings_v3', 'wcct_verify', 'wcct_last_purchase_facebook', 'woocommerce_wc_conv_tracking_settings', '_transient_wcct_upgrade_to_20' ), $free_left ) ), array() );
+    $expect( 'Free options kept', array_values( array_diff( array( 'wcct_settings', 'wcct_settings_v3', 'wcct_verify', 'wcct_last_purchase_facebook', 'woocommerce_wc_conv_tracking_settings', '_transient_wcct_upgrade_to_20' ), $free_left, $shared_left ) ), array() );
 }
+
+$expect( 'shared settings left', $shared_left, 'none' === $kept ? array() : $shared );
 
 if ( 'pro' === $kept ) {
     $expect( 'Pro options kept', array_values( array_diff( array( 'wcct_permissions', 'wcct_data_feed', 'wcct_feed_status', 'wcct_feed_login', 'wcct_secret_feed_password', '_transient_wcct_feed_example' ), $pro_left ) ), array() );
