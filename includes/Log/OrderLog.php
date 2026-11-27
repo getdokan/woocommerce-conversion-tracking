@@ -281,7 +281,11 @@ class OrderLog {
         $updates = array();
 
         foreach ( $row as $column => $value ) {
-            $values[] = null === $value ? 'NULL' : $wpdb->prepare( is_int( $value ) ? '%d' : '%s', $value );
+            if ( null === $value ) {
+                $values[] = 'NULL';
+            } else {
+                $values[] = is_int( $value ) ? $wpdb->prepare( '%d', $value ) : $wpdb->prepare( '%s', $value );
+            }
         }
 
         foreach ( array_keys( $row ) as $column ) {

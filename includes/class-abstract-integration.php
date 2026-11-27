@@ -646,9 +646,11 @@ abstract class WCCT_Integration {
         if ( did_action( 'wcct_gtag_loader_printed' ) ) {
             return false;
         }
+        // phpcs:disable WordPress.WP.EnqueuedResources.NonEnqueuedScript -- 2.x API for third-party integrations, printed where they call it.
         ?>
         <script async src="https://www.googletagmanager.com/gtag/js?id=<?php echo esc_attr( $tag_id ); ?>"></script>
         <?php
+        // phpcs:enable WordPress.WP.EnqueuedResources.NonEnqueuedScript
         do_action( 'wcct_gtag_loader_printed', $tag_id );
 
         return true;

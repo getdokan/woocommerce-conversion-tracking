@@ -5,6 +5,8 @@ namespace StorePulse\ConversionTracking\Settings;
 use InvalidArgumentException;
 use StorePulse\ConversionTracking\Access\SettingsIds;
 
+// phpcs:disable WordPress.Security.EscapeOutput.ExceptionNotEscaped -- Messages go back in REST JSON and show as text, never as HTML.
+
 /**
  * Validates and cleans one posted value against its schema field.
  */

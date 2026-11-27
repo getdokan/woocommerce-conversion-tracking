@@ -1,5 +1,10 @@
 <?php
 
+// don't call the file directly
+if ( ! defined( 'ABSPATH' ) ) {
+    exit;
+}
+
 require_once WCCT_INCLUDES . '/class-ga4-data.php';
 
 use StorePulse\ConversionTracking\Events\Event;
