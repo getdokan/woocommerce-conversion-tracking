@@ -7,9 +7,9 @@ Tested up to: 7.1
 Requires PHP: 7.4
 WC requires at least: 8.5.0
 WC tested up to: 11.1
-Stable tag: 2.1.6
-License: GPLv3
-License URI: https://www.gnu.org/licenses/gpl-3.0.html
+Stable tag: 3.0.0
+License: GPLv2
+License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
 Send WooCommerce purchases and shopper events to Meta, Google Analytics 4, Google Ads and X, each purchase counted once, plus your own scripts.
 
