@@ -10,7 +10,6 @@ package-lock.json
 phpcs-report.txt
 phpcs.xml.dist
 build
-composer.json
 composer.lock
 tests
 phpunit.xml.dist

@@ -155,7 +155,7 @@ class GoogleTag {
         $html = '';
 
         if ( $with_loader ) {
-            $html .= '<script async data-no-optimize="1" data-cfasync="false" src="https://www.googletagmanager.com/gtag/js?id=' . esc_attr( rawurlencode( $ids[0] ) ) . '"></script>' . "\n";
+            $html .= '<script async data-no-optimize="1" data-cfasync="false" src="https://www.googletagmanager.com/gtag/js?id=' . esc_attr( rawurlencode( $ids[0] ) ) . '"></script>' . "\n"; // phpcs:ignore WordPress.WP.EnqueuedResources.NonEnqueuedScript -- Printed with its config in one block, so consent and page caches keep them together.
         }
 
         // wcctGtag keeps working when another plugin redefines gtag; gtag stays defined for scripts that call it, as in 2.x.

@@ -10,6 +10,8 @@ use StorePulse\ConversionTracking\Events\ValueMode;
 use StorePulse\ConversionTracking\Install;
 use StorePulse\ConversionTracking\Events\ProductId;
 
+// phpcs:disable WordPress.Security.EscapeOutput.ExceptionNotEscaped -- Messages go back in REST JSON and show as text, never as HTML.
+
 /**
  * The 3.0 settings schema: global fields plus one plugin-ui element list per platform.
  */

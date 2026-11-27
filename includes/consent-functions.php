@@ -1,5 +1,10 @@
 <?php
 
+// don't call the file directly
+if ( ! defined( 'ABSPATH' ) ) {
+    exit;
+}
+
 use StorePulse\ConversionTracking\Consent\ConsentMode;
 
 /**

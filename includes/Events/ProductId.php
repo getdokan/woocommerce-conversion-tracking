@@ -311,7 +311,7 @@ class ProductId {
         foreach ( array_keys( $product->get_variation_attributes() ) as $name ) {
             $key = 'attribute_' . sanitize_title( $name );
 
-            // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only, like WooCommerce's own form.
+            // phpcs:ignore WordPress.Security.NonceVerification.Recommended, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- read-only, like WooCommerce's own form; wc_clean() sanitizes.
             $posted = isset( $_REQUEST[ $key ] ) ? wc_clean( wp_unslash( $_REQUEST[ $key ] ) ) : null;
             $value  = is_string( $posted ) ? $posted : $product->get_variation_default_attribute( $name );
 
