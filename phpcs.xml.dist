@@ -14,9 +14,11 @@
     <exclude-pattern>*/vendor/*</exclude-pattern>
     <exclude-pattern>*/tests/*</exclude-pattern>
     <exclude-pattern>*/bin/*</exclude-pattern>
+    <exclude-pattern>*/dist/*</exclude-pattern>
+    <exclude-pattern>*/languages/*</exclude-pattern>
+    <exclude-pattern>*/dependencies/*</exclude-pattern>
 
-    <arg name="report" value="full" />
-    <arg name="report-file" value="phpcs-report.txt" />
+    <!-- Results go to the terminal, and to cs2pr in CI. -->
     <arg name="warning-severity" value="0" />
 
     <!-- Check all PHP files in directory tree by default. -->
@@ -26,4 +28,12 @@
 
     <!-- <rule ref="WordPress.DB" /> -->
     <rule ref="WordPress.Security" />
+
+    <rule ref="WordPress.Security.ValidatedSanitizedInput">
+        <properties>
+            <property name="customSanitizingFunctions" type="array">
+                <element value="wc_clean" />
+            </property>
+        </properties>
+    </rule>
 </ruleset>

@@ -1,0 +1,61 @@
+name: PHPCS Inspections
+
+# Every pull request that touches a PHP file; only the files it changes are checked.
+on:
+    pull_request:
+        paths:
+            - '**.php'
+
+concurrency:
+    group: ${{ github.workflow }}-${{ github.ref }}
+    cancel-in-progress: true
+
+permissions:
+    contents: read
+
+jobs:
+    runPHPCSInspection:
+        name: Run PHPCS inspection
+        runs-on: ubuntu-latest
+        steps:
+            # The merge commit's first parent is the base tip, so depth 2 is enough for the diff.
+            - uses: actions/checkout@v4
+              with:
+                  fetch-depth: 2
+                  persist-credentials: false
+
+            - name: Setup PHP
+              uses: shivammathur/setup-php@v2
+              with:
+                  php-version: '7.4'
+                  coverage: none
+                  tools: cs2pr, composer:v2
+
+            - name: Get composer cache directory
+              id: composercache
+              run: echo "dir=$(composer config cache-files-dir)" >> $GITHUB_OUTPUT
+
+            - name: Cache dependencies
+              uses: actions/cache@v4
+              with:
+                  path: ${{ steps.composercache.outputs.dir }}
+                  key: "${{ runner.os }}-composer-${{ hashFiles('**/composer.lock') }}"
+                  restore-keys: ${{ runner.os }}-composer-
+
+            - name: Install dependencies
+              run: composer install --prefer-dist --no-progress --no-interaction
+
+            # PHP files this pull request changes, against the base it merges into; deleted files are dropped.
+            - id: changes
+              run: |
+                  FILES=$(git diff --name-only HEAD^1 HEAD -- '*.php' \
+                    | sort -u \
+                    | while read -r f; do [ -n "$f" ] && [ -f "$f" ] && echo "$f"; done \
+                    | xargs)
+                  echo "files=$FILES" >> $GITHUB_OUTPUT
+                  echo "PHP files changed by this pull request: ${FILES:-none}" >> $GITHUB_STEP_SUMMARY
+
+            # Files the ruleset excludes (tests, vendor, dependencies) are skipped even when listed.
+            - name: Detect coding standard violations
+              if: steps.changes.outputs.files != ''
+              run: vendor/bin/phpcs ${{ steps.changes.outputs.files }} -q --report=checkstyle | cs2pr --graceful-warnings
