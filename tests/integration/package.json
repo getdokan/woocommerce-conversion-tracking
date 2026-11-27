@@ -20,5 +20,10 @@
     },
     "devDependencies": {
         "@wordpress/env": "^12.1.0"
+    },
+    "overrides": {
+        "isomorphic-git": "^1.38.6",
+        "qs@<6.16.1": "^6.16.1",
+        "minimatch@>=7.0.0 <11.0.1": "^11.0.1"
     }
 }
