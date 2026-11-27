@@ -13,8 +13,8 @@ const path = require( 'path' );
 
 const ROOT = path.resolve( __dirname, '..' );
 const PLACEHOLDER = /PLUGIN_SINCE/g;
-const PATHS = [ 'conversion-tracking.php', 'includes', 'assets/js', 'assets/less' ];
-const EXTENSIONS = [ '.php', '.js', '.less' ];
+const PATHS = [ 'conversion-tracking.php', 'includes', 'assets/js', 'src' ];
+const EXTENSIONS = [ '.php', '.js', '.ts', '.tsx', '.css' ];
 
 const { version } = require( path.join( ROOT, 'package.json' ) );
 

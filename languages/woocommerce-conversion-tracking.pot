@@ -21,7 +21,7 @@ msgstr ""
 
 #. Plugin URI of the plugin
 #: conversion-tracking.php
-msgid "https://wedevs.com/woocommerce-conversion-tracking/"
+msgid "https://wordpress.org/plugins/woocommerce-conversion-tracking/"
 msgstr ""
 
 #. Description of the plugin

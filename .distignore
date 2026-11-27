@@ -14,6 +14,7 @@ composer.json
 composer.lock
 tests
 phpunit.xml.dist
+phpunit.integration.xml.dist
 .claude
 .distignore
 .editorconfig
@@ -26,5 +27,11 @@ npm-debug.log
 phpunit.xml
 *~
 /bin
-/assets/less
 /README.md
+/src
+.eslintrc
+.prettierrc.js
+postcss.config.js
+tsconfig.json
+webpack.config.js
+webpack-dependency-mapping.js

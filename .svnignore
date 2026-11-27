@@ -10,7 +10,6 @@ README.md
 plugin-deploy.sh
 assets/components
 assets/spa
-assets/less
 .svnignore
 composer.json
 composer.lock
